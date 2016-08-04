@@ -94,87 +94,87 @@ am__DEPENDENCIES_1 =
 libFOX_1_6_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
-am__objects_1 = FX88591Codec.lo FX88592Codec.lo FX88593Codec.lo \
-	FX88594Codec.lo FX88595Codec.lo FX88596Codec.lo \
-	FX88597Codec.lo FX88598Codec.lo FX88599Codec.lo \
-	FX885910Codec.lo FX885911Codec.lo FX885913Codec.lo \
-	FX885914Codec.lo FX885915Codec.lo FX885916Codec.lo \
-	FXCP437Codec.lo FXCP850Codec.lo FXCP852Codec.lo \
-	FXCP855Codec.lo FXCP856Codec.lo FXCP857Codec.lo \
-	FXCP860Codec.lo FXCP861Codec.lo FXCP862Codec.lo \
-	FXCP863Codec.lo FXCP864Codec.lo FXCP865Codec.lo \
-	FXCP866Codec.lo FXCP869Codec.lo FXCP874Codec.lo \
-	FXCP1250Codec.lo FXCP1251Codec.lo FXCP1252Codec.lo \
-	FXCP1253Codec.lo FXCP1254Codec.lo FXCP1255Codec.lo \
-	FXCP1256Codec.lo FXCP1257Codec.lo FXCP1258Codec.lo \
-	FXKOI8RCodec.lo FXUTF8Codec.lo FXUTF16Codec.lo FXUTF32Codec.lo
+am__objects_1 = FX88591Codec.o FX88592Codec.o FX88593Codec.o \
+	FX88594Codec.o FX88595Codec.o FX88596Codec.o \
+	FX88597Codec.o FX88598Codec.o FX88599Codec.o \
+	FX885910Codec.o FX885911Codec.o FX885913Codec.o \
+	FX885914Codec.o FX885915Codec.o FX885916Codec.o \
+	FXCP437Codec.o FXCP850Codec.o FXCP852Codec.o \
+	FXCP855Codec.o FXCP856Codec.o FXCP857Codec.o \
+	FXCP860Codec.o FXCP861Codec.o FXCP862Codec.o \
+	FXCP863Codec.o FXCP864Codec.o FXCP865Codec.o \
+	FXCP866Codec.o FXCP869Codec.o FXCP874Codec.o \
+	FXCP1250Codec.o FXCP1251Codec.o FXCP1252Codec.o \
+	FXCP1253Codec.o FXCP1254Codec.o FXCP1255Codec.o \
+	FXCP1256Codec.o FXCP1257Codec.o FXCP1258Codec.o \
+	FXKOI8RCodec.o FXUTF8Codec.o FXUTF16Codec.o FXUTF32Codec.o
 am__objects_2 =
-am_libFOX_1_6_la_OBJECTS = $(am__objects_1) FX4Splitter.lo \
-	FX7Segment.lo FXAccelTable.lo FXApp.lo FXArrowButton.lo \
-	FXBMPIcon.lo FXBMPImage.lo FXBitmap.lo FXBitmapFrame.lo \
-	FXBitmapView.lo FXButton.lo FXBZFileStream.lo FXCURCursor.lo \
-	FXCanvas.lo FXCheckButton.lo FXChoiceBox.lo FXColorBar.lo \
-	FXColorDialog.lo FXColorList.lo FXColorNames.lo FXColorRing.lo \
-	FXColorSelector.lo FXColorWell.lo FXColorWheel.lo \
-	FXComboBox.lo FXComposeContext.lo FXComposite.lo FXCursor.lo \
-	FXDataTarget.lo FXDate.lo FXDC.lo FXDCPrint.lo FXDCWindow.lo \
-	FXDLL.lo FXDebugTarget.lo FXDelegator.lo FXDial.lo \
-	FXDialogBox.lo FXDict.lo FXDir.lo FXDirBox.lo FXDirDialog.lo \
-	FXDirList.lo FXDirSelector.lo FXDockBar.lo FXDockSite.lo \
-	FXDockHandler.lo FXDockTitle.lo FXDocument.lo FXDragCorner.lo \
-	FXDrawable.lo FXDriveBox.lo FXException.lo FXExpression.lo \
-	FXExtentd.lo FXExtentf.lo FXFile.lo FXFileDialog.lo \
-	FXFileDict.lo FXFileList.lo FXFileSelector.lo FXFileStream.lo \
-	FXFoldingList.lo FXFont.lo FXFontDialog.lo FXFontSelector.lo \
-	FXFrame.lo FXGIFCursor.lo FXGIFIcon.lo FXGIFImage.lo \
-	FXGLCanvas.lo FXGLCone.lo FXGLContext.lo FXGLCube.lo \
-	FXGLCylinder.lo FXGLObject.lo FXGLShape.lo FXGLSphere.lo \
-	FXGLTriangleMesh.lo FXGLViewer.lo FXGLVisual.lo \
-	FXGradientBar.lo FXGroupBox.lo FXGUISignal.lo \
-	FXGZFileStream.lo FXHash.lo FXHeader.lo FXHorizontalFrame.lo \
-	FXICOIcon.lo FXICOImage.lo FXIFFIcon.lo FXIFFImage.lo \
-	FXIcon.lo FXIconDict.lo FXIconList.lo FXIconSource.lo FXId.lo \
-	FXImage.lo FXImageFrame.lo FXImageView.lo FXInputDialog.lo \
-	FXIO.lo FXJPGIcon.lo FXJPGImage.lo FXKnob.lo FXLabel.lo \
-	FXList.lo FXListBox.lo FXMDIButton.lo FXMDIChild.lo \
-	FXMDIClient.lo FXMainWindow.lo FXMat3d.lo FXMat4d.lo \
-	FXMat3f.lo FXMat4f.lo FXMatrix.lo FXMemMap.lo \
-	FXMemoryStream.lo FXMenuBar.lo FXMenuButton.lo \
-	FXMenuCaption.lo FXMenuCascade.lo FXMenuCheck.lo \
-	FXMenuRadio.lo FXMenuCommand.lo FXMenuPane.lo \
-	FXMenuSeparator.lo FXMenuTitle.lo FXMessageBox.lo FXObject.lo \
-	FXObjectList.lo FXOptionMenu.lo FXPCXIcon.lo FXPCXImage.lo \
-	FXPNGIcon.lo FXPNGImage.lo FXPPMIcon.lo FXPPMImage.lo \
-	FXPacker.lo FXPath.lo FXPicker.lo FXPipe.lo FXPopup.lo \
-	FXPoint.lo FXPrintDialog.lo FXProgressBar.lo \
-	FXProgressDialog.lo FXQuatd.lo FXQuatf.lo FXRASIcon.lo \
-	FXRASImage.lo FXRGBIcon.lo FXRGBImage.lo FXRadioButton.lo \
-	FXRangef.lo FXRanged.lo FXRealSlider.lo FXRealSpinner.lo \
-	FXRecentFiles.lo FXRectangle.lo FXRegion.lo FXRegistry.lo \
-	FXReplaceDialog.lo FXRex.lo FXRootWindow.lo FXRuler.lo \
-	FXRulerView.lo FXScrollArea.lo FXScrollBar.lo FXScrollPane.lo \
-	FXScrollWindow.lo FXSearchDialog.lo FXSeparator.lo \
-	FXSettings.lo FXShell.lo FXShutter.lo FXSize.lo FXSlider.lo \
-	FXSocket.lo FXSpinner.lo FXSpheref.lo FXSphered.lo \
-	FXSplashWindow.lo FXSplitter.lo FXSpring.lo FXStat.lo \
-	FXStatusBar.lo FXStatusLine.lo FXStream.lo FXString.lo \
-	FXStringDict.lo FXSwitcher.lo FXSystem.lo FXTGAIcon.lo \
-	FXTGAImage.lo FXTIFIcon.lo FXTIFImage.lo FXTabBar.lo \
-	FXTabBook.lo FXTabItem.lo FXTable.lo FXText.lo FXTextCodec.lo \
-	FXTextField.lo FXThread.lo FXToggleButton.lo FXToolBar.lo \
-	FXToolBarGrip.lo FXToolBarShell.lo FXToolBarTab.lo \
-	FXToolTip.lo FXTopWindow.lo FXTranslator.lo FXTreeList.lo \
-	FXTreeListBox.lo FXTriStateButton.lo FXUndoList.lo FXURL.lo \
-	FXVec2d.lo FXVec2f.lo FXVec3d.lo FXVec3f.lo FXVec4d.lo \
-	FXVec4f.lo FXVerticalFrame.lo FXVisual.lo FXWindow.lo \
-	FXWizard.lo FXXBMIcon.lo FXXBMImage.lo FXXPMIcon.lo \
-	FXXPMImage.lo fxascii.lo fxbmpio.lo fxfilematch.lo fxgifio.lo \
-	fxicoio.lo fxiffio.lo fxjpegio.lo fxkeyboard.lo fxkeysym.lo \
-	fxparsegeometry.lo fxpcxio.lo fxpngio.lo fxppmio.lo fxpriv.lo \
-	fxpsio.lo fxfsquantize.lo fxezquantize.lo fxwuquantize.lo \
-	fxrasio.lo fxrgbio.lo fxtargaio.lo fxtifio.lo fxunicode.lo \
-	fxutils.lo fxxbmio.lo fxxpmio.lo icons.lo strtoll.lo \
-	vsscanf.lo $(am__objects_2) $(am__objects_2)
+am_libFOX_1_6_la_OBJECTS = $(am__objects_1) FX4Splitter.o \
+	FX7Segment.o FXAccelTable.o FXApp.o FXArrowButton.o \
+	FXBMPIcon.o FXBMPImage.o FXBitmap.o FXBitmapFrame.o \
+	FXBitmapView.o FXButton.o FXBZFileStream.o FXCURCursor.o \
+	FXCanvas.o FXCheckButton.o FXChoiceBox.o FXColorBar.o \
+	FXColorDialog.o FXColorList.o FXColorNames.o FXColorRing.o \
+	FXColorSelector.o FXColorWell.o FXColorWheel.o \
+	FXComboBox.o FXComposeContext.o FXComposite.o FXCursor.o \
+	FXDataTarget.o FXDate.o FXDC.o FXDCPrint.o FXDCWindow.o \
+	FXDLL.o FXDebugTarget.o FXDelegator.o FXDial.o \
+	FXDialogBox.o FXDict.o FXDir.o FXDirBox.o FXDirDialog.o \
+	FXDirList.o FXDirSelector.o FXDockBar.o FXDockSite.o \
+	FXDockHandler.o FXDockTitle.o FXDocument.o FXDragCorner.o \
+	FXDrawable.o FXDriveBox.o FXException.o FXExpression.o \
+	FXExtentd.o FXExtentf.o FXFile.o FXFileDialog.o \
+	FXFileDict.o FXFileList.o FXFileSelector.o FXFileStream.o \
+	FXFoldingList.o FXFont.o FXFontDialog.o FXFontSelector.o \
+	FXFrame.o FXGIFCursor.o FXGIFIcon.o FXGIFImage.o \
+	FXGLCanvas.o FXGLCone.o FXGLContext.o FXGLCube.o \
+	FXGLCylinder.o FXGLObject.o FXGLShape.o FXGLSphere.o \
+	FXGLTriangleMesh.o FXGLViewer.o FXGLVisual.o \
+	FXGradientBar.o FXGroupBox.o FXGUISignal.o \
+	FXGZFileStream.o FXHash.o FXHeader.o FXHorizontalFrame.o \
+	FXICOIcon.o FXICOImage.o FXIFFIcon.o FXIFFImage.o \
+	FXIcon.o FXIconDict.o FXIconList.o FXIconSource.o FXId.o \
+	FXImage.o FXImageFrame.o FXImageView.o FXInputDialog.o \
+	FXIO.o FXJPGIcon.o FXJPGImage.o FXKnob.o FXLabel.o \
+	FXList.o FXListBox.o FXMDIButton.o FXMDIChild.o \
+	FXMDIClient.o FXMainWindow.o FXMat3d.o FXMat4d.o \
+	FXMat3f.o FXMat4f.o FXMatrix.o FXMemMap.o \
+	FXMemoryStream.o FXMenuBar.o FXMenuButton.o \
+	FXMenuCaption.o FXMenuCascade.o FXMenuCheck.o \
+	FXMenuRadio.o FXMenuCommand.o FXMenuPane.o \
+	FXMenuSeparator.o FXMenuTitle.o FXMessageBox.o FXObject.o \
+	FXObjectList.o FXOptionMenu.o FXPCXIcon.o FXPCXImage.o \
+	FXPNGIcon.o FXPNGImage.o FXPPMIcon.o FXPPMImage.o \
+	FXPacker.o FXPath.o FXPicker.o FXPipe.o FXPopup.o \
+	FXPoint.o FXPrintDialog.o FXProgressBar.o \
+	FXProgressDialog.o FXQuatd.o FXQuatf.o FXRASIcon.o \
+	FXRASImage.o FXRGBIcon.o FXRGBImage.o FXRadioButton.o \
+	FXRangef.o FXRanged.o FXRealSlider.o FXRealSpinner.o \
+	FXRecentFiles.o FXRectangle.o FXRegion.o FXRegistry.o \
+	FXReplaceDialog.o FXRex.o FXRootWindow.o FXRuler.o \
+	FXRulerView.o FXScrollArea.o FXScrollBar.o FXScrollPane.o \
+	FXScrollWindow.o FXSearchDialog.o FXSeparator.o \
+	FXSettings.o FXShell.o FXShutter.o FXSize.o FXSlider.o \
+	FXSocket.o FXSpinner.o FXSpheref.o FXSphered.o \
+	FXSplashWindow.o FXSplitter.o FXSpring.o FXStat.o \
+	FXStatusBar.o FXStatusLine.o FXStream.o FXString.o \
+	FXStringDict.o FXSwitcher.o FXSystem.o FXTGAIcon.o \
+	FXTGAImage.o FXTIFIcon.o FXTIFImage.o FXTabBar.o \
+	FXTabBook.o FXTabItem.o FXTable.o FXText.o FXTextCodec.o \
+	FXTextField.o FXThread.o FXToggleButton.o FXToolBar.o \
+	FXToolBarGrip.o FXToolBarShell.o FXToolBarTab.o \
+	FXToolTip.o FXTopWindow.o FXTranslator.o FXTreeList.o \
+	FXTreeListBox.o FXTriStateButton.o FXUndoList.o FXURL.o \
+	FXVec2d.o FXVec2f.o FXVec3d.o FXVec3f.o FXVec4d.o \
+	FXVec4f.o FXVerticalFrame.o FXVisual.o FXWindow.o \
+	FXWizard.o FXXBMIcon.o FXXBMImage.o FXXPMIcon.o \
+	FXXPMImage.o fxascii.o fxbmpio.o fxfilematch.o fxgifio.o \
+	fxicoio.o fxiffio.o fxjpegio.o fxkeyboard.o fxkeysym.o \
+	fxparsegeometry.o fxpcxio.o fxpngio.o fxppmio.o fxpriv.o \
+	fxpsio.o fxfsquantize.o fxezquantize.o fxwuquantize.o \
+	fxrasio.o fxrgbio.o fxtargaio.o fxtifio.o fxunicode.o \
+	fxutils.o fxxbmio.o fxxpmio.o icons.o strtoll.o \
+	vsscanf.o $(am__objects_2) $(am__objects_2)
 libFOX_1_6_la_OBJECTS = $(am_libFOX_1_6_la_OBJECTS)
 libFOX_1_6_la_LINK = $(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CXXLD) $(AM_CXXFLAGS) \
@@ -347,7 +347,7 @@ top_srcdir = ..
 INCLUDES = -I$(top_srcdir)/include -I$(top_builddir)/include
 RESWRAP = $(top_builddir)/utils/reswrap
 SUFFIXES = .gif .bmp
-lib_LTLIBRARIES = libFOX-1.6.la
+lib_LTLIBRARIES = libFOX-1.6.a
 libFOX_1_6_la_LIBADD = $(X_LIBS) $(X_BASE_LIBS) $(X_EXTRA_LIBS) $(GL_LIBS)
 libFOX_1_6_la_LDFLAGS = \
         -version-info $(LT_CURRENT):$(LT_REVISION):$(LT_AGE)    \
@@ -861,6 +861,9 @@ clean-libLTLIBRARIES:
 	done
 libFOX-1.6.la: $(libFOX_1_6_la_OBJECTS) $(libFOX_1_6_la_DEPENDENCIES) $(EXTRA_libFOX_1_6_la_DEPENDENCIES) 
 	$(libFOX_1_6_la_LINK) -rpath $(libdir) $(libFOX_1_6_la_OBJECTS) $(libFOX_1_6_la_LIBADD) $(LIBS)
+
+libFOX-1.6.a: $(libFOX_1_6_la_OBJECTS) $(libFOX_1_6_la_DEPENDENCIES) $(EXTRA_libFOX_1_6_la_DEPENDENCIES) 
+	ar cr $@ $(libFOX_1_6_la_OBJECTS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
