@@ -1,0 +1,10 @@
+prefix=c:/fra/local
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: libagg
+Description: Anti-grain library 
+Version: 2.5.0
+
+Libs: -L${libdir} -lagg -lm
+Cflags: -I${includedir}
