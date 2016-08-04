@@ -32,7 +32,7 @@ libfox.a: $(FOX_OBJ_FILES)
 	ar r $@ $(FOX_OBJ_FILES)
 
 clean:
-	rm *.o libfox.a
+	rm -f *.o libfox.a
 
 include makerules
 
