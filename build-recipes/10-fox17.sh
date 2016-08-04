@@ -6,10 +6,10 @@ cd fox-1.7.56
 # echo CXX="$CXX_BASE" CXXFLAGS="$CXXFLAGS_BASE" ./configure --prefix=/c/fra/local --enable-release --with-opengl=no --with-xft=no
 cd lib
 make clean
-make
+CXX="$CXX_BASE" CXXFLAGS="$CXXFLAGS_BASE" make
 
 cd -
-cp lib/libfox.a "$INSTALL_PREFIX/lib"
+cp lib/libfox.a "$INSTALL_PREFIX/lib/libfox17.a"
 rm -fr "$INSTALL_PREFIX/include/fox-1.7"
 mkdir -p "$INSTALL_PREFIX/include/fox-1.7"
 cp include/*.h "$INSTALL_PREFIX/include/fox-1.7"
