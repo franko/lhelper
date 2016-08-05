@@ -17,6 +17,7 @@ env['CFLAGS_AGG'] = CXXFLAGS_BASE + " -ffast-math"
 env['CXX_BASE'] = 'gcc'
 env['CXXFLAGS_BASE'] = CXXFLAGS_BASE
 env['CXXFLAGS_AGG'] = CXXFLAGS_BASE + " -fno-exceptions -fno-rtti"
+env['CXXFLAGS_FOX'] = CXXFLAGS_BASE + " -fstrict-aliasing -finline-functions -fexpensive-optimizations"
 env['BUILD_DIR'] = os.getcwd()
 env['INSTALL_PREFIX'] = INSTALL_PREFIX
 
