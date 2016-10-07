@@ -11,9 +11,25 @@ cp -R include/* "$INSTALL_PREFIX/include/agg2"
 
 PKG_NAME=libagg
 
-export WIN_INSTALL_PREFIX=${INSTALL_PREFIX/\/c\//c:\/}
-WIN_INSTALL_PREFIX=${WIN_INSTALL_PREFIX//\//\\\/}
-cat "$PKG_NAME.pc.build" | sed "s/BUILD_PREFIX_DIR/$WIN_INSTALL_PREFIX/g" > "$PKG_NAME.pc"
+WIN_INSTALL_PREFIX=${INSTALL_PREFIX/\/c\//c:\/}
+WIN_INSTALL_PREFIX=${WIN_INSTALL_PREFIX//\//\\}
+
+# Warning, since the 'EOF' below in unquoted shell variables substitutions
+# will be done on the text body. The '$' should be therefore escaped to
+# avoid shell substitution when needed.
+cat << EOF > $PKG_NAME.pc
+prefix=${WIN_INSTALL_PREFIX}
+libdir=\${prefix}/lib
+includedir=\${prefix}/include
+
+Name: libagg
+Description: Anti-grain library
+Version: 2.5.0
+
+Libs: -L\${libdir} -lagg -lm
+Cflags: -I\${includedir}
+EOF
+
 cp "$PKG_NAME.pc" "$INSTALL_PREFIX/lib/pkgconfig"
 
 touch "${BUILD_DIR}/${SCRIPT_NAME}.build-complete"
