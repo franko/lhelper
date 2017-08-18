@@ -1,6 +1,11 @@
+if [ -z $1 ]
+then
+    echo "Please provide the prefix directory argument"
+else
+
 CFLAGS_BASE='-O2 -fomit-frame-pointer'
 CXXFLAGS_BASE="-O2 -fomit-frame-pointer -ffast-math"
-INSTALL_PREFIX='/c/dev/local'
+INSTALL_PREFIX=$1
 
 export CC_BASE=gcc
 export CFLAGS_BASE=$CFLAGS_BASE
@@ -12,3 +17,9 @@ export CXXFLAGS_FOX="$CXXFLAGS_BASE -fstrict-aliasing -finline-functions -fexpen
 export BUILD_DIR=`pwd`
 export BUILD_CORES=2
 export INSTALL_PREFIX
+
+mkdir -p ${INSTALL_PREFIX}/lib/pkgconfig
+mkdir -p ${INSTALL_PREFIX}/include
+mkdir -p ${INSTALL_PREFIX}/bin
+
+fi

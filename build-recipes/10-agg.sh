@@ -1,4 +1,10 @@
 
+if [ -z $INSTALL_PREFIX ]
+then
+    echo "Please run the env.sh script before with the prefix directory"
+    exit 1
+fi
+
 cd agg-2.5
 make clean
 CC="$CC_BASE" CFLAGS="$CFLAGS_AGG" CXX="$CXX_BASE" CXXFLAGS="$CXXFLAGS_AGG" make
