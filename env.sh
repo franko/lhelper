@@ -3,13 +3,13 @@ then
     echo "Please provide the prefix directory argument"
 else
 
-CFLAGS_BASE='-O2 -fomit-frame-pointer'
-CXXFLAGS_BASE="-O2 -fomit-frame-pointer -ffast-math"
+CFLAGS_BASE='-O3 -fomit-frame-pointer -ffast-math'
+CXXFLAGS_BASE="-O3 -fomit-frame-pointer -ffast-math"
 INSTALL_PREFIX=$1
 
 export CC_BASE=gcc
 export CFLAGS_BASE=$CFLAGS_BASE
-export CFLAGS_AGG="$CXXFLAGS_BASE -ffast-math"
+export CFLAGS_AGG="$CXXFLAGS_BASE"
 export CXX_BASE=gcc
 export CXXFLAGS_BASE=$CXXFLAGS_BASE
 export CXXFLAGS_AGG="$CXXFLAGS_BASE -fno-exceptions -fno-rtti"
