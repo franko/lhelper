@@ -26,7 +26,7 @@ WIN_INSTALL_PREFIX=${WIN_INSTALL_PREFIX//\//\\}
 cat << EOF > $PKG_NAME.pc
 prefix=${WIN_INSTALL_PREFIX}
 libdir=\${prefix}/lib
-includedir=\${prefix}/include
+includedir=\${prefix}/include/agg2
 
 Name: libagg
 Description: Anti-grain library
