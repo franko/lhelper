@@ -17,6 +17,8 @@ export CXXFLAGS_FOX="$CXXFLAGS_BASE -fstrict-aliasing -finline-functions -fexpen
 export BUILD_DIR=`pwd`
 export BUILD_CORES=2
 export INSTALL_PREFIX
+export WIN_INSTALL_PREFIX=${INSTALL_PREFIX/\/c\//c:\/}
+WIN_INSTALL_PREFIX=${WIN_INSTALL_PREFIX//\//\\\/}
 
 mkdir -p ${INSTALL_PREFIX}/lib/pkgconfig
 mkdir -p ${INSTALL_PREFIX}/include

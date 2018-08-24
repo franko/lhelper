@@ -1,5 +1,6 @@
 FREETYPE_VERSION="2.7"
 
+cd downloads
 # Use the "-L" flag to follow redirects.
 curl -L -O "http://download.savannah.gnu.org/releases/freetype/freetype-${FREETYPE_VERSION}.tar.gz"
 
@@ -21,9 +22,6 @@ cp build/include/freetype/config/ftoption.h "$INSTALL_PREFIX/include/freetype/co
 
 PKG_NAME=freetype2
 
-WIN_INSTALL_PREFIX=${INSTALL_PREFIX/\/c\//c:\/}
-WIN_INSTALL_PREFIX=${WIN_INSTALL_PREFIX//\//\\}
-
 # Warning, since the 'EOF' below in unquoted shell variables substitutions
 # will be done on the text body. The '$' should be therefore escaped to
 # avoid shell substitution when needed.
@@ -39,4 +37,3 @@ EOF
 
 cp "$PKG_NAME.pc" "$INSTALL_PREFIX/lib/pkgconfig"
 
-touch "${BUILD_DIR}/${SCRIPT_NAME}.build-complete"

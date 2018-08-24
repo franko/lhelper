@@ -1,4 +1,4 @@
-cd fox-1.6.52
+cd source/fox-1.6.52
 # echo CXX="$CXX_BASE" CXXFLAGS="$CXXFLAGS_BASE" ./configure --prefix=/c/fra/local --enable-release --with-opengl=no --with-xft=no
 cd src
 make clean
@@ -11,8 +11,6 @@ mkdir -p "$INSTALL_PREFIX/include/fox-1.6"
 cp include/*.h "$INSTALL_PREFIX/include/fox-1.6"
 
 PKG_NAME=fox
-
-WIN_INSTALL_PREFIX=${INSTALL_PREFIX/\/c\//c:\/}
 
 cat << EOF > ${PKG_NAME}.pc
 prefix=${WIN_INSTALL_PREFIX}
@@ -37,4 +35,3 @@ EOF
 
 cp "$PKG_NAME.pc" "$INSTALL_PREFIX/lib/pkgconfig"
 
-touch "${BUILD_DIR}/${SCRIPT_NAME}.build-complete"

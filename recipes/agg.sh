@@ -5,7 +5,7 @@ then
     exit 1
 fi
 
-cd agg-2.5
+cd source/agg-2.5
 make clean
 CC="$CC_BASE" CFLAGS="$CFLAGS_AGG" CXX="$CXX_BASE" CXXFLAGS="$CXXFLAGS_AGG" make
 
@@ -16,9 +16,6 @@ mkdir -p "$INSTALL_PREFIX/include/agg2"
 cp -R include/* "$INSTALL_PREFIX/include/agg2"
 
 PKG_NAME=libagg
-
-WIN_INSTALL_PREFIX=${INSTALL_PREFIX/\/c\//c:\/}
-WIN_INSTALL_PREFIX=${WIN_INSTALL_PREFIX//\//\\}
 
 # Warning, since the 'EOF' below in unquoted shell variables substitutions
 # will be done on the text body. The '$' should be therefore escaped to
@@ -38,4 +35,3 @@ EOF
 
 cp "$PKG_NAME.pc" "$INSTALL_PREFIX/lib/pkgconfig"
 
-touch "${BUILD_DIR}/${SCRIPT_NAME}.build-complete"

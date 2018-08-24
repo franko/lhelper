@@ -1,8 +1,4 @@
-.deps
-.libs
-*.build-complete
-*.o
-*.a
-*.exe
-gsl-2.1
+source
+downloads
+builds
 

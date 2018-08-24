@@ -1,3 +1,4 @@
+cd downloads
 # curl -L -O "http://ab-initio.mit.edu/nlopt/nlopt-2.4.2.tar.gz"
 curl -L -O "https://github.com/stevengj/nlopt/releases/download/nlopt-2.4.2/nlopt-2.4.2.tar.gz"
 
