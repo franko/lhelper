@@ -5,11 +5,6 @@ rm -fr gsl-2.1
 tar xzf gsl-2.1.tar.gz
 
 cd gsl-2.1
-CC="$CC_BASE" CFLAGS="$CFLAGS_BASE" ./configure "--prefix=$INSTALL_PREFIX"
+CC="$CC_BASE" CFLAGS="$CFLAGS_BASE" ./configure --prefix="$WIN_INSTALL_PREFIX"
 make
 make install
-
-PKG_NAME=gsl
-
-cat "${BUILD_DIR}/$PKG_NAME.pc.build" | sed "s/BUILD_PREFIX_DIR/$WIN_INSTALL_PREFIX/g" > "$INSTALL_PREFIX/lib/pkgconfig/$PKG_NAME.pc"
-
