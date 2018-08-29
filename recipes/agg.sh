@@ -17,7 +17,7 @@ cp -R include/* "$INSTALL_PREFIX/include/agg2"
 
 PKG_NAME=libagg
 
-# Warning, since the 'EOF' below in unquoted shell variables substitutions
+# Warning, since the 'EOF' below is unquoted shell variables substitutions
 # will be done on the text body. The '$' should be therefore escaped to
 # avoid shell substitution when needed.
 cat << EOF > $PKG_NAME.pc
@@ -34,4 +34,3 @@ Cflags: -I\${includedir}
 EOF
 
 cp "$PKG_NAME.pc" "$INSTALL_PREFIX/lib/pkgconfig"
-
