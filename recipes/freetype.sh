@@ -9,7 +9,7 @@ tar xzf "freetype-${FREETYPE_VERSION}.tar.gz"
 
 cd "freetype-${FREETYPE_VERSION}"
 mkdir build && cd build
-cmake -G "Ninja" ..
+cmake -G "Ninja" -DWITH_ZLIB=OFF -DWITH_BZip2=OFF -DWITH_PNG=OFF -DCMAKE_DISABLE_FIND_PACKAGE_HarfBuzz=TRUE ..
 ninja || exit 1
 
 cd -
