@@ -3,7 +3,7 @@ rm -fr libui
 git clone https://github.com/andlabs/libui.git
 cd libui
 
-git checkout alpha4
+git checkout alpha4.1
 
 mkdir build && cd build
 # Disable shared libraries because MSVC build is required.
