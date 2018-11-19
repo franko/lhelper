@@ -3,7 +3,10 @@ rm -fr libui
 git clone https://github.com/andlabs/libui.git
 cd libui
 
-git checkout alpha4.1
+LIBUI_GIT_TAG=alpha4.1
+LIBUI_VERSION="0-${LIBUI_GIT_TAG}"
+
+git checkout $LIBUI_VERSION
 
 mkdir build && cd build
 # Disable shared libraries because MSVC build is required.
@@ -29,7 +32,7 @@ includedir=\${prefix}/include
 
 Name: ${PKG_NAME}
 Description: Simple and portable GUI library in C
-Version: 0-alpha4
+Version: ${LIBUI_VERSION}
 
 Libs: -L\${libdir} -lui -luser32 -lkernel32 -lgdi32 -lcomctl32 -luxtheme -lmsimg32 -lcomdlg32 -ld2d1 -ldwrite -lole32 -loleaut32 -loleacc -luuid -lwindowscodecs
 Cflags: -I\${includedir}
