@@ -19,6 +19,8 @@ export BUILD_CORES=2
 export INSTALL_PREFIX
 export WIN_INSTALL_PREFIX=${INSTALL_PREFIX/\/c\//c:\/}
 
+mkdir -p downloads
+
 mkdir -p ${INSTALL_PREFIX}/lib/pkgconfig
 mkdir -p ${INSTALL_PREFIX}/include
 mkdir -p ${INSTALL_PREFIX}/bin
