@@ -1,5 +1,6 @@
 set -e
 
+cd downloads
 rm -fr corrade
 git clone https://github.com/mosra/corrade.git
 

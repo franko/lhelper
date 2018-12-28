@@ -1,5 +1,5 @@
 set -e
-
+cd downloads
 rm -fr magnum
 git clone https://github.com/mosra/magnum.git
 

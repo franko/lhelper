@@ -7,6 +7,7 @@ set -e
 
 SDL_ARCHIVE_NAME=SDL2-2.0.8
 
+cd downloads
 curl -O  http://libsdl.org/release/${SDL_ARCHIVE_NAME}.tar.gz
 rm -fr ${SDL_ARCHIVE_NAME}
 tar xzf ${SDL_ARCHIVE_NAME}.tar.gz

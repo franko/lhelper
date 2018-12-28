@@ -1,5 +1,6 @@
 set -e
 
+cd downloads
 rm -fr magnum-examples
 git clone https://github.com/mosra/magnum-examples.git
 
