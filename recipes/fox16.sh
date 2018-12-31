@@ -1,37 +1,14 @@
-cd source/fox-1.6.52
-# echo CXX="$CXX_BASE" CXXFLAGS="$CXXFLAGS_BASE" ./configure --prefix=/c/fra/local --enable-release --with-opengl=no --with-xft=no
-cd src
-make clean
-CXX="$CXX_BASE" CXXFLAGS="$CXXFLAGS_FOX" make
+set -e
 
-cd -
-cp src/libfox16.a "$INSTALL_PREFIX/lib"
-rm -fr "$INSTALL_PREFIX/include/fox-1.6"
-mkdir -p "$INSTALL_PREFIX/include/fox-1.6"
-cp include/*.h "$INSTALL_PREFIX/include/fox-1.6"
+FOX_ARCHIVE_NAME=fox-1.6.57
 
-PKG_NAME=fox
+cd downloads
+curl -O "http://fox-toolkit.org/ftp/${FOX_ARCHIVE_NAME}.tar.gz"
+rm -fr "${FOX_ARCHIVE_NAME}"
+tar xzf "${FOX_ARCHIVE_NAME}.tar.gz"
 
-cat << EOF > ${PKG_NAME}.pc
-prefix=${WIN_INSTALL_PREFIX}
-exec_prefix=\${prefix}
-libdir=\${exec_prefix}/lib
-includedir=\${prefix}/include/fox-1.6
-LIBS=-lpthread
-X_LIBS=
-X_BASE_LIBS=-lcomctl32 -lwsock32 -lwinspool -lmpr -lgdi32 -limm32
-X_EXTRA_LIBS=
-GL_LIBS=
-FOX_LIBS=-lfox16
+cd "${FOX_ARCHIVE_NAME}"
 
-Name: FOX
-Description: The FOX Toolkit
-URL: www.fox-toolkit.org
-Version: 1.6.52
-Libs: -L\${libdir} \${FOX_LIBS} \${X_BASE_LIBS}
-Libs.private: \${X_LIBS} \${X_BASE_LIBS} \${X_EXTRA_LIBS} \${GL_LIBS} \${LIBS}
-Cflags: -I\${includedir}
-EOF
-
-cp "$PKG_NAME.pc" "$INSTALL_PREFIX/lib/pkgconfig"
-
+CC="$CC_BASE" CFLAGS="$CFLAGS_BASE" CXX="$CXX_BASE" CXXFLAGS="$CXXFLAGS_FOX" ./configure --with-opengl=no --enable-release --disable-shared --with-x=no --disable-bz2lib --with-xft=no --prefix="${INSTALL_PREFIX}"
+make
+make install
