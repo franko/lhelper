@@ -9,16 +9,9 @@ tar xzf "freetype-${FREETYPE_VERSION}.tar.gz"
 
 cd "freetype-${FREETYPE_VERSION}"
 mkdir build && cd build
-cmake -G "Ninja" -DWITH_ZLIB=OFF -DWITH_BZip2=OFF -DWITH_PNG=OFF -DCMAKE_DISABLE_FIND_PACKAGE_HarfBuzz=TRUE ..
-ninja || exit 1
-
-cd -
-
-cp build/libfreetype.a "$INSTALL_PREFIX/lib"
-cp include/ft2build.h "$INSTALL_PREFIX/include"
-cp -R include/freetype "$INSTALL_PREFIX/include"
-cp build/include/freetype/config/ftconfig.h "$INSTALL_PREFIX/include/freetype/config"
-cp build/include/freetype/config/ftoption.h "$INSTALL_PREFIX/include/freetype/config"
+cmake -G "Ninja" -DCMAKE_PREFIX_PATH="${INSTALL_PREFIX}" -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" -DWITH_ZLIB=OFF -DWITH_BZip2=OFF -DWITH_PNG=OFF -DCMAKE_DISABLE_FIND_PACKAGE_HarfBuzz=TRUE ..
+cmake --build .
+cmake --build . --target install
 
 PKG_NAME=freetype2
 
@@ -26,7 +19,7 @@ PKG_NAME=freetype2
 # will be done on the text body. The '$' should be therefore escaped to
 # avoid shell substitution when needed.
 cat << EOF > $PKG_NAME.pc
-prefix=BUILD_PREFIX_DIR
+prefix=${WIN_INSTALL_PREFIX}
 
 Name: Freetype2
 Description: Freetype2 library
@@ -36,4 +29,3 @@ Cflags: -I\${prefix}/include
 EOF
 
 cp "$PKG_NAME.pc" "$INSTALL_PREFIX/lib/pkgconfig"
-
