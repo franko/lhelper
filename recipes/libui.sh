@@ -3,7 +3,10 @@ rm -fr libui
 git clone https://github.com/andlabs/libui.git
 cd libui
 
-git checkout alpha4.1
+LIBUI_GIT_TAG=alpha4.1
+LIBUI_VERSION="0-${LIBUI_GIT_TAG}"
+
+git checkout $LIBUI_VERSION
 
 mkdir build && cd build
 # Disable shared libraries because MSVC build is required.
@@ -13,8 +16,19 @@ ninja
 ninja examples
 ninja tester
 
+if [[ "$OSTYPE" == "linux"* ]]; then
+  UI_OS_HEADER="ui_unix.h"
+  UI_OS_LIBS="-lui -lgtk-3 -lgdk-3 -lpangocairo-1.0 -lpango-1.0 -latk-1.0 -lcairo-gobject -lcairo -lgdk_pixbuf-2.0 -lgio-2.0 -lgobject-2.0 -lglib-2.0 -lm -ldl"
+elif [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* ]]; then
+  UI_OS_HEADER="ui_windows.h"
+  UI_OS_LIBS="-lui -luser32 -lkernel32 -lgdi32 -lcomctl32 -luxtheme -lmsimg32 -lcomdlg32 -ld2d1 -ldwrite -lole32 -loleaut32 -loleacc -luuid -lwindowscodecs"
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+  UI_OS_HEADER="ui_darwin.h"
+  UI_OS_LIBS=""
+fi
+
 cd -
-cp ui.h ui_windows.h "$INSTALL_PREFIX/include"
+cp ui.h "$UI_OS_HEADER" "$INSTALL_PREFIX/include"
 cp build/out/libui.a "$INSTALL_PREFIX/lib"
 
 PKG_NAME=libui
@@ -29,9 +43,9 @@ includedir=\${prefix}/include
 
 Name: ${PKG_NAME}
 Description: Simple and portable GUI library in C
-Version: 0-alpha4
+Version: ${LIBUI_VERSION}
 
-Libs: -L\${libdir} -lui -luser32 -lkernel32 -lgdi32 -lcomctl32 -luxtheme -lmsimg32 -lcomdlg32 -ld2d1 -ldwrite -lole32 -loleaut32 -loleacc -luuid -lwindowscodecs
+Libs: -L\${libdir} ${UI_OS_LIBS}
 Cflags: -I\${includedir}
 EOF
 
