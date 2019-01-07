@@ -7,7 +7,7 @@ fi
 
 cd source/agg-2.5
 make clean
-CC="$CC_BASE" CFLAGS="$CFLAGS_AGG" CXX="$CXX_BASE" CXXFLAGS="$CXXFLAGS_AGG" make
+CC="$CC_BASE" CFLAGS="$CFLAGS_FASTMATH" CXX="$CXX_BASE" CXXFLAGS="$CXXFLAGS_FASTMATH" make
 
 cp src/libagg.a "$INSTALL_PREFIX/lib"
 

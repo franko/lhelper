@@ -3,20 +3,16 @@ then
     echo "Please provide the prefix directory argument"
 else
 
-CFLAGS_BASE='-O3 -fomit-frame-pointer -ffast-math'
-CXXFLAGS_BASE="-O3 -fomit-frame-pointer -ffast-math"
-INSTALL_PREFIX=$1
-
 export CC_BASE=gcc
-export CFLAGS_BASE=$CFLAGS_BASE
-export CFLAGS_AGG="$CXXFLAGS_BASE"
-export CXX_BASE=gcc
-export CXXFLAGS_BASE=$CXXFLAGS_BASE
-export CXXFLAGS_AGG="$CXXFLAGS_BASE -fno-exceptions -fno-rtti"
-export CXXFLAGS_FOX="$CXXFLAGS_BASE -fstrict-aliasing -finline-functions -fexpensive-optimizations"
+export CXX_BASE=g++
+
+export CFLAGS_BASE="-malign-double -O3"
+export CXXFLAGS_BASE="-malign-double -O3 -fno-rtti"
+export CFLAGS_FASTMATH="$CFLAGS_BASE -ffast-math"
+export CXXFLAGS_FASTMATH="$CXXFLAGS_BASE -ffast-math"
+export INSTALL_PREFIX=$1
+
 export BUILD_DIR=`pwd`
-export BUILD_CORES=2
-export INSTALL_PREFIX
 export WIN_INSTALL_PREFIX=${INSTALL_PREFIX/\/c\//c:\/}
 
 mkdir -p downloads

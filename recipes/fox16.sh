@@ -9,6 +9,6 @@ tar xzf "${FOX_ARCHIVE_NAME}.tar.gz"
 
 cd "${FOX_ARCHIVE_NAME}"
 
-CC="$CC_BASE" CFLAGS="$CFLAGS_BASE" CXX="$CXX_BASE" CXXFLAGS="$CXXFLAGS_FOX" ./configure --with-opengl=no --enable-release --disable-shared --with-x=no --disable-bz2lib --with-xft=no --prefix="${INSTALL_PREFIX}"
+CC="$CC_BASE" CFLAGS="$CFLAGS_FASTMATH" CXX="$CXX_BASE" CXXFLAGS="$CXXFLAGS_FASTMATH" ./configure --with-opengl=no --enable-release --disable-shared --with-x=no --disable-bz2lib --with-xft=no --prefix="${INSTALL_PREFIX}"
 make
 make install
