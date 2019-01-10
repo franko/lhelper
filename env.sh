@@ -15,7 +15,9 @@ export INSTALL_PREFIX=$1
 export BUILD_DIR=`pwd`
 export WIN_INSTALL_PREFIX=${INSTALL_PREFIX/\/c\//c:\/}
 
-mkdir -p downloads
+mkdir -p downloads/builds
+mkdir -p downloads/repos
+mkdir -p downloads/archives
 
 mkdir -p ${INSTALL_PREFIX}/lib/pkgconfig
 mkdir -p ${INSTALL_PREFIX}/include

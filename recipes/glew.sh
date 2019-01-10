@@ -1,8 +1,6 @@
 set -e
-cd downloads
-rm -fr glew
-git clone https://github.com/nigels-com/glew.git glew
-cd glew
+source "build-helper.sh"
+enter_git_repository glew https://github.com/nigels-com/glew.git master
 
 echo "Applying patch glew-remove-nostdlib-flag"
 git apply ../../patch/glew-remove-nostdlib-flag.patch

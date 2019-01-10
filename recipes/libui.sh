@@ -1,12 +1,10 @@
-cd downloads
-rm -fr libui
-git clone https://github.com/andlabs/libui.git
-cd libui
+set -e
+source "build-helper.sh"
 
 LIBUI_GIT_TAG=alpha4.1
 LIBUI_VERSION="0-${LIBUI_GIT_TAG}"
 
-git checkout $LIBUI_VERSION
+enter_git_repository libui https://github.com/andlabs/libui.git "$LIBUI_VERSION"
 
 mkdir build && cd build
 # Disable shared libraries because MSVC build is required.
@@ -16,6 +14,8 @@ ninja
 ninja examples
 ninja tester
 
+# NB: The libraries should not be hard-coded here but should be provided by CMake.
+# The SDL2 library does it and it could be used to do the same thing.
 if [[ "$OSTYPE" == "linux"* ]]; then
   UI_OS_HEADER="ui_unix.h"
   UI_OS_LIBS="-lui -lgtk-3 -lgdk-3 -lpangocairo-1.0 -lpango-1.0 -latk-1.0 -lcairo-gobject -lcairo -lgdk_pixbuf-2.0 -lgio-2.0 -lgobject-2.0 -lglib-2.0 -lm -ldl"

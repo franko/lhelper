@@ -1,10 +1,7 @@
 set -e
+source "build-helper.sh"
+enter_git_repository magnum-examples https://github.com/mosra/magnum-examples.git master
 
-cd downloads
-rm -fr magnum-examples
-git clone https://github.com/mosra/magnum-examples.git
-
-cd magnum-examples
 mkdir build && cd build
 cmake -G "Ninja" -DCMAKE_PREFIX_PATH=${INSTALL_PREFIX} -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} -DWITH_SHADOWS_EXAMPLE=ON -DWITH_PRIMITIVES_EXAMPLE=ON -DWITH_VIEWER_EXAMPLE=ON -DWITH_TEXT_EXAMPLE=ON ..
 cmake --build .
