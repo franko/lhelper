@@ -15,4 +15,17 @@ enter_git_repository () {
     git checkout "$3"
     pushd "downloads/builds/$1"
 }
+
+# $1 = archive's name, name of the directory after extract
+# $2 = remote URL
+# $3 = archive's filename
+# $4 = extract command using "ARCHIVE_FILENAME" for the archive's filename
+enter_remote_archive () {
+    if [ ! -f "downloads/archives/$3" ]; then
+        curl -L "$2" -o "downloads/archives/$3"
+    fi
+    rm -fr "downloads/builds/$1"
+    pushd downloads/builds
+    eval "${4/ARCHIVE_FILENAME/..\/archives\/$3}"
+    pushd "$1"
 }
