@@ -12,6 +12,6 @@ else
     FOX_WITH_XFT=yes
 fi
 
-CC="$CC_BASE" CFLAGS="$CFLAGS_FASTMATH" CXX="$CXX_BASE" CXXFLAGS="$CXXFLAGS_FASTMATH" ./configure --with-opengl=no --enable-release --disable-shared --with-x=$FOX_WITH_X --disable-bz2lib --with-xft=$FOX_WITH_XFT --prefix="${INSTALL_PREFIX}"
+CC="$CC_BASE" CFLAGS="$CFLAGS_FASTMATH" CXX="$CXX_BASE" CXXFLAGS="$CXXFLAGS_FASTMATH" ./configure --with-opengl=no --enable-release --disable-shared --with-x=$FOX_WITH_X --disable-bz2lib --with-xft=$FOX_WITH_XFT --prefix="${WIN_INSTALL_PREFIX}"
 make
 make install

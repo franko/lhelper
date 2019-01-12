@@ -4,7 +4,7 @@ FREETYPE_VERSION="2.7"
 enter_remote_archive "freetype-${FREETYPE_VERSION}" "http://download.savannah.gnu.org/releases/freetype/freetype-${FREETYPE_VERSION}.tar.gz" "freetype-${FREETYPE_VERSION}.tar.gz" "tar xzf ARCHIVE_FILENAME"
 
 mkdir build && cd build
-cmake -G "Ninja" -DCMAKE_PREFIX_PATH="${INSTALL_PREFIX}" -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" -DWITH_ZLIB=OFF -DWITH_BZip2=OFF -DWITH_PNG=OFF -DCMAKE_DISABLE_FIND_PACKAGE_HarfBuzz=TRUE ..
+cmake -G "Ninja" -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" -DWITH_ZLIB=OFF -DWITH_BZip2=OFF -DWITH_PNG=OFF -DCMAKE_DISABLE_FIND_PACKAGE_HarfBuzz=TRUE ..
 cmake --build .
 cmake --build . --target install
 

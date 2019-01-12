@@ -1,10 +1,9 @@
-cd downloads
-curl -O "http://mirror.switch.ch/ftp/mirror/gnu/gsl/gsl-2.1.tar.gz"
+set -e
+source "build-helper.sh"
 
-rm -fr gsl-2.1
-tar xzf gsl-2.1.tar.gz
+GSL_VERSION=gsl-2.1
+enter_remote_archive "$GSL_VERSION" "ftp://ftp.gnu.org/gnu/gsl/${GSL_VERSION}.tar.gz" "${GSL_VERSION}.tar.gz" "tar xzf ARCHIVE_FILENAME"
 
-cd gsl-2.1
 CC="$CC_BASE" CFLAGS="$CFLAGS_BASE" ./configure --prefix="$WIN_INSTALL_PREFIX"
 make
 make install
