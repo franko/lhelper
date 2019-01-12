@@ -1,19 +1,12 @@
+set -e
+source "build-helper.sh"
 
-if [ -z $INSTALL_PREFIX ]
-then
-    echo "Please run the env.sh script before with the prefix directory"
-    exit 1
-fi
+enter_git_repository agg https://github.com/franko/agg.git master
 
-cd source/agg-2.5
-make clean
-CC="$CC_BASE" CFLAGS="$CFLAGS_FASTMATH" CXX="$CXX_BASE" CXXFLAGS="$CXXFLAGS_FASTMATH" make
-
-cp src/libagg.a "$INSTALL_PREFIX/lib"
-
-rm -fr "$INSTALL_PREFIX/include/agg2"
-mkdir -p "$INSTALL_PREFIX/include/agg2"
-cp -R include/* "$INSTALL_PREFIX/include/agg2"
+mkdir build && cd build
+meson --prefix="$INSTALL_PREFIX" --buildtype=release ..
+ninja
+ninja install
 
 PKG_NAME=libagg
 
