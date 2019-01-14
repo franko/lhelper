@@ -3,7 +3,7 @@ source "build-helper.sh"
 enter_git_repository glew https://github.com/nigels-com/glew.git master
 
 echo "Applying patch glew-remove-nostdlib-flag"
-git apply ../../patch/glew-remove-nostdlib-flag.patch
+inside_git_apply_patch "glew-remove-nostdlib-flag"
 
 export CC="$CC_BASE"
 export CFLAGS="$CFLAGS_FASTMATH"

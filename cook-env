@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 set -e
 
 if [ "$#" -lt 2 ]; then
@@ -27,6 +28,7 @@ else
 fi
 
 export CMAKE_PREFIX_PATH="${INSTALL_PREFIX}"
+export COOK_ENV_NAME="$1"
 if [ ! -z "\${PS1+x}" ]; then
     PS1="($1) \$PS1"
 fi
