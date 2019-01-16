@@ -21,7 +21,15 @@ if [ ! -d "${LHELPER_DIR}" ]; then
     echo "Lhelper may be not properly installed."
 fi
 
-INSTALL_PREFIX="$CMAKE_PREFIX_PATH"
+export INSTALL_PREFIX="$CMAKE_PREFIX_PATH"
+
+if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* ]]; then
+    WIN_INSTALL_PREFIX="${INSTALL_PREFIX/#\/c\//c:\/}"
+else
+    WIN_INSTALL_PREFIX="${INSTALL_PREFIX}"
+fi
+export WIN_INSTALL_PREFIX
+
 RECIPE="$1"
 
 mkdir -p "$LHELPER_WORKING_DIR/builds"
