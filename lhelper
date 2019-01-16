@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+if [ "$#" -lt 1 ]; then
+    echo "Usage: $0 <recipe-name>"
+    exit 1
+fi
+
+if [ -z ${LHELPER_ENV_NAME+x} ]; then
+    echo "error: no environment defined"
+    exit 1
+fi
+
+LHELPER_BIN_DIRNAME="$(dirname $0)"
+LHELPER_PREFIX="${LHELPER_BIN_DIRNAME%/bin}"
+
+export LHELPER_WORKING_DIR="$LHELPER_PREFIX/var/lib/lhelper"
+export LHELPER_DIR="$LHELPER_PREFIX/share/lhelper"
+
+if [ ! -d "${LHELPER_DIR}" ]; then
+    echo "error: directory "${LHELPER_DIR}" not found."
+    echo "Lhelper may be not properly installed."
+fi
+
+INSTALL_PREFIX="$CMAKE_PREFIX_PATH"
+RECIPE="$1"
+
+mkdir -p "$LHELPER_WORKING_DIR/builds"
+mkdir -p "$LHELPER_WORKING_DIR/repos"
+mkdir -p "$LHELPER_WORKING_DIR/archives"
+
+source "$LHELPER_DIR/env.sh"
+exec bash "$LHELPER_DIR/recipes/$RECIPE.sh"
