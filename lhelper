@@ -1,12 +1,7 @@
 #!/usr/bin/env bash
 
 if [ "$#" -lt 1 ]; then
-    echo "Usage: $0 <recipe-name>"
-    exit 1
-fi
-
-if [ -z ${LHELPER_ENV_NAME+x} ]; then
-    echo "error: no environment defined"
+    echo "Usage: $0 <command> [<other options>]"
     exit 1
 fi
 
@@ -21,20 +16,41 @@ if [ ! -d "${LHELPER_DIR}" ]; then
     echo "Lhelper may be not properly installed."
 fi
 
-export INSTALL_PREFIX="$CMAKE_PREFIX_PATH"
+library_install () {
+    if [ -z ${LHELPER_ENV_NAME+x} ]; then
+        echo "error: no environment defined"
+        exit 1
+    fi
 
-if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* ]]; then
-    WIN_INSTALL_PREFIX="${INSTALL_PREFIX/#\/c\//c:\/}"
-else
-    WIN_INSTALL_PREFIX="${INSTALL_PREFIX}"
-fi
-export WIN_INSTALL_PREFIX
+    export INSTALL_PREFIX="$CMAKE_PREFIX_PATH"
+    if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* ]]; then
+        WIN_INSTALL_PREFIX="${INSTALL_PREFIX/#\/c\//c:\/}"
+    else
+        WIN_INSTALL_PREFIX="${INSTALL_PREFIX}"
+    fi
+    export WIN_INSTALL_PREFIX
 
-RECIPE="$1"
+    mkdir -p "$LHELPER_WORKING_DIR/builds"
+    mkdir -p "$LHELPER_WORKING_DIR/repos"
+    mkdir -p "$LHELPER_WORKING_DIR/archives"
 
-mkdir -p "$LHELPER_WORKING_DIR/builds"
-mkdir -p "$LHELPER_WORKING_DIR/repos"
-mkdir -p "$LHELPER_WORKING_DIR/archives"
+    source "$LHELPER_DIR/env.sh"
+    exec bash "$LHELPER_DIR/recipes/$1.sh"
+}
 
-source "$LHELPER_DIR/env.sh"
-exec bash "$LHELPER_DIR/recipes/$RECIPE.sh"
+start_subshell () {
+    bash --init-file "$1/bin/activate"
+}
+
+case $1 in
+install)
+    library_install "$2"
+    ;;
+activate)
+    start_subshell "$2"
+    ;;
+*)
+    echo "error: unknown command $1"
+    exit 1
+    ;;
+esac
