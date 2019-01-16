@@ -18,14 +18,13 @@ mkdir -p "$DESTDIR/share/lhelper/recipes"
 mkdir -p "$DESTDIR/share/lhelper/patch"
 mkdir -p "$DESTDIR/var/lib/lhelper"
 
-cp lhelper-env "$DESTDIR/bin"
 cp env.sh "$DESTDIR/share/lhelper"
 cp build-helper.sh "$DESTDIR/share/lhelper"
+cp create-env.sh "$DESTDIR/share/lhelper"
 cp recipes/*.sh "$DESTDIR/share/lhelper/recipes"
 cp patch/*.patch "$DESTDIR/share/lhelper/patch"
 cp lhelper "$DESTDIR/bin"
 
 chmod a+x "$DESTDIR/bin/lhelper"
-chmod a+x "$DESTDIR/bin/lhelper-env"
 
 echo "done"

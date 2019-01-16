@@ -1,11 +1,6 @@
 #!/usr/bin/env bash
 set -e
 
-if [ "$#" -lt 2 ]; then
-    echo "Usage: $0 <name> <prefix>"
-    exit 1
-fi
-
 INSTALL_PREFIX="$2"
 
 mkdir -p "${INSTALL_PREFIX}/lib/pkgconfig"
@@ -35,6 +30,3 @@ fi
 EOF
 
 chmod a+x "${INSTALL_PREFIX}/bin/activate"
-
-echo "To activate the environment run the command:"
-echo "source ${INSTALL_PREFIX}/bin/activate"

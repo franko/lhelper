@@ -42,12 +42,19 @@ start_subshell () {
     bash --init-file "$1/bin/activate"
 }
 
+create_env () {
+    bash "$LHELPER_DIR/create-env.sh" "$1" "$2"
+}
+
 case $1 in
 install)
     library_install "$2"
     ;;
 activate)
     start_subshell "$2"
+    ;;
+create)
+    create_env "$2" "$3"
     ;;
 *)
     echo "error: unknown command $1"
