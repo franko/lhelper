@@ -11,30 +11,30 @@ if [ -z "${DESTDIR+x}" ]; then
     DESTDIR="$PREFIX"
 fi
 
-echo "Installing cook with prefix $DESTDIR"
+echo "Installing lhelper with prefix $DESTDIR"
 
 mkdir -p "$DESTDIR/bin"
-mkdir -p "$DESTDIR/share/cook/recipes"
-mkdir -p "$DESTDIR/share/cook/patch"
-mkdir -p "$DESTDIR/var/lib/cook"
+mkdir -p "$DESTDIR/share/lhelper/recipes"
+mkdir -p "$DESTDIR/share/lhelper/patch"
+mkdir -p "$DESTDIR/var/lib/lhelper"
 
-cp cook-env "$DESTDIR/bin"
-cp env.sh "$DESTDIR/share/cook"
-cp build-helper.sh "$DESTDIR/share/cook"
-cp recipes/*.sh "$DESTDIR/share/cook/recipes"
-cp patch/*.patch "$DESTDIR/share/cook/patch"
+cp lhelper-env "$DESTDIR/bin"
+cp env.sh "$DESTDIR/share/lhelper"
+cp build-helper.sh "$DESTDIR/share/lhelper"
+cp recipes/*.sh "$DESTDIR/share/lhelper/recipes"
+cp patch/*.patch "$DESTDIR/share/lhelper/patch"
 
-cat << EOF > "$DESTDIR/bin/cook"
+cat << EOF > "$DESTDIR/bin/lhelper"
 #!/usr/bin/env bash
 
-COOK_PREFIX="$PREFIX"
+LHELPER_PREFIX="$PREFIX"
 
 if [ "\$#" -lt 1 ]; then
     echo "Usage: \$0 <recipe-name>"
     exit 1
 fi
 
-if [ -z \${COOK_ENV_NAME+x} ]; then
+if [ -z \${LHELPER_ENV_NAME+x} ]; then
     echo "error: no environment defined"
     exit 1
 fi
@@ -42,18 +42,18 @@ fi
 INSTALL_PREFIX="\$CMAKE_PREFIX_PATH"
 RECIPE="\$1"
 
-export COOK_WORKING_DIR="\$COOK_PREFIX/var/lib/cook"
-export COOK_DIR="\$COOK_PREFIX/share/cook"
+export LHELPER_WORKING_DIR="\$LHELPER_PREFIX/var/lib/lhelper"
+export LHELPER_DIR="\$LHELPER_PREFIX/share/lhelper"
 
-mkdir -p "\$COOK_WORKING_DIR/builds"
-mkdir -p "\$COOK_WORKING_DIR/repos"
-mkdir -p "\$COOK_WORKING_DIR/archives"
+mkdir -p "\$LHELPER_WORKING_DIR/builds"
+mkdir -p "\$LHELPER_WORKING_DIR/repos"
+mkdir -p "\$LHELPER_WORKING_DIR/archives"
 
-source "\$COOK_DIR/env.sh"
-exec bash "\$COOK_DIR/recipes/\$RECIPE.sh"
+source "\$LHELPER_DIR/env.sh"
+exec bash "\$LHELPER_DIR/recipes/\$RECIPE.sh"
 EOF
 
-chmod a+x "$DESTDIR/bin/cook"
-chmod a+x "$DESTDIR/bin/cook-env"
+chmod a+x "$DESTDIR/bin/lhelper"
+chmod a+x "$DESTDIR/bin/lhelper-env"
 
 echo "done"
