@@ -1,6 +1,6 @@
 # Little Library Helper
 
-An simple utility to help you install C/C++ libraries on Windows, using MinGW and on Linux. Can simplify you develoment by creating separete environments that contains each libraries compiled using specific compilers or build options. Seamlessly change library environment and start compile your project using you favorite build system.
+An simple utility to help you install C/C++ libraries on Windows, using MinGW, and on Linux. Can simplify you develoment by creating separate environments that contains a collection of libraries compiled using specific compilers or build options. Seamlessly change library environment and start compile your project using you favorite build system.
 
 Little Library Helper works by creating a library environment first. The command is:
 
@@ -11,7 +11,7 @@ lhelper create <env-name> <env-directory>
 then the library can be activated and the helper will start for you a new shell on the new environment:
 
 ```sh
-lhelper activate <env-directory>
+lhelper activate <env-name>
 ```
 
 Once inside the environment libraries can be install using a simple command:
@@ -20,13 +20,19 @@ Once inside the environment libraries can be install using a simple command:
 lhelper install <library-name>
 ```
 
-When install libraries Little Library Helper will actually perform the following operations:
+Environments and recipes can be listed with the commands:
+
+```sh
+lhelper list environments
+lhelper list recipes
+```
+
+When a request to install a library is made the helper will actually perform the following operations:
 
 - download the source code from the internet. It can be an archive or a git reporitory.
 - build and install the software into the environment
 
 Once installed the software will be discoverable by build systems like CMake, configure, Meson or other but **only when inside the environment**.
-ell with CMake and use pkg-config for other build tools.
 
 ## Prerequisites
 
@@ -41,7 +47,7 @@ The following software should be installed and available in the PATH:
 - Ninja
 - Meson Build System, optional, it is required by some recipes
 
-In practice Little Library Helper on Windows works well with Mingw and with Msys2. This latter is not strictly required, only MinGW is required.
+In practice Little Library Helper on Windows works well with Mingw and with Msys2 but this latter is not strictly required.
 
 On Linux just make sure that the packages that provides the command above are installed.
 
@@ -73,6 +79,9 @@ Start a new shell in the environment in `<env-directory>`. When inside the envir
 
 Install the library identified by the name `<library-name>`. It will be based on the recipes present in `<install-prefix>/share/lhelper/recipes/<library-name>.sh`.
 
+`lhelper list (environments | recipes)`
+
+List the avilable environments or recipes.
 
 ## How it is implemented
 
@@ -86,7 +95,7 @@ Here what a typical recipe looks like:
 
 ```sh
 set -e
-source "build-helper.sh"
+source "$LHELPER_DIR/build-helper.sh"
 enter_git_repository magnum https://github.com/mosra/magnum.git master
 
 mkdir build && cd build
@@ -99,7 +108,7 @@ so the recipe is very simple and is easy to create new recipes of modifying exis
 
 ## Limitations
 
-- no attempt is made to manage dependencies between library. It is left to the user to install the library as needed in the good order.
+- no attempt is made to manage dependencies between libraries. It is left to the user to install the libraries as needed in the good order.
 - the number of available recipes is limited and they are included in the project itself.
-- the compiler flags are coded in the env.sh script and are not managed with the lhelper command
-- the version of each package is hard coded in the recipe.
+- the compiler flags are coded in the env.sh script and are not managed with the lhelper command.
+- the version of each package is hard coded in the recipe itself.
