@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 
+LHELPER_COMMAND_NAME=`basename $0`
+
 if [ "$#" -lt 1 ]; then
-    echo "Usage: $0 <command> [<other options>]"
+    echo "Usage: $LHELPER_COMMAND_NAME <command> [<other options>]"
     exit 1
 fi
 
@@ -19,6 +21,11 @@ fi
 library_install () {
     if [ -z ${LHELPER_ENV_NAME+x} ]; then
         echo "error: no environment defined"
+        exit 1
+    fi
+
+    if [ ! -f "$LHELPER_DIR/recipes/$1.sh" ]; then
+        echo "error: recipe $1 does not exist."
         exit 1
     fi
 
@@ -40,17 +47,43 @@ start_subshell () {
 
 create_env () {
     bash "$LHELPER_DIR/create-env.sh" "$1" "$2"
+    echo "Environment $1 successfully created in directory:"
+    echo "$2 ."
+    echo "It can be activated using the command:"
+    echo "> lhelper activate $1"
 }
 
 case $1 in
 install)
+    if [ $# -lt 2 ]; then
+        echo "Usage: $LHELPER_COMMAND_NAME install <library-name>"
+        exit 1
+    fi
     library_install "$2"
     ;;
 activate)
+    if [ $# -lt 2 ]; then
+        echo "Usage: $LHELPER_COMMAND_NAME activate <env-name>"
+        exit 1
+    fi
     start_subshell "$2"
     ;;
 create)
+    if [ $# -lt 3 ]; then
+        echo "Usage: $LHELPER_COMMAND_NAME create <env-name> <env-directory>"
+        exit 1
+    fi
     create_env "$2" "$3"
+    ;;
+list)
+    if [ "$2" == environments ]; then
+        ls -1 "$LHELPER_WORKING_DIR/environments"
+    elif [ "$2" == recipes ]; then
+        ls -1 "$LHELPER_DIR/recipes" | sed 's/\.sh//'
+    else
+        echo "Usage: $LHELPER_COMMAND_NAME list (environments|recipes)"
+        exit 1
+    fi
     ;;
 *)
     echo "error: unknown command $1"
