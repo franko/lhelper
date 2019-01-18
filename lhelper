@@ -30,16 +30,12 @@ library_install () {
     fi
     export WIN_INSTALL_PREFIX
 
-    mkdir -p "$LHELPER_WORKING_DIR/builds"
-    mkdir -p "$LHELPER_WORKING_DIR/repos"
-    mkdir -p "$LHELPER_WORKING_DIR/archives"
-
     source "$LHELPER_DIR/env.sh"
     exec bash "$LHELPER_DIR/recipes/$1.sh"
 }
 
 start_subshell () {
-    bash --init-file "$1/bin/activate"
+    bash --init-file "$LHELPER_WORKING_DIR/environments/$1"
 }
 
 create_env () {

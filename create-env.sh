@@ -7,7 +7,7 @@ mkdir -p "${INSTALL_PREFIX}/lib/pkgconfig"
 mkdir -p "${INSTALL_PREFIX}/include"
 mkdir -p "${INSTALL_PREFIX}/bin"
 
-cat << EOF > "${INSTALL_PREFIX}/bin/activate"
+cat << EOF > "$LHELPER_WORKING_DIR/environments/$1"
 export PATH="${INSTALL_PREFIX}/bin:\${PATH}"
 
 if [ -z "\${LD_LIBRARY_PATH+x}" ]; then
@@ -28,5 +28,3 @@ if [ ! -z "\${PS1+x}" ]; then
     PS1="($1) \$PS1"
 fi
 EOF
-
-chmod a+x "${INSTALL_PREFIX}/bin/activate"
