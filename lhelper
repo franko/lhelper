@@ -29,6 +29,9 @@ library_install () {
         exit 1
     fi
 
+    source "$LHELPER_DIR/build-helper.sh"
+    export -f enter_git_repository enter_remote_archive inside_git_apply_patch
+
     export INSTALL_PREFIX="$CMAKE_PREFIX_PATH"
     if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* ]]; then
         WIN_INSTALL_PREFIX="${INSTALL_PREFIX/#\/c\//c:\/}"

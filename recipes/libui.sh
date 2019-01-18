@@ -1,5 +1,4 @@
 set -e
-source "$LHELPER_DIR/build-helper.sh"
 
 LIBUI_GIT_TAG=alpha4.1
 LIBUI_VERSION="0-${LIBUI_GIT_TAG}"

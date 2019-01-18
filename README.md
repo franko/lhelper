@@ -95,7 +95,6 @@ Here what a typical recipe looks like:
 
 ```sh
 set -e
-source "$LHELPER_DIR/build-helper.sh"
 enter_git_repository magnum https://github.com/mosra/magnum.git master
 
 mkdir build && cd build

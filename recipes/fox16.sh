@@ -1,5 +1,4 @@
 set -e
-source "$LHELPER_DIR/build-helper.sh"
 
 FOX_ARCHIVE_NAME=fox-1.6.57
 enter_remote_archive "${FOX_ARCHIVE_NAME}" "http://fox-toolkit.org/ftp/${FOX_ARCHIVE_NAME}.tar.gz" "${FOX_ARCHIVE_NAME}.tar.gz" "tar xzf ARCHIVE_FILENAME"

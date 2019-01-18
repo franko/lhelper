@@ -1,5 +1,4 @@
 set -e
-source "$LHELPER_DIR/build-helper.sh"
 
 enter_git_repository agg https://github.com/franko/agg.git master
 

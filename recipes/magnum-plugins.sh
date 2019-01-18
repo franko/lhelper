@@ -1,5 +1,4 @@
 set -e
-source "$LHELPER_DIR/build-helper.sh"
 enter_git_repository magnum-plugins https://github.com/mosra/magnum-plugins.git master
 
 mkdir build && cd build
