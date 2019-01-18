@@ -10,10 +10,10 @@ enter_git_repository () {
         mkdir -p "$LHELPER_WORKING_DIR/repos/$1.git"
         git clone --bare "$2" "$LHELPER_WORKING_DIR/repos/$1.git"
     fi
-    rm -fr "$LHELPER_WORKING_DIR/builds/$1" && mkdir -p "$LHELPER_WORKING_DIR/builds/$1"
+    rm -fr "$LHELPER_WORKING_DIR/builds/$1"
     git clone --shared "$LHELPER_WORKING_DIR/repos/$1.git" "$LHELPER_WORKING_DIR/builds/$1"
+    cd "$LHELPER_WORKING_DIR/builds/$1"
     git checkout "$3"
-    pushd "$LHELPER_WORKING_DIR/builds/$1"
 }
 
 # $1 = archive's name, name of the directory after extract
@@ -25,9 +25,9 @@ enter_remote_archive () {
         curl -L "$2" -o "$LHELPER_WORKING_DIR/archives/$3"
     fi
     rm -fr "$LHELPER_WORKING_DIR/builds/$1"
-    pushd "$LHELPER_WORKING_DIR/builds"
+    cd "$LHELPER_WORKING_DIR/builds"
     eval "${4/ARCHIVE_FILENAME/$LHELPER_WORKING_DIR\/archives\/$3}"
-    pushd "$1"
+    cd "$1"
 }
 
 inside_git_apply_patch () {
