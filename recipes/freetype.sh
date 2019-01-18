@@ -1,5 +1,5 @@
 set -e
-source "build-helper.sh"
+source "$LHELPER_DIR/build-helper.sh"
 FREETYPE_VERSION="2.7"
 enter_remote_archive "freetype-${FREETYPE_VERSION}" "http://download.savannah.gnu.org/releases/freetype/freetype-${FREETYPE_VERSION}.tar.gz" "freetype-${FREETYPE_VERSION}.tar.gz" "tar xzf ARCHIVE_FILENAME"
 

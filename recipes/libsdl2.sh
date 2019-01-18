@@ -1,5 +1,5 @@
 set -e
-source "build-helper.sh"
+source "$LHELPER_DIR/build-helper.sh"
 
 # # Provided library below in binary form directly from libsdl.org
 # curl -O "https://buildbot.libsdl.org/sdl-builds/sdl-visualstudio/sdl-visualstudio-3946.zip"

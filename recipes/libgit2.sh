@@ -1,5 +1,5 @@
 set -e
-source "build-helper.sh"
+source "$LHELPER_DIR/build-helper.sh"
 enter_git_repository libgit2 https://github.com/libgit2/libgit2.git "v0.27.7"
 
 mkdir build && cd build

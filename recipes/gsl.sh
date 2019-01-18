@@ -1,5 +1,5 @@
 set -e
-source "build-helper.sh"
+source "$LHELPER_DIR/build-helper.sh"
 
 GSL_VERSION=gsl-2.1
 enter_remote_archive "$GSL_VERSION" "ftp://ftp.gnu.org/gnu/gsl/${GSL_VERSION}.tar.gz" "${GSL_VERSION}.tar.gz" "tar xzf ARCHIVE_FILENAME"

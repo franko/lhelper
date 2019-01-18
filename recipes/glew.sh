@@ -1,5 +1,5 @@
 set -e
-source "build-helper.sh"
+source "$LHELPER_DIR/build-helper.sh"
 enter_git_repository glew https://github.com/nigels-com/glew.git master
 
 echo "Applying patch glew-remove-nostdlib-flag"

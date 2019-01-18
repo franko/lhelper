@@ -1,5 +1,5 @@
 set -e
-source "build-helper.sh"
+source "$LHELPER_DIR/build-helper.sh"
 enter_git_repository corrade https://github.com/mosra/corrade.git master
 
 mkdir build && cd build
