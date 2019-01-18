@@ -41,6 +41,7 @@ The following software should be installed and available in the PATH:
 - bash shell
 - git
 - gcc or clang compiler
+- curl
 - tar
 - GNU Makefile (make)
 - CMakefile (cmake)
