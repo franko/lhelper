@@ -33,3 +33,7 @@ enter_remote_archive () {
 inside_git_apply_patch () {
     git apply "$LHELPER_DIR/patch/$1.patch"
 }
+
+inside_archive_apply_patch () {
+    patch -p1 < "$LHELPER_DIR/patch/$1.patch"
+}

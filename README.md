@@ -43,6 +43,7 @@ The following software should be installed and available in the PATH:
 - gcc or clang compiler
 - curl
 - tar
+- patch
 - GNU Makefile (make)
 - CMakefile (cmake)
 - Ninja
