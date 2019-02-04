@@ -19,7 +19,7 @@ Name: Freetype2
 Description: Freetype2 library
 Version: ${FREETYPE_VERSION}
 Libs: -L\${prefix}/lib -lfreetype
-Cflags: -I\${prefix}/include
+Cflags: -I\${prefix}/include/freetype2
 EOF
 
 cp "$PKG_NAME.pc" "$INSTALL_PREFIX/lib/pkgconfig"
