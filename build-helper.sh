@@ -4,7 +4,7 @@
 enter_git_repository () {
     if [ -d "$LHELPER_WORKING_DIR/repos/$1.git" ]; then
         pushd "$LHELPER_WORKING_DIR/repos/$1.git"
-        git fetch origin
+        git fetch origin '*:*'
         popd
     else
         mkdir -p "$LHELPER_WORKING_DIR/repos/$1.git"
