@@ -1,6 +1,14 @@
 # Little Library Helper
 
-An simple utility to help you install C/C++ libraries on Windows, using MinGW, and on Linux. Can simplify you develoment by creating separate environments that contains a collection of libraries compiled using specific compilers or build options. Seamlessly change library environment and start compile your project using you favorite build system.
+An simple utility to help you install C/C++ libraries on Windows and on Linux. On Windows works with MinGW only.
+
+It helps to simplify the develoment by creating separate environments each containing a collection of libraries compiled using specific a compiler and specific compiler's flags.
+
+For example you may have an environment for libraries compiled for x86 architecture and another one for x86_64.
+
+Seamlessly change environment and start compiling your project using you favorite build system.
+
+## Usage
 
 Little Library Helper works by creating a library environment first. The command is:
 
@@ -8,13 +16,21 @@ Little Library Helper works by creating a library environment first. The command
 lhelper create <env-name> <env-directory>
 ```
 
-then the library can be activated and the helper will start for you a new shell on the new environment:
+Once created an environment can be 'activated' using the command:
 
 ```sh
 lhelper activate <env-name>
 ```
 
-Once inside the environment libraries can be install using a simple command:
+It will start for you a new shell on the new environment.
+
+The first time inside a library you can edit the compiler options with the command:
+
+```sh
+lhelper edit
+```
+
+Once inside an environment any library can be installed using a simple command:
 
 ```sh
 lhelper install <library-name>
@@ -29,10 +45,12 @@ lhelper list recipes
 
 When a request to install a library is made the helper will actually perform the following operations:
 
-- download the source code from the internet. It can be an archive or a git reporitory.
-- build and install the software into the environment
+- download the source code from the internet. It can be an archive or a git repository.
+- build and install the library into the environment
 
-Once installed the software will be discoverable by build systems like CMake, configure, Meson or other but **only when inside the environment**.
+Once installed the software will be discoverable by build systems like CMake, configure, Meson or other but **only inside the environment**.
+
+When you are done just type 'exit' and you will go back to the original shell to quit the environment.
 
 ## Prerequisites
 
@@ -49,9 +67,9 @@ The following software should be installed and available in the PATH:
 - Ninja
 - Meson Build System, optional, it is required by some recipes
 
-In practice Little Library Helper on Windows works well with Mingw and with Msys2 but this latter is not strictly required.
+In practice Little Library Helper on Windows works well with Mingw and with Msys2 but this latter is not strictly required. Msys2 provides all the applications above by installing the appropriate packages. If you do not use Msys2 it is up to you to ensure that they are available in the PATH from the bash shell.
 
-On Linux just make sure that the packages that provides the command above are installed.
+On Linux just make sure that the packages that provides the commands above are installed.
 
 ## How to install
 
@@ -65,7 +83,7 @@ bash install.sh <install-prefix-directory>
 
 The `<install-prefix-directory>` can be any directory but it should contains a `bin` folder and it should be part of you PATH. The helper will install its files in the `<prefix>/share/lhelper` directory and it will use the directory `<prefix>/var/lib/lhelper` to store downloaded archives and build the libraries.
 
-On Ubuntu system you may use the `$HOME/.local` directory as a prefix.
+On Ubuntu systems you may use the `$HOME/.local` directory as a prefix.
 
 ## Little Library Helper commands
 
@@ -84,6 +102,10 @@ Install the library identified by the name `<library-name>`. It will be based on
 `lhelper list (environments | recipes)`
 
 List the avilable environments or recipes.
+
+`lhelper edit`
+
+Open an editor with the compiler's flags specific for the environment.
 
 ## How it is implemented
 
@@ -111,5 +133,4 @@ so the recipe is very simple and is easy to create new recipes of modifying exis
 
 - no attempt is made to manage dependencies between libraries. It is left to the user to install the libraries as needed in the good order.
 - the number of available recipes is limited and they are included in the project itself.
-- the compiler flags are coded in the env.sh script and are not managed with the lhelper command.
 - the version of each package is hard coded in the recipe itself.
