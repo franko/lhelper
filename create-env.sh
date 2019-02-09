@@ -24,6 +24,15 @@ fi
 
 export CMAKE_PREFIX_PATH="${INSTALL_PREFIX}"
 export LHELPER_ENV_NAME="$1"
+
+if [ -f /etc/bash.bashrc ]; then
+    source /etc/bash.bashrc
+fi
+
+if [ -f "$HOME/.bashrc" ]; then
+    source "$HOME/.bashrc"
+fi
+
 if [ ! -z "\${PS1+x}" ]; then
     PS1="($1) \$PS1"
 fi
