@@ -7,6 +7,10 @@ mkdir -p "${INSTALL_PREFIX}/lib/pkgconfig"
 mkdir -p "${INSTALL_PREFIX}/include"
 mkdir -p "${INSTALL_PREFIX}/bin"
 
+# Copy the file containing the compiler config into the environment
+# bin directory.
+cp "$LHELPER_DIR/lhelper-config-default" "${INSTALL_PREFIX}/bin/lhelper-config"
+
 cat << EOF > "$LHELPER_WORKING_DIR/environments/$1"
 export PATH="${INSTALL_PREFIX}/bin:\${PATH}"
 
@@ -23,7 +27,10 @@ else
 fi
 
 export CMAKE_PREFIX_PATH="${INSTALL_PREFIX}"
+export LHELPER_ENV_PREFIX="${INSTALL_PREFIX}"
 export LHELPER_ENV_NAME="$1"
+
+source "${INSTALL_PREFIX}/bin/lhelper-config"
 
 if [ -f /etc/bash.bashrc ]; then
     source /etc/bash.bashrc

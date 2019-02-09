@@ -1,3 +1,6 @@
+# Edit here the compiler variables and flags for this
+# specific environment.
+
 export CC_BASE=gcc
 export CXX_BASE=g++
 export CFLAGS_BASE="-malign-double -O3"

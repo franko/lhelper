@@ -32,7 +32,7 @@ library_install () {
     source "$LHELPER_DIR/build-helper.sh"
     export -f enter_git_repository enter_remote_archive inside_git_apply_patch inside_archive_apply_patch
 
-    export INSTALL_PREFIX="$CMAKE_PREFIX_PATH"
+    export INSTALL_PREFIX="$LHELPER_ENV_PREFIX"
     if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* ]]; then
         WIN_INSTALL_PREFIX="${INSTALL_PREFIX/#\/c\//c:\/}"
     else
@@ -40,7 +40,6 @@ library_install () {
     fi
     export WIN_INSTALL_PREFIX
 
-    source "$LHELPER_DIR/env.sh"
     exec bash "$LHELPER_DIR/recipes/$1.sh"
 }
 
@@ -77,6 +76,13 @@ create)
         exit 1
     fi
     create_env "$2" "$3"
+    ;;
+edit)
+    "${EDITOR-vim}" "$LHELPER_ENV_PREFIX/bin/lhelper-config"
+    echo "To make changes effective exit from the shell and use the command \"activate\" again:"
+    echo ""
+    echo "> exit"
+    echo "> lhelper activate \"${LHELPER_ENV_NAME}\""
     ;;
 list)
     if [ "$2" == environments ]; then

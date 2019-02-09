@@ -21,7 +21,7 @@ mkdir -p "$DESTDIR/var/lib/lhelper/repos"
 mkdir -p "$DESTDIR/var/lib/lhelper/archives"
 mkdir -p "$DESTDIR/var/lib/lhelper/environments"
 
-cp env.sh "$DESTDIR/share/lhelper"
+cp lhelper-config-default "$DESTDIR/share/lhelper"
 cp build-helper.sh "$DESTDIR/share/lhelper"
 cp create-env.sh "$DESTDIR/share/lhelper"
 cp recipes/*.sh "$DESTDIR/share/lhelper/recipes"
