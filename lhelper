@@ -30,7 +30,7 @@ library_install () {
     fi
 
     source "$LHELPER_DIR/build-helper.sh"
-    export -f enter_git_repository enter_remote_archive inside_git_apply_patch inside_archive_apply_patch
+    export -f enter_git_repository enter_remote_archive inside_git_apply_patch inside_archive_apply_patch build_and_install
 
     export INSTALL_PREFIX="$LHELPER_ENV_PREFIX"
     if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* ]]; then
@@ -41,7 +41,7 @@ library_install () {
     export WIN_INSTALL_PREFIX
 
     source "$LHELPER_ENV_PREFIX/bin/lhelper-config"
-    exec bash "$LHELPER_DIR/recipes/$1.sh"
+    exec bash -e "$LHELPER_DIR/recipes/$1.sh"
 }
 
 start_subshell () {

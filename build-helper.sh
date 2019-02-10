@@ -37,3 +37,30 @@ inside_git_apply_patch () {
 inside_archive_apply_patch () {
     patch -p1 < "$LHELPER_DIR/patch/$1.patch"
 }
+
+build_and_install () {
+    case $1 in
+    cmake)
+        mkdir build && pushd build
+        cmake -G "Ninja" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" "${@:2}" ..
+        cmake --build .
+        cmake --build . --target install
+        popd
+        ;;
+    meson)
+        mkdir build && pushd build
+        meson --prefix="$INSTALL_PREFIX" --buildtype="${BUILD_TYPE,,}" "${@:2}" ..
+        ninja
+        ninja install
+        popd
+        ;;
+    configure)
+        ./configure --prefix="$WIN_INSTALL_PREFIX" --enable-${BUILD_TYPE,,} "${@:2}"
+        make
+        make install
+        ;;
+    *)
+        echo "error: unknown build type \"$1\""
+        exit 1
+    esac
+}

@@ -1,11 +1,5 @@
-set -e
-
 enter_git_repository agg https://github.com/franko/agg.git master
-
-mkdir build && cd build
-meson --prefix="$INSTALL_PREFIX" --buildtype="${BUILD_TYPE,,}" ..
-ninja
-ninja install
+build_and_install meson
 
 PKG_NAME=libagg
 

@@ -1,5 +1,3 @@
-set -e
-
 LIBUI_GIT_TAG=alpha4.1
 LIBUI_VERSION="0-${LIBUI_GIT_TAG}"
 
@@ -7,8 +5,7 @@ enter_git_repository libui https://github.com/andlabs/libui.git "$LIBUI_VERSION"
 
 mkdir build && cd build
 # Disable shared libraries because MSVC build is required.
-cmake -G "Ninja" -DBUILD_SHARED_LIBS=OFF ..
-
+cmake -G "Ninja" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" -DBUILD_SHARED_LIBS=OFF ..
 ninja
 ninja examples
 ninja tester
