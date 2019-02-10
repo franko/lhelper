@@ -109,7 +109,7 @@ Open an editor with the compiler's flags specific for the environment.
 
 ## How it is implemented
 
-Little Library Helper is implemented as simple bash script. In case of problem it is easy to customize or modify the scripts.
+Little Library Helper is implemented as a few, simple, bash scripts.
 
 ## What about the recipes
 
@@ -118,16 +118,11 @@ Currently a small set of recipe is available and they are bundled with the libra
 Here what a typical recipe looks like:
 
 ```sh
-set -e
 enter_git_repository magnum https://github.com/mosra/magnum.git master
-
-mkdir build && cd build
-cmake -G "Ninja" -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} -DWITH_SDL2APPLICATION=ON ..
-cmake --build .
-cmake --build . --target install
+build_and_install cmake -DWITH_SDL2APPLICATION=ON
 ```
 
-so the recipe is very simple and is easy to create new recipes of modifying existing one to suit you needs.
+The recipe is just a simple shell script. If needed each recipe can be easily modified and if a recipe is missing you can easily create a new one.
 
 ## Limitations
 
