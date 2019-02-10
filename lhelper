@@ -40,6 +40,7 @@ library_install () {
     fi
     export WIN_INSTALL_PREFIX
 
+    source "$LHELPER_ENV_PREFIX/bin/lhelper-config"
     exec bash "$LHELPER_DIR/recipes/$1.sh"
 }
 
@@ -79,10 +80,6 @@ create)
     ;;
 edit)
     "${EDITOR-vim}" "$LHELPER_ENV_PREFIX/bin/lhelper-config"
-    echo "To make changes effective exit from the shell and use the command \"activate\" again:"
-    echo ""
-    echo "> exit"
-    echo "> lhelper activate \"${LHELPER_ENV_NAME}\""
     ;;
 list)
     if [ "$2" == environments ]; then
