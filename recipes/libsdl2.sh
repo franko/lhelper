@@ -7,6 +7,6 @@ SDL_ARCHIVE_NAME=SDL2-2.0.8
 enter_remote_archive "$SDL_ARCHIVE_NAME" "http://libsdl.org/release/${SDL_ARCHIVE_NAME}.tar.gz" "${SDL_ARCHIVE_NAME}.tar.gz" "tar xzf ARCHIVE_FILENAME"
 
 mkdir build && cd build
-cmake -G "Ninja" -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} ..
+cmake -G "Ninja" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" ..
 cmake --build .
 cmake --build . --target install

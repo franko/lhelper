@@ -1,9 +1,14 @@
 # Edit here the compiler variables and flags for this
 # specific environment.
 
-export CC_BASE=gcc
-export CXX_BASE=g++
-export CFLAGS_BASE="-malign-double -O3"
-export CXXFLAGS_BASE="-malign-double -O3 -fno-rtti"
-export CFLAGS_FASTMATH="$CFLAGS_BASE -ffast-math"
-export CXXFLAGS_FASTMATH="$CXXFLAGS_BASE -ffast-math"
+# Avoid using generic debug or optimization flags as they
+# are automatically added by cmake or meson depending on
+# the BUILD_TYPE variable.
+
+export CC=gcc
+export CXX=g++
+export CFLAGS=
+export CXXFLAGS=
+
+# Can be Release or Debug
+export BUILD_TYPE="Release"

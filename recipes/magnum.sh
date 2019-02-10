@@ -2,6 +2,6 @@ set -e
 enter_git_repository magnum https://github.com/mosra/magnum.git master
 
 mkdir build && cd build
-cmake -G "Ninja" -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} -DWITH_SDL2APPLICATION=ON ..
+cmake -G "Ninja" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" -DWITH_SDL2APPLICATION=ON ..
 cmake --build .
 cmake --build . --target install
