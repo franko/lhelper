@@ -62,6 +62,10 @@ install)
         echo "Usage: $LHELPER_COMMAND_NAME install <library-name>"
         exit 1
     fi
+    if [ -z ${LHELPER_ENV_NAME+x} ]; then
+        echo "Please activate an environment before."
+        exit 1
+    fi
     library_install "$2"
     ;;
 activate)
@@ -79,6 +83,10 @@ create)
     create_env "$2" "$3"
     ;;
 edit)
+    if [ -z ${LHELPER_ENV_NAME+x} ]; then
+        echo "Please activate an environment before."
+        exit 1
+    fi
     "${EDITOR-vim}" "$LHELPER_ENV_PREFIX/bin/lhelper-config"
     ;;
 list)
