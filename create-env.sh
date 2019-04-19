@@ -3,7 +3,27 @@ set -e
 
 INSTALL_PREFIX="$2"
 
-mkdir -p "${INSTALL_PREFIX}/lib/pkgconfig"
+# Figure out the default library directory.
+# Adapted from https://github.com/mesonbuild/meson/blob/master/mesonbuild/mesonlib.py
+default_libdir () {
+    if [ -f /etc/debian_version ]; then
+        local archpath=$(dpkg-architecture -qDEB_HOST_MULTIARCH)
+        if [ $? == 0 -a ${archpath:-none} != "none" ]; then
+            echo "lib/$archpath"
+            return
+        fi
+    fi
+    if [ -d /usr/lib64 -a ! -L /usr/lib64 ]; then
+        echo "lib64"
+        return
+    fi
+    echo "lib"
+}
+
+_libdir=$(default_libdir)
+_pkgconfigdir="$_libdir/pkgconfig"
+
+mkdir -p "${INSTALL_PREFIX}/$_pkgconfigdir"
 mkdir -p "${INSTALL_PREFIX}/include"
 mkdir -p "${INSTALL_PREFIX}/bin"
 
@@ -15,15 +35,15 @@ cat << EOF > "$LHELPER_WORKING_DIR/environments/$1"
 export PATH="${INSTALL_PREFIX}/bin:\${PATH}"
 
 if [ -z "\${LD_LIBRARY_PATH+x}" ]; then
-    export LD_LIBRARY_PATH="${INSTALL_PREFIX}/lib"
+    export LD_LIBRARY_PATH="${INSTALL_PREFIX}/$_libdir"
 else
-    LD_LIBRARY_PATH="${INSTALL_PREFIX}/lib:\$LD_LIBRARY_PATH"
+    LD_LIBRARY_PATH="${INSTALL_PREFIX}/$_libdir:\$LD_LIBRARY_PATH"
 fi
 
 if [ -z "\${PKG_CONFIG_PATH+x}" ]; then
-    export PKG_CONFIG_PATH="${INSTALL_PREFIX}/lib/pkgconfig"
+    export PKG_CONFIG_PATH="${INSTALL_PREFIX}/$_pkgconfigdir"
 else
-    PKG_CONFIG_PATH="${INSTALL_PREFIX}/lib/pkgconfig:\$PKG_CONFIG_PATH"
+    PKG_CONFIG_PATH="${INSTALL_PREFIX}/$_pkgconfigdir:\$PKG_CONFIG_PATH"
 fi
 
 export CMAKE_PREFIX_PATH="${INSTALL_PREFIX}"
