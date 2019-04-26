@@ -1,6 +1,6 @@
 diff -Naur LuaJIT-2.0.5.orig/Makefile LuaJIT-2.0.5/Makefile
 --- LuaJIT-2.0.5.orig/Makefile	2019-04-24 16:29:33 +0000
-+++ LuaJIT-2.0.5/Makefile	2019-04-24 16:48:48 +0000
++++ LuaJIT-2.0.5/Makefile	2019-04-26 17:31:22 +0000
 @@ -18,6 +18,7 @@
  RELVER=  5
  VERSION= $(MAJVER).$(MINVER).$(RELVER)
@@ -9,7 +9,15 @@ diff -Naur LuaJIT-2.0.5.orig/Makefile LuaJIT-2.0.5/Makefile
  
  ##############################################################################
  #
-@@ -91,6 +92,8 @@
+@@ -83,6 +84,7 @@
+ FILE_SO= libluajit.so
+ FILE_MAN= luajit.1
+ FILE_PC= luajit.pc
++FILE_DLL_A= libluajit-$(ABIVER).dll.a
+ FILES_INC= lua.h lualib.h lauxlib.h luaconf.h lua.hpp luajit.h
+ FILES_JITLIB= bc.lua v.lua dump.lua dis_x86.lua dis_x64.lua dis_arm.lua \
+ 	      dis_ppc.lua dis_mips.lua dis_mipsel.lua bcsave.lua vmdef.lua
+@@ -91,6 +93,8 @@
    HOST_SYS:= $(shell uname -s)
  else
    HOST_SYS= Windows
@@ -18,9 +26,18 @@ diff -Naur LuaJIT-2.0.5.orig/Makefile LuaJIT-2.0.5/Makefile
  endif
  TARGET_SYS?= $(HOST_SYS)
  
+@@ -121,6 +125,8 @@
+ 	  $(LDCONFIG) $(INSTALL_LIB) && \
+ 	  $(SYMLINK) $(INSTALL_SONAME) $(INSTALL_SHORT1) && \
+ 	  $(SYMLINK) $(INSTALL_SONAME) $(INSTALL_SHORT2) || :
++	cd src && test -f $(FILE_DLL_A) && \
++	  $(INSTALL_X) $(FILE_DLL_A) $(INSTALL_LIB) || :
+ 	cd etc && $(INSTALL_F) $(FILE_MAN) $(INSTALL_MAN)
+ 	cd etc && $(SED_PC) $(FILE_PC) > $(FILE_PC).tmp && \
+ 	  $(INSTALL_F) $(FILE_PC).tmp $(INSTALL_PC) && \
 diff -Naur LuaJIT-2.0.5.orig/src/luaconf.h LuaJIT-2.0.5/src/luaconf.h
 --- LuaJIT-2.0.5.orig/src/luaconf.h	2019-04-24 16:29:33 +0000
-+++ LuaJIT-2.0.5/src/luaconf.h	2019-04-26 09:22:36 +0000
++++ LuaJIT-2.0.5/src/luaconf.h	2019-04-26 09:28:56 +0000
 @@ -13,7 +13,7 @@
  #include <stddef.h>
  
@@ -30,3 +47,23 @@ diff -Naur LuaJIT-2.0.5.orig/src/luaconf.h LuaJIT-2.0.5/src/luaconf.h
  /*
  ** In Windows, any exclamation mark ('!') in the path is replaced by the
  ** path of the directory of the executable file of the current process.
+diff -Naur LuaJIT-2.0.5.orig/src/Makefile LuaJIT-2.0.5/src/Makefile
+--- LuaJIT-2.0.5.orig/src/Makefile	2019-04-24 16:29:33 +0000
++++ LuaJIT-2.0.5/src/Makefile	2019-04-26 17:24:49 +0000
+@@ -216,6 +216,7 @@
+ TARGET_DYLIBNAME= libluajit-$(ABIVER).$(MAJVER).dylib
+ TARGET_DYLIBPATH= $(TARGET_LIBPATH)/$(TARGET_DYLIBNAME)
+ TARGET_DLLNAME= lua$(NODOTABIVER).dll
++TARGET_DLLIMPLIB= libluajit-$(ABIVER).dll.a
+ TARGET_XSHLDFLAGS= -shared -fPIC -Wl,-soname,$(TARGET_SONAME)
+ TARGET_DYNXLDOPTS=
+ 
+@@ -290,7 +291,7 @@
+ TARGET_SYS?= $(HOST_SYS)
+ ifeq (Windows,$(TARGET_SYS))
+   TARGET_STRIP+= --strip-unneeded
+-  TARGET_XSHLDFLAGS= -shared
++  TARGET_XSHLDFLAGS= -shared -Wl,--out-implib,$(TARGET_DLLIMPLIB)
+   TARGET_DYNXLDOPTS=
+ else
+ ifeq (,$(shell $(TARGET_CC) -o /dev/null -c -x c /dev/null -fno-stack-protector 2>/dev/null || echo 1))
