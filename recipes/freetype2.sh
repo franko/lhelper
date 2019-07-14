@@ -22,4 +22,4 @@ Libs: -L\${prefix}/lib -lfreetype
 Cflags: -I\${prefix}/include/freetype2
 EOF
 
-cp "$PKG_NAME.pc" "$INSTALL_PREFIX/lib/pkgconfig"
+install_pkgconfig_file "${PKG_NAME}.pc"

@@ -38,6 +38,11 @@ inside_archive_apply_patch () {
     patch -p1 < "$LHELPER_DIR/patch/$1.patch"
 }
 
+install_pkgconfig_file () {
+    echo "Installing \"$1\" in \"$LHELPER_PKGCONFIG_PATH\""
+    cp "$1" "$LHELPER_PKGCONFIG_PATH"
+}
+
 build_and_install () {
     case $1 in
     cmake)

@@ -45,4 +45,4 @@ Libs: -L\${libdir} ${UI_OS_LIBS}
 Cflags: -I\${includedir}
 EOF
 
-cp "$PKG_NAME.pc" "$INSTALL_PREFIX/lib/pkgconfig"
+install_pkgconfig_file "${PKG_NAME}.pc"
