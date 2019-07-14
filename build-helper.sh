@@ -1,3 +1,9 @@
+# This script is sources from the lhelper's main script when and only when
+# a command to install a library is executed.
+# It provides some functions needed to build and install a library.
+# The functions defined below are explicitly exported from the lhelpers's
+# main script.
+
 # $1 = git repository name
 # $2 = repository remote URL
 # $3 = branch or tag to use
