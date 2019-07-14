@@ -1,5 +1,3 @@
-#!/usr/bin/env bash
-set -e
 # This script is executed from lhelper's main script when a command to create
 # a new environment is given.
 
