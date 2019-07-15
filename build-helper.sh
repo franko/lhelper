@@ -4,6 +4,14 @@
 # The functions defined below are explicitly exported from the lhelpers's
 # main script.
 
+_current_archive_dir=
+
+interrupt_clean_archive () {
+    echo "Cleaning up directory \"$_current_archive_dir\""
+    rm -fr "$_current_archive_dir"
+    exit 1
+}
+
 # $1 = git repository name
 # $2 = repository remote URL
 # $3 = branch or tag to use
@@ -14,7 +22,10 @@ enter_git_repository () {
         popd
     else
         mkdir -p "$LHELPER_WORKING_DIR/repos/$1.git"
-        git clone --bare "$2" "$LHELPER_WORKING_DIR/repos/$1.git"
+        _current_archive_dir="$LHELPER_WORKING_DIR/repos/$1.git"
+        trap interrupt_clean_archive INT
+        git clone --bare "$2" "$LHELPER_WORKING_DIR/repos/$1.git" || interrupt_clean_archive
+        trap INT
     fi
     rm -fr "$LHELPER_WORKING_DIR/builds/$1"
     git clone --shared "$LHELPER_WORKING_DIR/repos/$1.git" "$LHELPER_WORKING_DIR/builds/$1"
@@ -28,7 +39,10 @@ enter_git_repository () {
 # $4 = extract command using "ARCHIVE_FILENAME" for the archive's filename
 enter_remote_archive () {
     if [ ! -f "$LHELPER_WORKING_DIR/archives/$3" ]; then
-        curl -L "$2" -o "$LHELPER_WORKING_DIR/archives/$3"
+        _current_archive_dir="$LHELPER_WORKING_DIR/archives/$3"
+        trap interrupt_clean_archive INT
+        curl -L "$2" -o "$LHELPER_WORKING_DIR/archives/$3" || interrupt_clean_archive
+        trap INT
     fi
     rm -fr "$LHELPER_WORKING_DIR/builds/$1"
     cd "$LHELPER_WORKING_DIR/builds"

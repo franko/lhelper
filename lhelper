@@ -30,7 +30,7 @@ library_install () {
     fi
 
     source "$LHELPER_DIR/build-helper.sh"
-    export -f enter_git_repository enter_remote_archive inside_git_apply_patch inside_archive_apply_patch build_and_install install_pkgconfig_file
+    export -f enter_git_repository enter_remote_archive inside_git_apply_patch inside_archive_apply_patch build_and_install install_pkgconfig_file interrupt_clean_archive
 
     export INSTALL_PREFIX="$LHELPER_ENV_PREFIX"
     if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* ]]; then
@@ -49,7 +49,7 @@ start_subshell () {
 }
 
 create_env () {
-    bash -e "$LHELPER_DIR/create-env.sh" "$1" "$2"
+    bash "$LHELPER_DIR/create-env.sh" "$1" "$2"
     echo "Environment $1 successfully created in directory:"
     echo "$2 ."
     echo "It can be activated using the command:"
