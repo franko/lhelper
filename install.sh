@@ -19,6 +19,7 @@ mkdir -p "$DESTDIR/share/lhelper/patch"
 mkdir -p "$DESTDIR/var/lib/lhelper/builds"
 mkdir -p "$DESTDIR/var/lib/lhelper/repos"
 mkdir -p "$DESTDIR/var/lib/lhelper/archives"
+mkdir -p "$DESTDIR/var/lib/lhelper/packages"
 mkdir -p "$DESTDIR/var/lib/lhelper/environments"
 mkdir -p "$DESTDIR/var/lib/lhelper/env"
 
