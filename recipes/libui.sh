@@ -1,5 +1,5 @@
 LIBUI_GIT_TAG=alpha4.1
-LIBUI_VERSION="0-${LIBUI_GIT_TAG}"
+LIBUI_VERSION="${LIBUI_GIT_TAG}"
 
 enter_git_repository libui https://github.com/andlabs/libui.git "$LIBUI_VERSION"
 
