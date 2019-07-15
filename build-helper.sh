@@ -63,6 +63,23 @@ install_pkgconfig_file () {
     cp "$1" "$LHELPER_PKGCONFIG_PATH"
 }
 
+find_package_name () {
+    local script_name=`basename "$0"`
+    echo "${script_name%.sh}"
+}
+
+install_library_with_command () {
+    local install_command="$1"
+    local package_name=$(find_package_name)
+    local package_temp_dir="$LHELPER_WORKING_DIR/tmp"
+    rm -fr "$package_temp_dir"
+    mkdir "$package_temp_dir"
+    DESTDIR="$package_temp_dir" $install_command
+    tar -C "$package_temp_dir$INSTALL_PREFIX" -czf "$package_name.tar.gz" .
+    mv "$package_name.tar.gz" "$LHELPER_WORKING_DIR/packages"
+    tar -C "$INSTALL_PREFIX" -xf "$LHELPER_WORKING_DIR/packages/$package_name.tar.gz"
+}
+
 build_and_install () {
     case $1 in
     cmake)
@@ -76,7 +93,7 @@ build_and_install () {
         mkdir build && pushd build
         meson --prefix="$INSTALL_PREFIX" --buildtype="${BUILD_TYPE,,}" "${@:2}" ..
         ninja
-        ninja install
+        install_library_with_command "ninja install"
         popd
         ;;
     configure)
