@@ -85,6 +85,31 @@ edit)
     fi
     "${EDITOR-vim}" "$LHELPER_ENV_PREFIX/bin/lhelper-config"
     ;;
+delete)
+    if [ $# -lt 2 ]; then
+        echo "Usage: $LHELPER_COMMAND_NAME delete <env-name>"
+        exit 1
+    fi
+    _env_name="$2"
+    if [ -f "$LHELPER_WORKING_DIR/environments/$_env_name" ]; then
+        source "$LHELPER_WORKING_DIR/environments/$_env_name"
+    else
+        echo "Environment $_env_name not found."
+        exit 1
+    fi
+    if [ -n "$LHELPER_ENV_PREFIX" ]; then
+        echo -n "Are you sure you want to delete the environment $_env_name (y/n) ? "
+        read _sure_delete
+        if [[ "$_sure_delete" == "y" || "$_sure_delete" == "Y" ]]; then
+            rm -fr "$LHELPER_ENV_PREFIX"
+            rm -f "$LHELPER_WORKING_DIR/environments/$_env_name"
+            echo "Environment $_env_name successfully deleted."
+        else
+            echo "Operation canceled."
+        fi
+        unset _sure_delete
+    fi
+    ;;
 list)
     if [ "$2" == environments ]; then
         ls -1 "$LHELPER_WORKING_DIR/environments"

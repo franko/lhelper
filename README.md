@@ -43,6 +43,12 @@ lhelper list environments
 lhelper list recipes
 ```
 
+An existing environment can be deleted with the command:
+
+```sh
+lhelper delete <env-name>
+```
+
 When a request to install a library is made the helper will actually perform the following operations:
 
 - download the source code from the internet. It can be an archive or a git repository.
