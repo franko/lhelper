@@ -50,10 +50,6 @@ start_subshell () {
 
 create_env () {
     bash "$LHELPER_DIR/create-env.sh" "$1" "$2"
-    echo "Environment $1 successfully created in directory:"
-    echo "$2 ."
-    echo "It can be activated using the command:"
-    echo "> lhelper activate $1"
 }
 
 case $1 in
@@ -76,8 +72,8 @@ activate)
     start_subshell "$2"
     ;;
 create)
-    if [ $# -lt 3 ]; then
-        echo "Usage: $LHELPER_COMMAND_NAME create <env-name> <env-directory>"
+    if [ $# -lt 2 ]; then
+        echo "Usage: $LHELPER_COMMAND_NAME create <env-name> [env-root-dir]"
         exit 1
     fi
     create_env "$2" "$3"

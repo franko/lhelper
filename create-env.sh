@@ -1,7 +1,7 @@
 # This script is executed from lhelper's main script when a command to create
 # a new environment is given.
 
-INSTALL_PREFIX="$2"
+INSTALL_PREFIX="${2:-$LHELPER_WORKING_DIR/env/$1}"
 
 # Figure out the default library directory.
 # Adapted from https://github.com/mesonbuild/meson/blob/master/mesonbuild/mesonlib.py
@@ -63,3 +63,13 @@ if [ ! -z "\${PS1+x}" ]; then
     PS1="($1) \$PS1"
 fi
 EOF
+
+echo "Environment $1 successfully created in directory:"
+echo ""
+echo "$INSTALL_PREFIX"
+echo ""
+echo "It can be activated using the command:"
+echo "> lhelper activate $1"
+echo ""
+echo "The build options can be modified with the command:"
+echo "> lhelper edit"

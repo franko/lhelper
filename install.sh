@@ -20,6 +20,7 @@ mkdir -p "$DESTDIR/var/lib/lhelper/builds"
 mkdir -p "$DESTDIR/var/lib/lhelper/repos"
 mkdir -p "$DESTDIR/var/lib/lhelper/archives"
 mkdir -p "$DESTDIR/var/lib/lhelper/environments"
+mkdir -p "$DESTDIR/var/lib/lhelper/env"
 
 cp lhelper-config-default "$DESTDIR/share/lhelper"
 cp build-helper.sh "$DESTDIR/share/lhelper"
