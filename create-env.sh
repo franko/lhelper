@@ -3,29 +3,47 @@
 
 INSTALL_PREFIX="${2:-$LHELPER_WORKING_DIR/env/$1}"
 
+# Take a format and a list or aguments. Format each argument with
+# the given format using printf ang join all strings.
+# Omit the first character of the result string.
+function printf_join {
+    local _fmt="$1"
+    shift
+    local _result=$(printf "$_fmt" "$@")
+    echo "${_result:1}"
+}
+
 # Figure out the default library directory.
 # Adapted from https://github.com/mesonbuild/meson/blob/master/mesonbuild/mesonlib.py
+# Returns one or more paths separated by a colon. It can return multiple values
+# because on debian with multiarch there is the lib directory and its multiarch
+# subdirectory.
 default_libdir () {
+    local _prefix="$1"
     if [ -f /etc/debian_version ]; then
         local archpath=$(dpkg-architecture -qDEB_HOST_MULTIARCH)
         if [ $? == 0 -a ${archpath:-none} != "none" ]; then
-            echo "lib/$archpath"
+            echo "${_prefix}/lib/$archpath:${_prefix}/lib"
             return
         fi
     fi
     if [ -d /usr/lib64 -a ! -L /usr/lib64 ]; then
-        echo "lib64"
+        echo "${_prefix}/lib64"
         return
     fi
-    echo "lib"
+    echo "${_prefix}/lib"
 }
 
-_libdir=$(default_libdir)
-_pkgconfigdir="$_libdir/pkgconfig"
+IFS=':' read -r -a _libdir_array <<< "$(default_libdir "${INSTALL_PREFIX}")"
 
-mkdir -p "${INSTALL_PREFIX}/$_pkgconfigdir"
+for _libdir in "${_libdir_array[@]}"; do
+    mkdir -p "${_libdir}/pkgconfig"
+done
 mkdir -p "${INSTALL_PREFIX}/include"
 mkdir -p "${INSTALL_PREFIX}/bin"
+
+_pkgconfigdir=$(printf_join ":%s/pkgconfig" "${_libdir_array[@]}")
+_ldpath=$(printf_join ":%s" "${_libdir_array[@]}")
 
 # Copy the file containing the compiler config into the environment
 # bin directory.
@@ -35,15 +53,15 @@ cat << EOF > "$LHELPER_WORKING_DIR/environments/$1"
 export PATH="${INSTALL_PREFIX}/bin:\${PATH}"
 
 if [ -z "\${LD_LIBRARY_PATH+x}" ]; then
-    export LD_LIBRARY_PATH="${INSTALL_PREFIX}/$_libdir"
+    export LD_LIBRARY_PATH="$_ldpath"
 else
-    LD_LIBRARY_PATH="${INSTALL_PREFIX}/$_libdir:\$LD_LIBRARY_PATH"
+    LD_LIBRARY_PATH="$_ldpath:\$LD_LIBRARY_PATH"
 fi
 
 if [ -z "\${PKG_CONFIG_PATH+x}" ]; then
-    export PKG_CONFIG_PATH="${INSTALL_PREFIX}/$_pkgconfigdir"
+    export PKG_CONFIG_PATH="$_pkgconfigdir"
 else
-    PKG_CONFIG_PATH="${INSTALL_PREFIX}/$_pkgconfigdir:\$PKG_CONFIG_PATH"
+    PKG_CONFIG_PATH="$_pkgconfigdir:\$PKG_CONFIG_PATH"
 fi
 
 export CMAKE_PREFIX_PATH="${INSTALL_PREFIX}"
