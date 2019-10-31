@@ -19,31 +19,30 @@ function printf_join {
 # because on debian with multiarch there is the lib directory and its multiarch
 # subdirectory.
 default_libdir () {
-    local _prefix="$1"
     if [ -f /etc/debian_version ]; then
         local archpath=$(dpkg-architecture -qDEB_HOST_MULTIARCH)
         if [ $? == 0 -a ${archpath:-none} != "none" ]; then
-            echo "${_prefix}/lib/$archpath:${_prefix}/lib"
+            echo "lib/$archpath:lib"
             return
         fi
     fi
     if [ -d /usr/lib64 -a ! -L /usr/lib64 ]; then
-        echo "${_prefix}/lib64"
+        echo "lib64"
         return
     fi
-    echo "${_prefix}/lib"
+    echo "lib"
 }
 
 IFS=':' read -r -a _libdir_array <<< "$(default_libdir "${INSTALL_PREFIX}")"
 
 for _libdir in "${_libdir_array[@]}"; do
-    mkdir -p "${_libdir}/pkgconfig"
+    mkdir -p "${INSTALL_PREFIX}/${_libdir}/pkgconfig"
 done
 mkdir -p "${INSTALL_PREFIX}/include"
 mkdir -p "${INSTALL_PREFIX}/bin"
 
-_pkgconfigdir=$(printf_join ":%s/pkgconfig" "${_libdir_array[@]}")
-_ldpath=$(printf_join ":%s" "${_libdir_array[@]}")
+_pkgconfigdir=$(printf_join ":${INSTALL_PREFIX}/%s/pkgconfig" "${_libdir_array[@]}")
+_ldpath=$(printf_join ":${INSTALL_PREFIX}/%s" "${_libdir_array[@]}")
 
 # Copy the file containing the compiler config into the environment
 # bin directory.
