@@ -72,12 +72,14 @@ install_library_with_command () {
     local install_command="$1"
     local package_name=$(find_package_name)
     local package_temp_dir="$LHELPER_WORKING_DIR/tmp"
+    local digest=$(build_env_digest)
+    local tar_package_filename="${package_name}-${digest}.tar.gz"
     rm -fr "$package_temp_dir"
     mkdir "$package_temp_dir"
     DESTDIR="$package_temp_dir" $install_command
-    tar -C "$package_temp_dir$INSTALL_PREFIX" -czf "$package_name.tar.gz" .
-    mv "$package_name.tar.gz" "$LHELPER_WORKING_DIR/packages"
-    tar -C "$INSTALL_PREFIX" -xf "$LHELPER_WORKING_DIR/packages/$package_name.tar.gz"
+    tar -C "$package_temp_dir$INSTALL_PREFIX" -czf "${tar_package_filename}" .
+    mv "${tar_package_filename}" "$LHELPER_WORKING_DIR/packages"
+    tar -C "$INSTALL_PREFIX" -xf "$LHELPER_WORKING_DIR/packages/${tar_package_filename}"
 }
 
 build_and_install () {

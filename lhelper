@@ -18,6 +18,21 @@ if [ ! -d "${LHELPER_DIR}" ]; then
     echo "Lhelper may be not properly installed."
 fi
 
+build_env_digest () {
+    source "$LHELPER_ENV_PREFIX/bin/lhelper-config"
+    _digest=($(cat << EOF | md5sum
+CC="$CC"
+CXX="$CXX"
+CFLAGS="$CFLAGS"
+CXXFLAGS="$CXXFLAGS"
+BUILD_TYPE="$BUILD_TYPE"
+CC_VERSION="$($CC --version | head -n 1)"
+CXX_VERSION="$($CXX --version | head -n 1)"
+EOF
+    ))
+    echo "${_digest[0]}"
+}
+
 library_install () {
     if [ -z ${LHELPER_ENV_NAME+x} ]; then
         echo "error: no environment defined"
@@ -30,7 +45,7 @@ library_install () {
     fi
 
     source "$LHELPER_DIR/build-helper.sh"
-    export -f enter_git_repository enter_remote_archive inside_git_apply_patch inside_archive_apply_patch build_and_install install_pkgconfig_file interrupt_clean_archive install_library_with_command find_package_name
+    export -f enter_git_repository enter_remote_archive inside_git_apply_patch inside_archive_apply_patch build_and_install install_pkgconfig_file interrupt_clean_archive install_library_with_command find_package_name build_env_digest
 
     export INSTALL_PREFIX="$LHELPER_ENV_PREFIX"
     if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* ]]; then
