@@ -18,6 +18,8 @@ function printf_join {
 # Returns one or more paths separated by a colon. It can return multiple values
 # because on debian with multiarch there is the lib directory and its multiarch
 # subdirectory.
+# The first directory will be used by lhelper to install new pkg-config files if
+# the build system doesn't do it natively.
 default_libdir () {
     if [ -f /etc/debian_version ]; then
         local archpath=$(dpkg-architecture -qDEB_HOST_MULTIARCH)
@@ -41,31 +43,24 @@ done
 mkdir -p "${INSTALL_PREFIX}/include"
 mkdir -p "${INSTALL_PREFIX}/bin"
 
-_pkgconfigdir=$(printf_join ":${INSTALL_PREFIX}/%s/pkgconfig" "${_libdir_array[@]}")
-_ldpath=$(printf_join ":${INSTALL_PREFIX}/%s" "${_libdir_array[@]}")
-
 # Copy the file containing the compiler config into the environment
 # bin directory.
 cp "$LHELPER_DIR/lhelper-config-default" "${INSTALL_PREFIX}/bin/lhelper-config"
 
+_pkgconfig_dir=$(printf_join ":\${_prefix}/%s/pkgconfig" "${_libdir_array[0]}")
+_pkgconfig_path=$(printf_join ":\${_prefix}/%s/pkgconfig" "${_libdir_array[@]}")
+_ldpath=$(printf_join ":\${_prefix}/%s" "${_libdir_array[@]}")
+
 cat << EOF > "$LHELPER_WORKING_DIR/environments/$1"
-export PATH="${INSTALL_PREFIX}/bin:\${PATH}"
+_prefix="${INSTALL_PREFIX}"
+export PATH="\${_prefix}/bin\${PATH:+:}\${PATH}"
 
-if [ -z "\${LD_LIBRARY_PATH+x}" ]; then
-    export LD_LIBRARY_PATH="$_ldpath"
-else
-    LD_LIBRARY_PATH="$_ldpath:\$LD_LIBRARY_PATH"
-fi
+export LD_LIBRARY_PATH="${_ldpath}\${LD_LIBRARY_PATH:+:}\${LD_LIBRARY_PATH}"
+export PKG_CONFIG_PATH="${_pkgconfig_path}\${PKG_CONFIG_PATH:+:}\${PKG_CONFIG_PATH}"
 
-if [ -z "\${PKG_CONFIG_PATH+x}" ]; then
-    export PKG_CONFIG_PATH="$_pkgconfigdir"
-else
-    PKG_CONFIG_PATH="$_pkgconfigdir:\$PKG_CONFIG_PATH"
-fi
-
-export CMAKE_PREFIX_PATH="${INSTALL_PREFIX}"
-export LHELPER_PKGCONFIG_PATH="${INSTALL_PREFIX}/$_pkgconfigdir"
-export LHELPER_ENV_PREFIX="${INSTALL_PREFIX}"
+export CMAKE_PREFIX_PATH="\${_prefix}"
+export LHELPER_PKGCONFIG_PATH="${_pkgconfig_dir}"
+export LHELPER_ENV_PREFIX="\${_prefix}"
 export LHELPER_ENV_NAME="$1"
 
 if [ -f /etc/bash.bashrc ]; then
