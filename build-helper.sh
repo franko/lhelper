@@ -68,17 +68,32 @@ find_package_name () {
     echo "${script_name%.sh}"
 }
 
+prepare_temp_dir () {
+    local temp_dir="$1/tmp"
+    rm -fr "$temp_dir"
+    mkdir "$temp_dir"
+    echo "$temp_dir"
+}
+
+archive_reloc () {
+    local archive_dir="$1"
+    local old_prefix="${2//\//\\\/}"
+    local new_prefix="${3//\//\\\/}"
+    find "$archive_dir" '(' -name '*.la' -or -name '*.pc' ')' -exec sed "s/${old_prefix}/${new_prefix}/g" '{}' \;
+}
+
 install_library_with_command () {
     local install_command="$1"
     local package_name=$(find_package_name)
-    local package_temp_dir="$LHELPER_WORKING_DIR/tmp"
     local digest=$(build_env_digest)
     local tar_package_filename="${package_name}-${digest}.tar.gz"
-    rm -fr "$package_temp_dir"
-    mkdir "$package_temp_dir"
+    local package_temp_dir="$(prepare_temp_dir "$LHELPER_WORKING_DIR")"
     DESTDIR="$package_temp_dir" $install_command
+    archive_reloc "$package_temp_dir" "$INSTALL_PREFIX" LHELPER_PREFIX
+    echo tar -C "$package_temp_dir$INSTALL_PREFIX" -czf "${tar_package_filename}" .
     tar -C "$package_temp_dir$INSTALL_PREFIX" -czf "${tar_package_filename}" .
     mv "${tar_package_filename}" "$LHELPER_WORKING_DIR/packages"
+    echo tar -C "$INSTALL_PREFIX" -xf "$LHELPER_WORKING_DIR/packages/${tar_package_filename}"
     tar -C "$INSTALL_PREFIX" -xf "$LHELPER_WORKING_DIR/packages/${tar_package_filename}"
 }
 
