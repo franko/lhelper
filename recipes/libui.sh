@@ -24,8 +24,10 @@ elif [[ "$OSTYPE" == "darwin"* ]]; then
 fi
 
 cd -
-cp ui.h "$UI_OS_HEADER" "$INSTALL_PREFIX/include"
-cp build/out/libui.a "$INSTALL_PREFIX/lib"
+mkdir -p "$DESTDIR$INSTALL_PREFIX/include"
+mkdir -p "$DESTDIR$INSTALL_PREFIX/lib"
+cp ui.h "$UI_OS_HEADER" "$DESTDIR$INSTALL_PREFIX/include"
+cp build/out/libui.a "$DESTDIR$INSTALL_PREFIX/lib"
 
 PKG_NAME=libui
 
