@@ -60,7 +60,8 @@ inside_archive_apply_patch () {
 
 install_pkgconfig_file () {
     echo "Installing \"$1\" in \"$LHELPER_PKGCONFIG_PATH\""
-    cp "$1" "$LHELPER_PKGCONFIG_PATH"
+    mkdir -p "$DESTDIR$LHELPER_PKGCONFIG_PATH"
+    cp "$1" "$DESTDIR$LHELPER_PKGCONFIG_PATH"
 }
 
 find_package_name () {
@@ -72,7 +73,6 @@ prepare_temp_dir () {
     local temp_dir="$1/tmp"
     rm -fr "$temp_dir"
     mkdir "$temp_dir"
-    echo "$temp_dir"
 }
 
 # Relocate prefix path references for all files in a library install's
@@ -86,26 +86,12 @@ library_dir_reloc () {
 
 # Extract library archive and relocate prefix path references.
 extract_archive_reloc () {
+    $(prepare_temp_dir "$LHELPER_WORKING_DIR")
     local tar_package_filename="$1"
-    local package_temp_dir="$(prepare_temp_dir "$LHELPER_WORKING_DIR")"
+    local package_temp_dir="$LHELPER_WORKING_DIR/tmp"
     tar -C "$package_temp_dir" -xf "$LHELPER_WORKING_DIR/packages/${tar_package_filename}"
     library_dir_reloc "$package_temp_dir" LHELPER_PREFIX "$INSTALL_PREFIX"
     cp -a "$package_temp_dir/." "$INSTALL_PREFIX"
-}
-
-install_library_with_command () {
-    local install_command="$1"
-    local package_name=$(find_package_name)
-    local digest=$(build_env_digest)
-    local tar_package_filename="${package_name}-${digest}.tar.gz"
-    local package_temp_dir="$(prepare_temp_dir "$LHELPER_WORKING_DIR")"
-    DESTDIR="$package_temp_dir" $install_command
-    library_dir_reloc "$package_temp_dir" "$INSTALL_PREFIX" LHELPER_PREFIX
-    echo "CREATING PACKAGE ${tar_package_filename}"
-    echo tar -C "$package_temp_dir$INSTALL_PREFIX" -czf "${tar_package_filename}" .
-    tar -C "$package_temp_dir$INSTALL_PREFIX" -czf "${tar_package_filename}" .
-    echo "MOVING PACKAGE ${tar_package_filename}"
-    mv "${tar_package_filename}" "$LHELPER_WORKING_DIR/packages"
 }
 
 build_and_install () {
@@ -114,20 +100,20 @@ build_and_install () {
         mkdir build && pushd build
         cmake -G "Ninja" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" "${@:2}" ..
         cmake --build .
-        install_library_with_command "cmake --build . --target install"
+        cmake --build . --target install
         popd
         ;;
     meson)
         mkdir build && pushd build
         meson --prefix="$INSTALL_PREFIX" --buildtype="${BUILD_TYPE,,}" "${@:2}" ..
         ninja
-        install_library_with_command "ninja install"
+        ninja install
         popd
         ;;
     configure)
         ./configure --prefix="$WIN_INSTALL_PREFIX" --enable-${BUILD_TYPE,,} "${@:2}"
         make
-        install_library_with_command "make install"
+        make install
         ;;
     *)
         echo "error: unknown build type \"$1\""

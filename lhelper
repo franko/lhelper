@@ -45,7 +45,7 @@ library_install () {
     fi
 
     source "$LHELPER_DIR/build-helper.sh"
-    export -f enter_git_repository enter_remote_archive inside_git_apply_patch inside_archive_apply_patch build_and_install install_pkgconfig_file interrupt_clean_archive install_library_with_command find_package_name build_env_digest library_dir_reloc prepare_temp_dir extract_archive_reloc
+    export -f enter_git_repository enter_remote_archive inside_git_apply_patch inside_archive_apply_patch build_and_install install_pkgconfig_file interrupt_clean_archive find_package_name build_env_digest library_dir_reloc prepare_temp_dir extract_archive_reloc
 
     export INSTALL_PREFIX="$LHELPER_ENV_PREFIX"
     if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* ]]; then
@@ -64,7 +64,19 @@ library_install () {
     else
         echo "PACKAGE DO NOT EXISTS"
         echo "COMPILING..."
-        bash -e "$LHELPER_DIR/recipes/$1.sh"
+
+        $(prepare_temp_dir "$LHELPER_WORKING_DIR")
+
+        # Execute the recipe
+        DESTDIR="$LHELPER_WORKING_DIR/tmp" bash -e "$LHELPER_DIR/recipes/$1.sh"
+
+        local package_temp_dir="$LHELPER_WORKING_DIR/tmp"
+        library_dir_reloc "$package_temp_dir" "$INSTALL_PREFIX" LHELPER_PREFIX
+        echo "CREATING PACKAGE ${tar_package_filename}"
+        echo tar -C "$package_temp_dir$INSTALL_PREFIX" -czf "${tar_package_filename}" .
+        tar -C "$package_temp_dir$INSTALL_PREFIX" -czf "${tar_package_filename}" .
+        echo "MOVING PACKAGE ${tar_package_filename}"
+        mv "${tar_package_filename}" "$LHELPER_WORKING_DIR/packages"
     fi
     echo "EXTRACTING..."
     extract_archive_reloc "${tar_package_filename}"
