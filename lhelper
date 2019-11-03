@@ -56,7 +56,19 @@ library_install () {
     export WIN_INSTALL_PREFIX
 
     source "$LHELPER_ENV_PREFIX/bin/lhelper-config"
-    exec bash -e "$LHELPER_DIR/recipes/$1.sh"
+
+    local digest=$(build_env_digest)
+    local tar_package_filename="$1-${digest}.tar.gz"
+    if [ -f "$LHELPER_WORKING_DIR/packages/${tar_package_filename}" ]; then
+        echo "PACKAGE EXISTS: ${tar_package_filename}"
+    else
+        echo "PACKAGE DO NOT EXISTS"
+        echo "COMPILING..."
+        bash -e "$LHELPER_DIR/recipes/$1.sh"
+    fi
+    echo "EXTRACTING..."
+    extract_archive_reloc "${tar_package_filename}"
+    echo "DONE"
 }
 
 start_subshell () {

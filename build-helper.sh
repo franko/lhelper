@@ -95,17 +95,14 @@ install_library_with_command () {
     local package_name=$(find_package_name)
     local digest=$(build_env_digest)
     local tar_package_filename="${package_name}-${digest}.tar.gz"
-    echo "ARCHIVE_FILENAME \'$LHELPER_WORKING_DIR/packages/${tar_package_filename}\'"
-    if [ ! -f "$LHELPER_WORKING_DIR/packages/${tar_package_filename}" ]; then
-        local package_temp_dir="$(prepare_temp_dir "$LHELPER_WORKING_DIR")"
-        echo "INSTALLING COMMAND"
-        DESTDIR="$package_temp_dir" $install_command
-        archive_reloc "$package_temp_dir" "$INSTALL_PREFIX" LHELPER_PREFIX
-        tar -C "$package_temp_dir$INSTALL_PREFIX" -czf "${tar_package_filename}" .
-        mv "${tar_package_filename}" "$LHELPER_WORKING_DIR/packages"
-    fi
-    echo "EXTRACTING EXISTING ARCHIVE"
-    extract_archive_reloc "${tar_package_filename}"
+    local package_temp_dir="$(prepare_temp_dir "$LHELPER_WORKING_DIR")"
+    DESTDIR="$package_temp_dir" $install_command
+    archive_reloc "$package_temp_dir" "$INSTALL_PREFIX" LHELPER_PREFIX
+    echo "CREATING PACKAGE ${tar_package_filename}"
+    echo tar -C "$package_temp_dir$INSTALL_PREFIX" -czf "${tar_package_filename}" .
+    tar -C "$package_temp_dir$INSTALL_PREFIX" -czf "${tar_package_filename}" .
+    echo "MOVING PACKAGE ${tar_package_filename}"
+    mv "${tar_package_filename}" "$LHELPER_WORKING_DIR/packages"
 }
 
 build_and_install () {
@@ -114,7 +111,7 @@ build_and_install () {
         mkdir build && pushd build
         cmake -G "Ninja" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" "${@:2}" ..
         cmake --build .
-        cmake --build . --target install
+        install_library_with_command "cmake --build . --target install"
         popd
         ;;
     meson)
@@ -127,7 +124,7 @@ build_and_install () {
     configure)
         ./configure --prefix="$WIN_INSTALL_PREFIX" --enable-${BUILD_TYPE,,} "${@:2}"
         make
-        make install
+        install_library_with_command "make install"
         ;;
     *)
         echo "error: unknown build type \"$1\""
