@@ -79,7 +79,15 @@ archive_reloc () {
     local archive_dir="$1"
     local old_prefix="${2//\//\\\/}"
     local new_prefix="${3//\//\\\/}"
-    find "$archive_dir" '(' -name '*.la' -or -name '*.pc' ')' -exec sed "s/${old_prefix}/${new_prefix}/g" '{}' \;
+    find "$archive_dir" '(' -name '*.la' -or -name '*.pc' ')' -exec sed -i "s/${old_prefix}/${new_prefix}/g" '{}' \;
+}
+
+extract_archive_reloc () {
+    local tar_package_filename="$1"
+    local package_temp_dir="$(prepare_temp_dir "$LHELPER_WORKING_DIR")"
+    tar -C "$package_temp_dir" -xf "$LHELPER_WORKING_DIR/packages/${tar_package_filename}"
+    archive_reloc "$package_temp_dir" LHELPER_PREFIX "$INSTALL_PREFIX"
+    cp -a "$package_temp_dir/." "$INSTALL_PREFIX"
 }
 
 install_library_with_command () {
@@ -87,14 +95,17 @@ install_library_with_command () {
     local package_name=$(find_package_name)
     local digest=$(build_env_digest)
     local tar_package_filename="${package_name}-${digest}.tar.gz"
-    local package_temp_dir="$(prepare_temp_dir "$LHELPER_WORKING_DIR")"
-    DESTDIR="$package_temp_dir" $install_command
-    archive_reloc "$package_temp_dir" "$INSTALL_PREFIX" LHELPER_PREFIX
-    echo tar -C "$package_temp_dir$INSTALL_PREFIX" -czf "${tar_package_filename}" .
-    tar -C "$package_temp_dir$INSTALL_PREFIX" -czf "${tar_package_filename}" .
-    mv "${tar_package_filename}" "$LHELPER_WORKING_DIR/packages"
-    echo tar -C "$INSTALL_PREFIX" -xf "$LHELPER_WORKING_DIR/packages/${tar_package_filename}"
-    tar -C "$INSTALL_PREFIX" -xf "$LHELPER_WORKING_DIR/packages/${tar_package_filename}"
+    echo "ARCHIVE_FILENAME \'$LHELPER_WORKING_DIR/packages/${tar_package_filename}\'"
+    if [ ! -f "$LHELPER_WORKING_DIR/packages/${tar_package_filename}" ]; then
+        local package_temp_dir="$(prepare_temp_dir "$LHELPER_WORKING_DIR")"
+        echo "INSTALLING COMMAND"
+        DESTDIR="$package_temp_dir" $install_command
+        archive_reloc "$package_temp_dir" "$INSTALL_PREFIX" LHELPER_PREFIX
+        tar -C "$package_temp_dir$INSTALL_PREFIX" -czf "${tar_package_filename}" .
+        mv "${tar_package_filename}" "$LHELPER_WORKING_DIR/packages"
+    fi
+    echo "EXTRACTING EXISTING ARCHIVE"
+    extract_archive_reloc "${tar_package_filename}"
 }
 
 build_and_install () {
