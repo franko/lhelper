@@ -64,36 +64,6 @@ install_pkgconfig_file () {
     cp "$1" "$DESTDIR$LHELPER_PKGCONFIG_PATH"
 }
 
-find_package_name () {
-    local script_name=`basename "$0"`
-    echo "${script_name%.sh}"
-}
-
-prepare_temp_dir () {
-    local temp_dir="$1/tmp"
-    rm -fr "$temp_dir"
-    mkdir "$temp_dir"
-}
-
-# Relocate prefix path references for all files in a library install's
-# directory.
-library_dir_reloc () {
-    local archive_dir="$1"
-    local old_prefix="${2//\//\\\/}"
-    local new_prefix="${3//\//\\\/}"
-    find "$archive_dir" '(' -name '*.la' -or -name '*.pc' ')' -exec sed -i "s/${old_prefix}/${new_prefix}/g" '{}' \;
-}
-
-# Extract library archive and relocate prefix path references.
-extract_archive_reloc () {
-    $(prepare_temp_dir "$LHELPER_WORKING_DIR")
-    local tar_package_filename="$1"
-    local package_temp_dir="$LHELPER_WORKING_DIR/tmp"
-    tar -C "$package_temp_dir" -xf "$LHELPER_WORKING_DIR/packages/${tar_package_filename}"
-    library_dir_reloc "$package_temp_dir" LHELPER_PREFIX "$INSTALL_PREFIX"
-    cp -a "$package_temp_dir/." "$INSTALL_PREFIX"
-}
-
 build_and_install () {
     case $1 in
     cmake)
