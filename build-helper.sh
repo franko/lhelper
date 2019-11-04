@@ -59,9 +59,9 @@ inside_archive_apply_patch () {
 }
 
 install_pkgconfig_file () {
-    echo "Installing \"$1\" in \"$LHELPER_PKGCONFIG_PATH\""
-    mkdir -p "$DESTDIR$LHELPER_PKGCONFIG_PATH"
-    cp "$1" "$DESTDIR$LHELPER_PKGCONFIG_PATH"
+    echo "Installing \"$1\" in \"${INSTALL_PREFIX}/$LHELPER_PKGCONFIG_RPATH\""
+    mkdir -p "${INSTALL_PREFIX}/$LHELPER_PKGCONFIG_RPATH"
+    cp "$1" "${INSTALL_PREFIX}/$LHELPER_PKGCONFIG_RPATH"
 }
 
 build_and_install () {

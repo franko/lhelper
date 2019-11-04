@@ -52,10 +52,25 @@ library_dir_reloc () {
 extract_archive_reloc () {
     $(prepare_temp_dir "$LHELPER_WORKING_DIR")
     local tar_package_filename="$1"
+    local old_prefix="$2"
+    local new_prefix="$3"
+    local _install_prefix="$4"
     local package_temp_dir="$LHELPER_WORKING_DIR/tmp"
     tar -C "$package_temp_dir" -xf "$LHELPER_WORKING_DIR/packages/${tar_package_filename}"
-    library_dir_reloc "$package_temp_dir" "$LHELPER_ROOT_NAME" "$INSTALL_PREFIX"
-    cp -a "$package_temp_dir/." "$INSTALL_PREFIX"
+    library_dir_reloc "$package_temp_dir" "$old_prefix" "$new_prefix"
+    cp -a "$package_temp_dir/." "$_install_prefix"
+}
+
+set_prefix_variables () {
+    local prefix_dir="$1"
+    INSTALL_PREFIX="$prefix_dir"
+    if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* ]]; then
+        WIN_INSTALL_PREFIX="${INSTALL_PREFIX/#\/c\//c:\/}"
+    else
+        WIN_INSTALL_PREFIX="${INSTALL_PREFIX}"
+    fi
+    SED_PREFIX_PATTERN="$(echo "${WIN_INSTALL_PREFIX}" | sed -e 's/\([a-zA-Z]\):/\[\L\1\U\1\]:/')"
+    export INSTALL_PREFIX WIN_INSTALL_PREFIX SED_PREFIX_PATTERN
 }
 
 library_install () {
@@ -72,9 +87,8 @@ library_install () {
     source "$LHELPER_DIR/build-helper.sh"
     export -f enter_git_repository enter_remote_archive inside_git_apply_patch inside_archive_apply_patch build_and_install install_pkgconfig_file interrupt_clean_archive
 
-    LHELPER_ROOT_NAME="/lhelper_root"
-    export INSTALL_PREFIX="$LHELPER_ROOT_NAME"
-    export WIN_INSTALL_PREFIX="$LHELPER_ROOT_NAME"
+    LHELPER_TEMP_ROOT="$LHELPER_WORKING_DIR/tmp"
+    set_prefix_variables "$LHELPER_TEMP_ROOT"
 
     source "$LHELPER_ENV_PREFIX/bin/lhelper-config"
 
@@ -88,19 +102,29 @@ library_install () {
 
         $(prepare_temp_dir "$LHELPER_WORKING_DIR")
 
+        echo "INSTALL_PREFIX=$INSTALL_PREFIX"
+        echo "WIN_INSTALL_PREFIX=$WIN_INSTALL_PREFIX"
         # Execute the recipe
-        DESTDIR="$LHELPER_WORKING_DIR/tmp" bash -e "$LHELPER_DIR/recipes/$1.sh"
+        bash -e "$LHELPER_DIR/recipes/$1.sh"
 
-        local package_temp_dir="$LHELPER_WORKING_DIR/tmp"
-        library_dir_reloc "$package_temp_dir" "$INSTALL_PREFIX" "$LHELPER_ROOT_NAME"
+        echo "WAITING"
+        read answer
+
+        echo "RELOCATING USING $SED_PREFIX_PATTERN"
+        library_dir_reloc "$LHELPER_TEMP_ROOT" "$SED_PREFIX_PATTERN" '__LHELPER_PREFIX__'
+
+        echo "RELOCATING DONE WITH $SED_PREFIX_PATTERN"
+        read answer
+
         echo "CREATING PACKAGE ${tar_package_filename}"
-        echo tar -C "$package_temp_dir$INSTALL_PREFIX" -czf "${tar_package_filename}" .
-        tar -C "$package_temp_dir$INSTALL_PREFIX" -czf "${tar_package_filename}" .
+        echo tar -C "$LHELPER_TEMP_ROOT" -czf "${tar_package_filename}" .
+        tar -C "$LHELPER_TEMP_ROOT" -czf "${tar_package_filename}" .
         echo "MOVING PACKAGE ${tar_package_filename}"
         mv "${tar_package_filename}" "$LHELPER_WORKING_DIR/packages"
     fi
     echo "EXTRACTING..."
-    extract_archive_reloc "${tar_package_filename}"
+    set_prefix_variables "$LHELPER_ENV_PREFIX"
+    extract_archive_reloc "${tar_package_filename}" '__LHELPER_PREFIX__' "$WIN_INSTALL_PREFIX" "$INSTALL_PREFIX"
     echo "DONE"
 }
 
