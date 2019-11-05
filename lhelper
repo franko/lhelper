@@ -105,13 +105,18 @@ library_install () {
     local tar_package_filename="$1-${digest}.tar.gz"
     if [ -f "$LHELPER_WORKING_DIR/packages/${tar_package_filename}" ]; then
         echo "Lhelper: found an existing package"
+        echo "Lhelper: extracting package"
     else
         $(prepare_temp_dir "$LHELPER_WORKING_DIR")
 
-        echo "Lhelper: building package..."
+        echo "Lhelper: building library..."
         # Execute the recipe
         bash -e "$LHELPER_DIR/recipes/$1.sh"
-        echo "Lhelper: building package done"
+        if [ $? -ne 0 ]; then
+            echo "Lhelper: error building library \"$1\""
+            exit 1
+        fi
+        echo "Lhelper: build done"
 
         library_dir_reloc "$LHELPER_TEMP_ROOT" "$SED_PREFIX_PATTERN" '__LHELPER_PREFIX__'
 
@@ -119,7 +124,6 @@ library_install () {
         tar -C "$LHELPER_TEMP_ROOT" -czf "${tar_package_filename}" .
         mv "${tar_package_filename}" "$LHELPER_WORKING_DIR/packages"
     fi
-    echo "Lhelper: extracting package"
     set_prefix_variables "$LHELPER_ENV_PREFIX"
     extract_archive_reloc "${tar_package_filename}" '__LHELPER_PREFIX__' "$(sed_replace_escape "$WIN_INSTALL_PREFIX")" "$INSTALL_PREFIX"
     echo "Lhelper: done"
