@@ -104,37 +104,25 @@ library_install () {
     local digest=$(build_env_digest)
     local tar_package_filename="$1-${digest}.tar.gz"
     if [ -f "$LHELPER_WORKING_DIR/packages/${tar_package_filename}" ]; then
-        echo "PACKAGE EXISTS: ${tar_package_filename}"
+        echo "Lhelper: found an existing package"
     else
-        echo "PACKAGE DO NOT EXISTS"
-        echo "COMPILING..."
-
         $(prepare_temp_dir "$LHELPER_WORKING_DIR")
 
-        echo "INSTALL_PREFIX=$INSTALL_PREFIX"
-        echo "WIN_INSTALL_PREFIX=$WIN_INSTALL_PREFIX"
+        echo "Lhelper: building package..."
         # Execute the recipe
         bash -e "$LHELPER_DIR/recipes/$1.sh"
+        echo "Lhelper: building package done"
 
-        echo "WAITING"
-        read answer
-
-        echo "RELOCATING USING $SED_PREFIX_PATTERN"
         library_dir_reloc "$LHELPER_TEMP_ROOT" "$SED_PREFIX_PATTERN" '__LHELPER_PREFIX__'
 
-        echo "RELOCATING DONE WITH $SED_PREFIX_PATTERN"
-        read answer
-
-        echo "CREATING PACKAGE ${tar_package_filename}"
-        echo tar -C "$LHELPER_TEMP_ROOT" -czf "${tar_package_filename}" .
+        echo "Lhelper: saving package"
         tar -C "$LHELPER_TEMP_ROOT" -czf "${tar_package_filename}" .
-        echo "MOVING PACKAGE ${tar_package_filename}"
         mv "${tar_package_filename}" "$LHELPER_WORKING_DIR/packages"
     fi
-    echo "EXTRACTING..."
+    echo "Lhelper: extracting package"
     set_prefix_variables "$LHELPER_ENV_PREFIX"
     extract_archive_reloc "${tar_package_filename}" '__LHELPER_PREFIX__' "$(sed_replace_escape "$WIN_INSTALL_PREFIX")" "$INSTALL_PREFIX"
-    echo "DONE"
+    echo "Lhelper: done"
 }
 
 start_subshell () {
