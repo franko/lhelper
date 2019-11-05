@@ -43,8 +43,8 @@ prepare_temp_dir () {
 # directory.
 library_dir_reloc () {
     local archive_dir="$1"
-    local old_prefix="${2//\//\\\/}"
-    local new_prefix="${3//\//\\\/}"
+    local old_prefix="$2"
+    local new_prefix="$3"
     find "$archive_dir" '(' -name '*.la' -or -name '*.pc' ')' -exec sed -i "s/${old_prefix}/${new_prefix}/g" '{}' \;
 }
 
@@ -69,8 +69,15 @@ set_prefix_variables () {
     else
         WIN_INSTALL_PREFIX="${INSTALL_PREFIX}"
     fi
-    SED_PREFIX_PATTERN="$(echo "${WIN_INSTALL_PREFIX}" | sed -e 's/\([a-zA-Z]\):/\[\L\1\U\1\]:/')"
+    local sed_pattern="$(echo "${WIN_INSTALL_PREFIX}" | sed -e 's/\([a-zA-Z]\):/\[\L\1\U\1\]:/')"
+    SED_PREFIX_PATTERN="${sed_pattern//\//\\\/}"
     export INSTALL_PREFIX WIN_INSTALL_PREFIX SED_PREFIX_PATTERN
+}
+
+# Escape the '/' so that it is suitable for sed as a RHS term in
+# substitute (s) command, like in sed -e 's/this/that/' after the 2nd /.
+sed_replace_escape () {
+    echo "${1//\//\\\/}"
 }
 
 library_install () {
@@ -124,7 +131,7 @@ library_install () {
     fi
     echo "EXTRACTING..."
     set_prefix_variables "$LHELPER_ENV_PREFIX"
-    extract_archive_reloc "${tar_package_filename}" '__LHELPER_PREFIX__' "$WIN_INSTALL_PREFIX" "$INSTALL_PREFIX"
+    extract_archive_reloc "${tar_package_filename}" '__LHELPER_PREFIX__' "$(sed_replace_escape "$WIN_INSTALL_PREFIX")" "$INSTALL_PREFIX"
     echo "DONE"
 }
 
