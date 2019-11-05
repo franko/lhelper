@@ -26,8 +26,10 @@ CXX="$CXX"
 CFLAGS="$CFLAGS"
 CXXFLAGS="$CXXFLAGS"
 BUILD_TYPE="$BUILD_TYPE"
+MACHTYPE="$MACHTYPE"
 CC_VERSION="$($CC --version | head -n 1)"
 CXX_VERSION="$($CXX --version | head -n 1)"
+CC_DUMPMACHINE="$($CC -dumpmachine)"
 EOF
     ))
     echo "${_digest[0]}"
