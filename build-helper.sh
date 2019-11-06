@@ -88,9 +88,6 @@ build_and_install () {
             CFLAGS="$CFLAGS -g"
             CXXFLAGS="$CXXFLAGS -g"
         fi
-        echo "CFLAGS=$CFLAGS"
-        echo "CXXFLAGS=$CXXFLAGS"
-        echo configure --prefix="$WIN_INSTALL_PREFIX" "${@:2}"
         ./configure --prefix="$WIN_INSTALL_PREFIX" "${@:2}"
         make
         make install
