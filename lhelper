@@ -18,9 +18,8 @@ if [ ! -d "${LHELPER_DIR}" ]; then
     echo "Lhelper may be not properly installed."
 fi
 
-build_env_digest () {
-    source "$LHELPER_ENV_PREFIX/bin/lhelper-config"
-    _digest=($(cat << EOF | md5sum
+cat_digest () {
+    cat << EOF
 CC="$CC"
 CXX="$CXX"
 CFLAGS="$CFLAGS"
@@ -31,8 +30,16 @@ CC_VERSION="$($CC --version | head -n 1)"
 CXX_VERSION="$($CXX --version | head -n 1)"
 CC_DUMPMACHINE="$($CC -dumpmachine)"
 EOF
-    ))
-    echo "${_digest[0]}"
+}
+
+build_env_digest () {
+    source "$LHELPER_ENV_PREFIX/bin/lhelper-config"
+    local digest_a=($(cat_digest | md5sum))
+    local digest="${digest_a[0]}"
+    if [ ! -f "$LHELPER_WORKING_DIR/digests/$digest" ]; then
+        cat_digest > "$LHELPER_WORKING_DIR/digests/$digest"
+    fi
+    echo "$digest"
 }
 
 prepare_temp_dir () {
