@@ -81,7 +81,17 @@ build_and_install () {
         popd
         ;;
     configure)
-        ./configure --prefix="$WIN_INSTALL_PREFIX" --enable-${BUILD_TYPE,,} "${@:2}"
+        if [ "${BUILD_TYPE,,}" = "release" ]; then
+            CFLAGS="$CFLAGS -O3"
+            CXXFLAGS="$CXXFLAGS -O3"
+        elif [ "${BUILD_TYPE,,}" = "debug" ]; then
+            CFLAGS="$CFLAGS -g"
+            CXXFLAGS="$CXXFLAGS -g"
+        fi
+        echo "CFLAGS=$CFLAGS"
+        echo "CXXFLAGS=$CXXFLAGS"
+        echo configure --prefix="$WIN_INSTALL_PREFIX" "${@:2}"
+        ./configure --prefix="$WIN_INSTALL_PREFIX" "${@:2}"
         make
         make install
         ;;
