@@ -1,4 +1,4 @@
-WXWIDGETS_PACKAGE=wxWidgets-3.1.0
+WXWIDGETS_PACKAGE="wxWidgets-$2"
 enter_remote_archive "$WXWIDGETS_PACKAGE" "https://github.com/wxWidgets/wxWidgets/releases/download/v3.1.0/$WXWIDGETS_PACKAGE.tar.bz2" "$WXWIDGETS_PACKAGE.tar.bz2" "tar xjf ARCHIVE_FILENAME"
 build_and_install configure
 

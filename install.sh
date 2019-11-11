@@ -27,7 +27,7 @@ mkdir -p "$DESTDIR/var/lib/lhelper/digests"
 cp lhelper-config-default "$DESTDIR/share/lhelper"
 cp build-helper.sh "$DESTDIR/share/lhelper"
 cp create-env.sh "$DESTDIR/share/lhelper"
-cp recipes/*.sh "$DESTDIR/share/lhelper/recipes"
+cp recipes/*.sh recipes/index "$DESTDIR/share/lhelper/recipes"
 cp patch/*.patch "$DESTDIR/share/lhelper/patch"
 cp lhelper "$DESTDIR/bin"
 
