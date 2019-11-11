@@ -169,6 +169,19 @@ create_env () {
     bash "$LHELPER_DIR/create-env.sh" "$1" "$2"
 }
 
+# Take the environment name and its install prefix as arguments.
+print_create_env_message () {
+    echo "Environment $1 successfully created in directory:"
+    echo ""
+    echo "$2"
+    echo ""
+    echo "It can be activated using the command:"
+    echo "> lhelper activate $1"
+    echo ""
+    echo "The build options can be modified with the command:"
+    echo "> lhelper edit"
+}
+
 case $1 in
 install)
     if [ $# -lt 2 ]; then
@@ -193,7 +206,10 @@ create)
         echo "Usage: $LHELPER_COMMAND_NAME create <env-name> [env-root-dir]"
         exit 1
     fi
-    create_env "$2" "$3"
+    env_prefix="${3-$LHELPER_WORKING_DIR/env/$2}"
+    create_env "$2" "$env_prefix"
+    "${EDITOR-vim}" "${env_prefix}/bin/lhelper-config"
+    print_create_env_message "$2" "$env_prefix"
     ;;
 edit)
     if [ -z ${LHELPER_ENV_NAME+x} ]; then

@@ -1,7 +1,7 @@
 # This script is executed from lhelper's main script when a command to create
 # a new environment is given.
 
-INSTALL_PREFIX="${2:-$LHELPER_WORKING_DIR/env/$1}"
+INSTALL_PREFIX="$2"
 
 # Take a format and a list or aguments. Format each argument with
 # the given format using printf ang join all strings.
@@ -63,6 +63,8 @@ export LHELPER_PKGCONFIG_RPATH="${_pkgconfig_reldir}"
 export LHELPER_ENV_PREFIX="\${_prefix}"
 export LHELPER_ENV_NAME="$1"
 
+source "\${LHELPER_ENV_PREFIX}/bin/lhelper-config"
+
 if [ -f /etc/bash.bashrc ]; then
     source /etc/bash.bashrc
 fi
@@ -76,12 +78,4 @@ if [ ! -z "\${PS1+x}" ]; then
 fi
 EOF
 
-echo "Environment $1 successfully created in directory:"
-echo ""
 echo "$INSTALL_PREFIX"
-echo ""
-echo "It can be activated using the command:"
-echo "> lhelper activate $1"
-echo ""
-echo "The build options can be modified with the command:"
-echo "> lhelper edit"
