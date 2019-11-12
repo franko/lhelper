@@ -136,7 +136,7 @@ library_install () {
 
     local digest=$(build_env_digest)
     local tar_package_filename="${package}_${version}_${digest}.tar.gz"
-    if [ -f "$LHELPER_WORKING_DIR/packages/${tar_package_filename}" ]; then
+    if [[ "$version" != "git-"* && -f "$LHELPER_WORKING_DIR/packages/${tar_package_filename}" ]]; then
         echo "Lhelper: found an existing package"
         echo "Lhelper: extracting package"
     else
