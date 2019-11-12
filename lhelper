@@ -115,6 +115,7 @@ library_install () {
             echo "error: cannot find version number for \"${package}\""
             exit 1
         fi
+        echo "Lhelper: using version $version"
     else
         version="$2"
     fi
