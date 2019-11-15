@@ -73,12 +73,18 @@ extract_archive_reloc () {
 set_prefix_variables () {
     local prefix_dir="$1"
     INSTALL_PREFIX="$prefix_dir"
+    local sed_pattern
     if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* ]]; then
         WIN_INSTALL_PREFIX="${INSTALL_PREFIX/#\/c\//c:\/}"
+        # We need to produce a sed pattern that match both 'c:/' and '/c/' for the
+        # drive letter.
+        # The pattern is '\([cC]:\|\/c\)' but the backslash need to be escaped
+        # of the RHS of sed's edit command, so it becomes: '\\([cC]:\\|\/c\/)'.
+        sed_pattern="$(echo "${WIN_INSTALL_PREFIX}" | sed -e 's/\([a-zA-Z]\):/\\(\[\L\1\U\1\]:\\|\/\L\1\\)/')"
     else
         WIN_INSTALL_PREFIX="${INSTALL_PREFIX}"
+        sed_pattern="${INSTALL_PREFIX}"
     fi
-    local sed_pattern="$(echo "${WIN_INSTALL_PREFIX}" | sed -e 's/\([a-zA-Z]\):/\[\L\1\U\1\]:/')"
     SED_PREFIX_PATTERN="${sed_pattern//\//\\\/}"
     export INSTALL_PREFIX WIN_INSTALL_PREFIX SED_PREFIX_PATTERN
 }
