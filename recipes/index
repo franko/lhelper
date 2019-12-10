@@ -6,7 +6,7 @@ freetype2 2.7
 libcanvas 1.0-alpha1
 nlopt 2.4.2
 libui alpha4.1
-luajit 2.0.5-franko
+luajit 2.0.5-lhelper2
 sndfile 1.0.28
 libsdl2 2.0.8
 magnum 2019.01
