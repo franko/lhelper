@@ -64,6 +64,46 @@ install_pkgconfig_file () {
     cp "$1" "${INSTALL_PREFIX}/$LHELPER_PKGCONFIG_RPATH"
 }
 
+configure_options () {
+    shared_option="--disable-shared"
+    local options_new=()
+    while [ ! -z ${1+x} ]; do
+        case $1 in
+            --enable-shared)
+                shared_option="--enable-shared"
+                ;;
+            --disable-shared)
+                ;;
+            *)
+                options_new+=($1)
+                ;;
+        esac
+        shift
+    done
+    options_new+=($shared_option)
+    echo "${options_new[*]}"
+}
+
+meson_options () {
+    shared_option="static"
+    local options_new=()
+    while [ ! -z ${1+x} ]; do
+        case $1 in
+            --enable-shared)
+                shared_option="shared"
+                ;;
+            --disable-shared)
+                ;;
+            *)
+                options_new+=("${1/--enable-/-D}=true")
+                ;;
+        esac
+        shift
+    done
+    options_new+=("-Ddefault_library=$shared_option")
+    echo "${options_new[*]}"
+}
+
 build_and_install () {
     case $1 in
     cmake)

@@ -114,16 +114,43 @@ library_install () {
     fi
 
     local package="$1"
+    shift
+
+    local options_a=()
+    for opt in "${@:1}"; do
+        if [[ $opt =~ ^- ]]; then
+            if [[ ! $opt =~ '--enable-' ]]; then
+                echo "error: unsupported package option: \"$opt\""
+                exit 1
+            fi
+            options_a+=("$opt")
+            shift
+        fi
+    done
+
+    local options_short=()
+    for opt in "${options_a[@]}"; do
+        options_short+=("${opt/--enable-/}")
+    done
+    local options_tag=""
+    if [[ ${#options_short[@]} -ne 0 ]]; then
+        options_tag="_${options_short[*]}"
+    fi
+
     local version
-    if [ -z "$2" ]; then
+    if [ -z "$1" ]; then
         version="$(latest_package_version "$package")"
         if [ -z "$version" ]; then
             echo "error: cannot find version number for \"${package}\""
             exit 1
         fi
-        echo "Lhelper: using version $version"
+        if [[ ${#options_short[@]} -eq 0 ]]; then
+            echo "Lhelper: using version $version"
+        else
+            echo "Lhelper: using version $version with options: ${options_short[*]}"
+        fi
     else
-        version="$2"
+        version="$1"
     fi
 
     local recipe_filename="${package}_${version}.sh"
@@ -133,7 +160,7 @@ library_install () {
     fi
 
     source "$LHELPER_DIR/build-helper.sh"
-    export -f enter_git_repository enter_remote_archive inside_git_apply_patch inside_archive_apply_patch build_and_install install_pkgconfig_file interrupt_clean_archive
+    export -f enter_git_repository enter_remote_archive inside_git_apply_patch inside_archive_apply_patch build_and_install install_pkgconfig_file interrupt_clean_archive configure_options meson_options
 
     LHELPER_TEMP_ROOT="$LHELPER_WORKING_DIR/tmp"
     set_prefix_variables "$LHELPER_TEMP_ROOT"
@@ -141,7 +168,7 @@ library_install () {
     source "$LHELPER_ENV_PREFIX/bin/lhelper-config"
 
     local digest=$(build_env_digest)
-    local tar_package_filename="${package}_${version}_${digest}.tar.gz"
+    local tar_package_filename="${package}${options_tag}_${version}_${digest}.tar.gz"
     if [[ "$version" != "git-"* && -f "$LHELPER_WORKING_DIR/packages/${tar_package_filename}" ]]; then
         echo "Lhelper: found an existing package"
         echo "Lhelper: extracting package"
@@ -150,9 +177,9 @@ library_install () {
 
         echo "Lhelper: building library..."
         # Execute the recipe
-        bash -e "$LHELPER_DIR/recipes/${recipe_filename}" "${package}" "${version}"
+        bash -e "$LHELPER_DIR/recipes/${recipe_filename}" "${package}" "${version}" "${options_a[@]}"
         if [ $? -ne 0 ]; then
-            echo "Lhelper: error building library \"$1\""
+            echo "Lhelper: error building library \"$package\""
             exit 1
         fi
         echo "Lhelper: build done"
