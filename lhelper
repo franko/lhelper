@@ -152,7 +152,7 @@ library_install () {
     if [ -z "$1" ]; then
         version="$(latest_package_version "$package")"
         if [ -z "$version" ]; then
-            echo "error: cannot find version number for \"${package}\""
+            echo "error: cannot find package \"${package}\""
             exit 1
         fi
         if [[ ${#options_short[@]} -eq 0 ]]; then
