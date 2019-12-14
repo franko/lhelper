@@ -117,21 +117,32 @@ library_install () {
     shift
 
     local options_a=()
+    local pic_option
     for opt in "${@:1}"; do
-        if [[ $opt =~ ^- ]]; then
-            if [[ ! $opt =~ '--enable-' ]]; then
+        case $opt in
+            --pic)
+                if [[ $MACHTYPE =~ linux ]]; then
+                    pic_option=$opt
+                fi
+                ;;
+            --enable-*)
+                options_a+=("$opt")
+                ;;
+            *)
                 echo "error: unsupported package option: \"$opt\""
                 exit 1
-            fi
-            options_a+=("$opt")
-            shift
-        fi
+                ;;
+        esac
+        shift
     done
 
     local options_short=()
     for opt in "${options_a[@]}"; do
         options_short+=("${opt/--enable-/}")
     done
+    if [ -n "$pic_option" ]; then
+        options_short+=('pic')
+    fi
     local options_tag=""
     if [[ ${#options_short[@]} -ne 0 ]]; then
         options_tag="_${options_short[*]}"
@@ -174,6 +185,11 @@ library_install () {
         echo "Lhelper: extracting package"
     else
         $(prepare_temp_dir "$LHELPER_WORKING_DIR")
+
+        if [ -n "$pic_option" ]; then
+            CFLAGS="$CFLAGS -fPIC"
+            CXXFLAGS="$CXXFLAGS -fPIC"
+        fi
 
         echo "Lhelper: building library..."
         # Execute the recipe
