@@ -1,8 +1,18 @@
 FREETYPE_VERSION="$2"
 enter_remote_archive "freetype-${FREETYPE_VERSION}" "http://download.savannah.gnu.org/releases/freetype/freetype-${FREETYPE_VERSION}.tar.gz" "freetype-${FREETYPE_VERSION}.tar.gz" "tar xzf ARCHIVE_FILENAME"
 
+pic_option="OFF"
+while [ ! -z ${3+x} ]; do
+    case $3 in
+        -shared | -pic)
+            pic_option="ON"
+            ;;
+    esac
+    shift
+done
+         
 mkdir build && cd build
-cmake -G "Ninja" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" -DWITH_ZLIB=OFF -DWITH_BZip2=OFF -DWITH_PNG=OFF -DCMAKE_DISABLE_FIND_PACKAGE_HarfBuzz=TRUE ..
+cmake -G "Ninja" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" -DWITH_ZLIB=OFF -DWITH_BZip2=OFF -DWITH_PNG=OFF -DCMAKE_DISABLE_FIND_PACKAGE_HarfBuzz=TRUE -DCMAKE_POSITION_INDEPENDENT_CODE=$pic_option ..
 cmake --build .
 cmake --build . --target install
 

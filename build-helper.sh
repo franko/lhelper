@@ -65,48 +65,84 @@ install_pkgconfig_file () {
 }
 
 configure_options () {
-    shared_option="--disable-shared"
+    local shared_option="--disable-shared"
+    local pic_option
     local options_new=()
     while [ ! -z ${1+x} ]; do
         case $1 in
-            --enable-shared)
+            -shared)
                 shared_option="--enable-shared"
+                shift
                 ;;
-            --disable-shared)
+            -pic)
+                pic_option="--with-pic=yes"
+                shift
                 ;;
             *)
                 options_new+=($1)
+                shift
                 ;;
         esac
-        shift
     done
     options_new+=($shared_option)
+    if [ -n "$pic_option" ]; then
+        options_new+=($pic_option)
+    fi
     echo "${options_new[*]}"
 }
 
 meson_options () {
-    shared_option="static"
+    local shared_option="static"
+    local pic_option
     local options_new=()
     while [ ! -z ${1+x} ]; do
         case $1 in
-            --enable-shared)
-                shared_option="shared"
+            -shared)
+                shared_option="both"
+                shift
                 ;;
-            --disable-shared)
+            -pic)
+                pic_option="true"
+                shift
                 ;;
             *)
-                options_new+=("${1/--enable-/-D}=true")
+                options_new+=($1)
+                shift
                 ;;
         esac
-        shift
     done
     options_new+=("-Ddefault_library=$shared_option")
+    if [[ $shared_option == "static" && -n "$pic_option" ]]; then
+        options_new+=("-Db_staticpic=$pic_option")
+    fi
+    echo "${options_new[*]}"
+}
+
+cmake_options () {
+    local pic_option
+    local options_new=()
+    while [ ! -z ${1+x} ]; do
+        case $1 in
+            -pic)
+                pic_option="ON"
+                shift
+                ;;
+            *)
+                options_new+=($1)
+                shift
+                ;;
+        esac
+    done
+    if [ -n "$pic_option" ]; then
+        options_new+=("-DCMAKE_POSITION_INDEPENDENT_CODE=$pic_option")
+    fi
     echo "${options_new[*]}"
 }
 
 build_and_install () {
     case $1 in
     cmake)
+        processed_options="$(cmake_options "${@:2}")"
         mkdir build && pushd build
         cmake -G "Ninja" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" "${@:2}" ..
         cmake --build .
@@ -114,13 +150,15 @@ build_and_install () {
         popd
         ;;
     meson)
+        processed_options="$(meson_options "${@:2}")"
         mkdir build && pushd build
-        meson --prefix="$INSTALL_PREFIX" --buildtype="${BUILD_TYPE,,}" "${@:2}" ..
+        meson --prefix="$INSTALL_PREFIX" --buildtype="${BUILD_TYPE,,}" $processed_options ..
         ninja
         ninja install
         popd
         ;;
     configure)
+        processed_options="$(configure_options "${@:2}")"
         if [ "${BUILD_TYPE,,}" = "release" ]; then
             CFLAGS="$CFLAGS -O3"
             CXXFLAGS="$CXXFLAGS -O3"
@@ -128,7 +166,7 @@ build_and_install () {
             CFLAGS="$CFLAGS -g"
             CXXFLAGS="$CXXFLAGS -g"
         fi
-        ./configure --prefix="$WIN_INSTALL_PREFIX" "${@:2}"
+        ./configure --prefix="$WIN_INSTALL_PREFIX" $processed_options
         make
         make install
         ;;

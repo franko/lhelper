@@ -1,4 +1,3 @@
 GSL_VERSION="gsl-$2"
 enter_remote_archive "$GSL_VERSION" "http://ftpmirror.gnu.org/gsl/${GSL_VERSION}.tar.gz" "${GSL_VERSION}.tar.gz" "tar xzf ARCHIVE_FILENAME"
-options="$(configure_options "${@:3}")"
-build_and_install configure $options
+build_and_install configure "${@:3}"

@@ -107,6 +107,8 @@ latest_package_version () {
     return 1
 }
 
+join_by () { local IFS="$1"; shift; echo "$*"; }
+
 library_install () {
     if [ -z ${LHELPER_ENV_NAME+x} ]; then
         echo "error: no environment defined"
@@ -116,52 +118,48 @@ library_install () {
     local package="$1"
     shift
 
+    local version
     local options_a=()
-    local pic_option
     for opt in "${@:1}"; do
         case $opt in
-            --pic)
-                if [[ $MACHTYPE =~ linux ]]; then
-                    pic_option=$opt
+            -pic)
+                if [[ ! $MACHTYPE =~ (mingw|msys|cygwin) ]]; then
+                    options_a+=("$opt")
                 fi
+                shift
                 ;;
-            --enable-*)
+            -*)
                 options_a+=("$opt")
+                shift
                 ;;
             *)
-                echo "error: unsupported package option: \"$opt\""
-                exit 1
+                if [ -n "$version" ]; then
+                    echo "Unrecognized package argument \"$1\""
+                    exit 1
+                fi
+                version="$1"
+                shift
                 ;;
         esac
-        shift
     done
 
-    local options_short=()
-    for opt in "${options_a[@]}"; do
-        options_short+=("${opt/--enable-/}")
-    done
-    if [ -n "$pic_option" ]; then
-        options_short+=('pic')
-    fi
     local options_tag=""
-    if [[ ${#options_short[@]} -ne 0 ]]; then
-        options_tag="_${options_short[*]}"
+    if [[ ${#options_a[@]} -ne 0 ]]; then
+        options_tag=$(join_by '' "${options_a[@]}")
+        options_tag="${options_tag/#-/_}"
     fi
 
-    local version
-    if [ -z "$1" ]; then
+    if [ -z "${version+set}" ]; then
         version="$(latest_package_version "$package")"
         if [ -z "$version" ]; then
             echo "error: cannot find package \"${package}\""
             exit 1
         fi
-        if [[ ${#options_short[@]} -eq 0 ]]; then
+        if [[ ${#options_a[@]} -eq 0 ]]; then
             echo "Lhelper: using version $version"
         else
-            echo "Lhelper: using version $version with options: ${options_short[*]}"
+            echo "Lhelper: using version $version with options: ${options_a[*]}"
         fi
-    else
-        version="$1"
     fi
 
     local recipe_filename="${package}_${version}.sh"
@@ -171,7 +169,7 @@ library_install () {
     fi
 
     source "$LHELPER_DIR/build-helper.sh"
-    export -f enter_git_repository enter_remote_archive inside_git_apply_patch inside_archive_apply_patch build_and_install install_pkgconfig_file interrupt_clean_archive configure_options meson_options
+    export -f enter_git_repository enter_remote_archive inside_git_apply_patch inside_archive_apply_patch build_and_install install_pkgconfig_file interrupt_clean_archive configure_options meson_options cmake_options
 
     LHELPER_TEMP_ROOT="$LHELPER_WORKING_DIR/tmp"
     set_prefix_variables "$LHELPER_TEMP_ROOT"
@@ -185,11 +183,6 @@ library_install () {
         echo "Lhelper: extracting package"
     else
         $(prepare_temp_dir "$LHELPER_WORKING_DIR")
-
-        if [ -n "$pic_option" ]; then
-            CFLAGS="$CFLAGS -fPIC"
-            CXXFLAGS="$CXXFLAGS -fPIC"
-        fi
 
         echo "Lhelper: building library..."
         # Execute the recipe
