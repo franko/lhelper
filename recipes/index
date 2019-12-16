@@ -15,3 +15,4 @@ magnum-plugins 2019.01
 libgit2 0.27.7
 glew 2.1.0
 wxwidgets 3.1.0
+openblas 0.3.7
