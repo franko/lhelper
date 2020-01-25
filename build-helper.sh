@@ -144,7 +144,7 @@ build_and_install () {
     cmake)
         processed_options="$(cmake_options "${@:2}")"
         mkdir build && pushd build
-        cmake -G "Ninja" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" "${@:2}" ..
+        cmake -G "Ninja" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" "$processed_options" ..
         cmake --build .
         cmake --build . --target install
         popd
