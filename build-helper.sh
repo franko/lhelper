@@ -28,7 +28,7 @@ enter_git_repository () {
         trap INT
     fi
     rm -fr "$LHELPER_WORKING_DIR/builds/$1"
-    git clone --shared "$LHELPER_WORKING_DIR/repos/$1.git" "$LHELPER_WORKING_DIR/builds/$1"
+    git clone "${@:4}" --shared "$LHELPER_WORKING_DIR/repos/$1.git" "$LHELPER_WORKING_DIR/builds/$1"
     cd "$LHELPER_WORKING_DIR/builds/$1"
     git checkout "$3"
 }
