@@ -3,7 +3,7 @@ corrade 2019.01
 libagg 2.4-franko2
 gsl 2.1
 freetype2 2.7
-libcanvas 1.0-alpha1
+libelemplot 1.0-beta1
 nlopt 2.4.2
 libui alpha4.1
 luajit 2.0.5-lhelper2
