@@ -17,4 +17,5 @@ glew 2.1.0
 wxwidgets 3.1.0
 openblas 0.3.7
 luabridge 2.4.1-franko1
-lua 5.1.5
+lua 5.1.5-lhelper1
+sol2 3.2.0
