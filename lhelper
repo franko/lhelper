@@ -270,6 +270,10 @@ activate)
         echo "Usage: $LHELPER_COMMAND_NAME activate <env-name>"
         exit 1
     fi
+    if [ ! -f "$LHELPER_WORKING_DIR/environments/$2" ]; then
+        echo "The environment \"$2\" does not exists"
+        exit 1
+    fi
     start_subshell "$2"
     ;;
 create)
