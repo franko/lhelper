@@ -46,6 +46,7 @@ mkdir -p "${INSTALL_PREFIX}/bin"
 # Copy the file containing the compiler config into the environment
 # bin directory.
 cp "$LHELPER_DIR/lhelper-config-default" "${INSTALL_PREFIX}/bin/lhelper-config"
+touch "${INSTALL_PREFIX}/bin/lhelper-packages"
 
 _pkgconfig_reldir=$(printf_join ":%s/pkgconfig" "${_libdir_array[0]}")
 _pkgconfig_path=$(printf_join ":\${_prefix}/%s/pkgconfig" "${_libdir_array[@]}")
@@ -64,6 +65,13 @@ export LHELPER_ENV_PREFIX="\${_prefix}"
 export LHELPER_ENV_NAME="$1"
 
 source "\${LHELPER_ENV_PREFIX}/bin/lhelper-config"
+
+echo "Installed packages"
+echo
+while IFS= read -r line; do
+    echo "* \$line"
+done < "\${LHELPER_ENV_PREFIX}/bin/lhelper-packages"
+echo
 
 if [ -f /etc/bash.bashrc ]; then
     source /etc/bash.bashrc

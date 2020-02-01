@@ -109,6 +109,33 @@ latest_package_version () {
 
 join_by () { local IFS="$1"; shift; echo "$*"; }
 
+register_package () {
+    local env_dir="$LHELPER_WORKING_DIR/env/$LHELPER_ENV_NAME"
+    local package_filename="$env_dir/bin/lhelper-packages"
+    local package_name="$1"
+    local found
+    packages_content=()
+    while IFS= read -r line; do
+        IFS=' ' read -ra line_a <<< $line
+        if [ ${#line_a[@]} -eq 0 ]; then
+            continue
+        fi
+        local line_package_name="${line_a[0]}"
+        if [ "$line_package_name" == "$package_name" ]; then
+            line="$*"
+            found=yes
+        fi
+        packages_content+=("$line")
+    done < "$package_filename"
+    if [ -z ${found+x} ]; then
+        packages_content+=("$*")
+    fi
+    true > "$package_filename"
+    for line in "${packages_content[@]}"; do
+        echo "$line" >> "$package_filename"
+    done
+}
+
 library_install () {
     if [ -z ${LHELPER_ENV_NAME+x} ]; then
         echo "error: no environment defined"
@@ -201,6 +228,7 @@ library_install () {
     fi
     set_prefix_variables "$LHELPER_ENV_PREFIX"
     extract_archive_reloc "${tar_package_filename}" '__LHELPER_PREFIX__' "$(sed_replace_escape "$WIN_INSTALL_PREFIX")" "$INSTALL_PREFIX"
+    register_package "$package" "$version" "${options_a[@]}"
     echo "Lhelper: done"
 }
 
