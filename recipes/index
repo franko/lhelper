@@ -19,3 +19,4 @@ openblas 0.3.7
 luabridge 2.4.1-franko1
 lua 5.1.5-lhelper1
 sol2 3.2.0
+glfw 3.3.2
