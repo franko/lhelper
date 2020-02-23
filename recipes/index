@@ -14,7 +14,7 @@ magnum-examples 2019.01
 magnum-plugins 2019.01
 libgit2 0.27.7
 glew 2.1.0
-wxwidgets 3.1.0
+wxwidgets 3.1.3
 openblas 0.3.7
 luabridge 2.4.1-franko1
 lua 5.1.5-lhelper1
