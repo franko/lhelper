@@ -6,7 +6,7 @@ if [[ "$OSTYPE" == "linux"* ]]; then
 fi
 
 # Normally we may use --enable-no_exceptions but as 3.1.3 is broken because Scintilla
-# requires exceptions.
+# requires exceptions. --enable-no_rtti doesn't work either one gets missing typeinfo at link time.
 
 # If SVG is enable PNG library is required.
 
@@ -16,7 +16,7 @@ fi
 
 # Disable language localisation maybe.
 
-X_OPTIONS=(--disable-{svg,webkit,webview,unicode,compat30} --enable-no_rtti --without-{libxpm,libiconv,gnomevfs,libnotify,opengl,dmalloc,sdl,regex,zlib,expat,libpng,libjpeg,libtiff})
+X_OPTIONS=(--disable-{svg,webkit,webview,unicode,compat30} --without-{libxpm,libiconv,gnomevfs,libnotify,opengl,dmalloc,sdl,regex,zlib,expat,libpng,libjpeg,libtiff})
 
 build_and_install configure "${X_OPTIONS[@]}" "${BACKEND_OPTIONS[@]}"
 
