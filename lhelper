@@ -329,6 +329,19 @@ list)
         exit 1
     fi
     ;;
+update)
+    if [ "$2" == recipes ]; then
+        pushd "${LHELPER_DIR}/recipes"
+        echo "Updating recipes"
+        git fetch origin master
+        git checkout -q -f master
+        git reset --hard origin/master
+        popd
+    else
+        echo "Usage: $LHELPER_COMMAND_NAME update recipes"
+        exit 1
+    fi
+    ;;
 *)
     echo "error: unknown command $1"
     exit 1
