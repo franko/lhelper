@@ -11,10 +11,13 @@ if [ -z "${DESTDIR+x}" ]; then
     DESTDIR="$PREFIX"
 fi
 
+recipes_repo="https://github.com/franko/lhelper-recipes.git"
+recipes_branch=master
+recipes_dir="$DESTDIR/share/lhelper/recipes"
+
 echo "Installing lhelper with prefix $DESTDIR"
 
 mkdir -p "$DESTDIR/bin"
-mkdir -p "$DESTDIR/share/lhelper/recipes"
 mkdir -p "$DESTDIR/share/lhelper/patch"
 mkdir -p "$DESTDIR/var/lib/lhelper/builds"
 mkdir -p "$DESTDIR/var/lib/lhelper/repos"
@@ -27,9 +30,15 @@ mkdir -p "$DESTDIR/var/lib/lhelper/digests"
 cp lhelper-config-default "$DESTDIR/share/lhelper"
 cp build-helper.sh "$DESTDIR/share/lhelper"
 cp create-env.sh "$DESTDIR/share/lhelper"
-cp recipes/*.sh recipes/index "$DESTDIR/share/lhelper/recipes"
 cp patch/*.patch "$DESTDIR/share/lhelper/patch"
 cp lhelper "$DESTDIR/bin"
+
+if [ -d "$recipes_dir" ]; then
+	echo "Deleting existing recipes dir: $recipes_dir"
+	rm -fr "$recipes_dir"
+fi
+
+git clone --depth 1 -b "$recipes_branch" "$recipes_repo" "$recipes_dir"
 
 chmod a+x "$DESTDIR/bin/lhelper"
 
