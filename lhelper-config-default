@@ -9,6 +9,7 @@ export CC=gcc
 export CXX=g++
 export CFLAGS=
 export CXXFLAGS=
+export LDFLAGS=
 
 # Can be Release or Debug
 export BUILD_TYPE="Release"
