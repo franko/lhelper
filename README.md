@@ -1,6 +1,6 @@
 # Little Library Helper
 
-An simple utility to help you install C/C++ libraries on Windows and on Linux. On Windows works with MinGW only.
+An simple utility to help you install C and C++ libraries on Windows, using MSYS2 and on Linux.
 
 It helps to simplify the develoment by creating separate environments each containing a collection of libraries compiled using specific a compiler and specific compiler's flags.
 
@@ -13,8 +13,10 @@ Seamlessly change environment and start compiling your project using you favorit
 Little Library Helper works by creating a library environment first. The command is:
 
 ```sh
-lhelper create <env-name> <env-directory>
+lhelper create <env-name> [env-directory]
 ```
+
+The env-directory argument is optional. It will open an editor to configure the compiler and flags you want to use.
 
 Once created an environment can be 'activated' using the command:
 
@@ -24,17 +26,13 @@ lhelper activate <env-name>
 
 It will start for you a new shell on the new environment.
 
-The first time inside a library you can edit the compiler options with the command:
-
-```sh
-lhelper edit
-```
-
 Once inside an environment any library can be installed using a simple command:
 
 ```sh
-lhelper install <library-name>
+lhelper install <library-name> [options]
 ```
+
+Common options are `-shared` to compile as a shared library and `-pic` to compile position-independent code (-fPIC flag).
 
 Environments and recipes can be listed with the commands:
 
@@ -49,12 +47,12 @@ An existing environment can be deleted with the command:
 lhelper delete <env-name>
 ```
 
-When a request to install a library is made the helper will actually perform the following operations:
+When a request to install a library is made the helper will actually download the source code from the internet, build the library and install it in a packaged form.
 
-- download the source code from the internet. It can be an archive or a git repository.
-- build and install the library into the environment
+The package created when compiled a library are locally stored and they are re-used when a new install is requested with the same options and compiler.
+The packages will avoid compiling the same package over and over again.
 
-Once installed the software will be discoverable by build systems like CMake, configure, Meson or other but **only inside the environment**.
+Once installed the software will be discoverable by build systems like CMake, configure, Meson or other but **only inside the environment** whe it was installed.
 
 When you are done just type 'exit' and you will go back to the original shell to quit the environment.
 
@@ -67,13 +65,12 @@ The following software should be installed and available in the PATH:
 - gcc or clang compiler
 - curl
 - tar
-- patch
 - GNU Makefile (make)
 - CMakefile (cmake)
 - Ninja
 - Meson Build System, optional, it is required by some recipes
 
-In practice Little Library Helper on Windows works well with Mingw and with Msys2 but this latter is not strictly required. Msys2 provides all the applications above by installing the appropriate packages. If you do not use Msys2 it is up to you to ensure that they are available in the PATH from the bash shell.
+In practice Little Library Helper on Windows works well with Mingw and with Msys2. Msys2 provides all the applications above by installing the appropriate packages. If you do not use Msys2 it is up to you to ensure that they are available in the PATH from the bash shell.
 
 On Linux just make sure that the packages that provides the commands above are installed.
 
@@ -91,27 +88,13 @@ The `<install-prefix-directory>` can be any directory but it should contains a `
 
 On Ubuntu systems you may use the `$HOME/.local` directory as a prefix.
 
-## Little Library Helper commands
+## Recipes update
 
-`lhelper create <env-name> <env-directory>`
+Recipes can be updated using the commande
 
-Create a new environment in the `env-directory>` with the name `<env-name>`.
-
-`lhelper activate <env-directory>`
-
-Start a new shell in the environment in `<env-directory>`. When inside the environment the previously installed library will be visible to the build system and new libraries can be installed.
-
-`lhelper install <library-name>`
-
-Install the library identified by the name `<library-name>`. It will be based on the recipes present in `<install-prefix>/share/lhelper/recipes/<library-name>.sh`.
-
-`lhelper list (environments | recipes)`
-
-List the avilable environments or recipes.
-
-`lhelper edit`
-
-Open an editor with the compiler's flags specific for the environment.
+```sh
+lhelper update recipes
+```
 
 ## How it is implemented
 
