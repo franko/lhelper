@@ -42,6 +42,7 @@ for _libdir in "${_libdir_array[@]}"; do
 done
 mkdir -p "${INSTALL_PREFIX}/include"
 mkdir -p "${INSTALL_PREFIX}/bin"
+mkdir -p "${INSTALL_PREFIX}/packages"
 
 # Copy the file containing the compiler config into the environment
 # bin directory.

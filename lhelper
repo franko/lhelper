@@ -65,9 +65,15 @@ extract_archive_reloc () {
     local old_prefix="$2"
     local new_prefix="$3"
     local _install_prefix="$4"
+    local file_list_filename="$5"
     local package_temp_dir="$LHELPER_WORKING_DIR/tmp"
     tar -C "$package_temp_dir" -xf "$LHELPER_WORKING_DIR/packages/${tar_package_filename}"
     library_dir_reloc "$package_temp_dir" "$old_prefix" "$new_prefix"
+    # Getting list of package's files
+    pushd "$package_temp_dir"
+    find . > "$file_list_filename"
+    popd
+    # Copy files in the destination directory
     cp -a "$package_temp_dir/." "$_install_prefix"
 }
 
@@ -137,6 +143,27 @@ register_package () {
     done
 }
 
+unregister_package () {
+    local env_dir="$LHELPER_WORKING_DIR/env/$LHELPER_ENV_NAME"
+    local package_filename="$env_dir/bin/lhelper-packages"
+    local package_name="$1"
+    packages_content=()
+    while IFS= read -r line; do
+        IFS=' ' read -ra line_a <<< $line
+        if [ ${#line_a[@]} -eq 0 ]; then
+            continue
+        fi
+        local line_package_name="${line_a[0]}"
+        if [ "$line_package_name" != "$package_name" ]; then
+            packages_content+=("$line")
+        fi
+    done < "$package_filename"
+    true > "$package_filename"
+    for line in "${packages_content[@]}"; do
+        echo "$line" >> "$package_filename"
+    done
+}
+
 library_install () {
     if [ -z ${LHELPER_ENV_NAME+x} ]; then
         echo "error: no environment defined"
@@ -145,6 +172,9 @@ library_install () {
 
     local package="$1"
     shift
+
+    # TODO: check if another package with the same name is already
+    # installed. If yes remove it before.
 
     local version
     local options_a=()
@@ -228,9 +258,33 @@ library_install () {
         mv "${tar_package_filename}" "$LHELPER_WORKING_DIR/packages"
     fi
     set_prefix_variables "$LHELPER_ENV_PREFIX"
-    extract_archive_reloc "${tar_package_filename}" '__LHELPER_PREFIX__' "$(sed_replace_escape "$WIN_INSTALL_PREFIX")" "$INSTALL_PREFIX"
+    local file_list_filename="$INSTALL_PREFIX/packages/${package}.list"
+    extract_archive_reloc "${tar_package_filename}" '__LHELPER_PREFIX__' "$(sed_replace_escape "$WIN_INSTALL_PREFIX")" "$INSTALL_PREFIX" "$file_list_filename"
     register_package "$package" "$version" "${options_a[@]}"
     echo "Lhelper: done"
+}
+
+library_remove () {
+    local package="$1"
+    local prefix="$LHELPER_ENV_PREFIX"
+    local file_list_filename="$prefix/packages/${package}.list"
+    if [ ! -f "$file_list_filename" ]; then
+        echo "package \"$package\" not installed"
+        exit 1
+    fi
+    pushd "$prefix"
+    while IFS= read -r line; do
+        if [ -f "$line" ]; then
+            # remove the fild installed from package
+            rm "$line"
+        fi
+    done < "$file_list_filename"
+    # Removing empty directories
+    find "." -empty -type d -delete
+    popd
+    rm "$file_list_filename"
+    unregister_package "$package"
+    echo "package \"$package\" successfully removed."
 }
 
 start_subshell () {
@@ -318,6 +372,17 @@ delete)
         fi
         unset _sure_delete
     fi
+    ;;
+remove)
+    if [ $# -lt 2 ]; then
+        echo "Usage: $LHELPER_COMMAND_NAME remove <library-name>"
+        exit 1
+    fi
+    if [ -z ${LHELPER_ENV_NAME+x} ]; then
+        echo "Please activate an environment before."
+        exit 1
+    fi
+    library_remove "${@:2}"
     ;;
 list)
     if [ "$2" == environments ]; then
