@@ -51,6 +51,14 @@ prepare_temp_dir () {
     mkdir "$temp_dir"
 }
 
+prepare_log_dir () {
+    local log_dirname="$LHELPER_WORKING_DIR/logs/$LHELPER_ENV_NAME"
+    if [ ! -d "$log_dirname" ]; then
+        mkdir -p "$log_dirname"
+    fi
+    echo "$log_dirname"
+}
+
 # Relocate prefix path references for all files in a library install's
 # directory.
 library_dir_reloc () {
@@ -268,11 +276,12 @@ library_install () {
         echo "Lhelper: found an existing package"
         echo "Lhelper: extracting package"
     else
-        $(prepare_temp_dir "$LHELPER_WORKING_DIR")
+        prepare_temp_dir "$LHELPER_WORKING_DIR"
+        local log_dirname=$(prepare_log_dir)
 
         echo "Lhelper: building library..."
         # Execute the recipe
-        bash -e "$LHELPER_DIR/recipes/${recipe_filename}" "${package}" "${version}" "${options_a[@]}"
+        bash -e "$LHELPER_DIR/recipes/${recipe_filename}" "${package}" "${version}" "${options_a[@]}" 2> "$log_dirname/$package-stderr.log" 1> "$log_dirname/$package-stdout.log"
         if [ $? -ne 0 ]; then
             echo "Lhelper: error building library \"$package\""
             exit 1
