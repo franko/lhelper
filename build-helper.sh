@@ -6,6 +6,9 @@
 
 _current_archive_dir=
 
+pushd_quiet () { builtin pushd "$@" > /dev/null; }
+popd_quiet () { builtin popd "$@" > /dev/null; }
+
 interrupt_clean_archive () {
     echo "Cleaning up directory \"$_current_archive_dir\""
     rm -fr "$_current_archive_dir"
@@ -17,9 +20,9 @@ interrupt_clean_archive () {
 # $3 = branch or tag to use
 enter_git_repository () {
     if [ -d "$LHELPER_WORKING_DIR/repos/$1.git" ]; then
-        pushd "$LHELPER_WORKING_DIR/repos/$1.git"
+        pushd_quiet "$LHELPER_WORKING_DIR/repos/$1.git"
         git fetch --force origin '*:*'
-        popd
+        popd_quiet
     else
         mkdir -p "$LHELPER_WORKING_DIR/repos/$1.git"
         _current_archive_dir="$LHELPER_WORKING_DIR/repos/$1.git"
@@ -143,19 +146,21 @@ build_and_install () {
     case $1 in
     cmake)
         processed_options="$(cmake_options "${@:2}")"
-        mkdir build && pushd build
+        mkdir build
+        pushd_quiet build
         cmake -G "Ninja" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" "$processed_options" ..
         cmake --build .
         cmake --build . --target install
-        popd
+        popd_quiet
         ;;
     meson)
         processed_options="$(meson_options "${@:2}")"
-        mkdir build && pushd build
+        mkdir build
+        pushd_quiet build
         meson --prefix="$INSTALL_PREFIX" --buildtype="${BUILD_TYPE,,}" $processed_options ..
         ninja
         ninja install
-        popd
+        popd_quiet
         ;;
     configure)
         processed_options="$(configure_options "${@:2}")"

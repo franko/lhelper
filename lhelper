@@ -18,6 +18,9 @@ if [ ! -d "${LHELPER_DIR}" ]; then
     echo "Lhelper may be not properly installed."
 fi
 
+pushd_quiet () { builtin pushd "$@" > /dev/null; }
+popd_quiet () { builtin popd "$@" > /dev/null; }
+
 cat_digest () {
     cat << EOF
 CC="$CC"
@@ -70,9 +73,9 @@ extract_archive_reloc () {
     tar -C "$package_temp_dir" -xf "$LHELPER_WORKING_DIR/packages/${tar_package_filename}"
     library_dir_reloc "$package_temp_dir" "$old_prefix" "$new_prefix"
     # Getting list of package's files
-    pushd "$package_temp_dir"
+    pushd_quiet "$package_temp_dir"
     find . > "$filename_list"
-    popd
+    popd_quiet
     # Copy files in the destination directory
     cp -a "$package_temp_dir/." "$_install_prefix"
 }
@@ -174,7 +177,7 @@ remove_package () {
     local prefix="$1"
     local package="$2"
     local filename_list="$prefix/packages/$package.list"
-    pushd "$prefix"
+    pushd_quiet "$prefix"
     while IFS= read -r line; do
         if [ -f "$line" ]; then
             # remove the fild installed from package
@@ -183,7 +186,7 @@ remove_package () {
     done < "$filename_list"
     # Removing empty directories
     find "." -empty -type d -delete
-    popd
+    popd_quiet
     rm "$filename_list"
 }
 
@@ -410,12 +413,12 @@ list)
     ;;
 update)
     if [ "$2" == recipes ]; then
-        pushd "${LHELPER_DIR}/recipes"
+        pushd_quiet "${LHELPER_DIR}/recipes"
         echo "Updating recipes"
         git fetch origin master
         git checkout -q -f master
         git reset --hard origin/master
-        popd
+        popd_quiet
     else
         echo "Usage: $LHELPER_COMMAND_NAME update recipes"
         exit 1
