@@ -41,6 +41,14 @@ lhelper list environments
 lhelper list recipes
 ```
 
+While the command:
+
+```sh
+lhelper list packages
+```
+
+list all the installed libraries when inside an environment.
+
 An existing environment can be deleted with the command:
 
 ```sh

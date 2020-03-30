@@ -339,6 +339,15 @@ print_create_env_message () {
     echo "> lhelper edit"
 }
 
+print_installed_packages () {
+    echo "Installed packages"
+    echo
+    while IFS= read -r line; do
+        echo "* $line"
+    done < "${LHELPER_ENV_PREFIX}/bin/lhelper-packages"
+    echo
+}
+
 case $1 in
 install)
     if [ $# -lt 2 ]; then
@@ -420,6 +429,13 @@ list)
         ls -1 "$LHELPER_WORKING_DIR/environments"
     elif [ "$2" == recipes ]; then
         ls -1 "$LHELPER_DIR/recipes" | sed 's/\.sh//'
+    elif [ "$2" == packages ]; then
+        if [ -z ${LHELPER_ENV_NAME+x} ]; then
+            echo "No environement activated"
+            echo "To list the packages an environement should be activated"
+            exit 1
+        fi
+        print_installed_packages
     else
         echo "Usage: $LHELPER_COMMAND_NAME list (environments|recipes)"
         exit 1
