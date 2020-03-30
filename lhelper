@@ -65,13 +65,13 @@ extract_archive_reloc () {
     local old_prefix="$2"
     local new_prefix="$3"
     local _install_prefix="$4"
-    local file_list_filename="$5"
+    local filename_list="$5"
     local package_temp_dir="$LHELPER_WORKING_DIR/tmp"
     tar -C "$package_temp_dir" -xf "$LHELPER_WORKING_DIR/packages/${tar_package_filename}"
     library_dir_reloc "$package_temp_dir" "$old_prefix" "$new_prefix"
     # Getting list of package's files
     pushd "$package_temp_dir"
-    find . > "$file_list_filename"
+    find . > "$filename_list"
     popd
     # Copy files in the destination directory
     cp -a "$package_temp_dir/." "$_install_prefix"
@@ -198,7 +198,7 @@ library_install () {
 
     if $(package_is_installed "$LHELPER_ENV_PREFIX" "$package"); then
         remove_package "$LHELPER_ENV_PREFIX" "$package"
-        echo "removed previously installed package \"$package\""
+        echo "Lhelper: removed previously installed package \"$package\""
     fi
 
     local version
@@ -283,8 +283,8 @@ library_install () {
         mv "${tar_package_filename}" "$LHELPER_WORKING_DIR/packages"
     fi
     set_prefix_variables "$LHELPER_ENV_PREFIX"
-    local file_list_filename="$INSTALL_PREFIX/packages/${package}.list"
-    extract_archive_reloc "${tar_package_filename}" '__LHELPER_PREFIX__' "$(sed_replace_escape "$WIN_INSTALL_PREFIX")" "$INSTALL_PREFIX" "$file_list_filename"
+    local filename_list="$LHELPER_ENV_PREFIX/packages/${package}.list"
+    extract_archive_reloc "${tar_package_filename}" '__LHELPER_PREFIX__' "$(sed_replace_escape "$WIN_INSTALL_PREFIX")" "$INSTALL_PREFIX" "$filename_list"
     register_package "$package" "$version" "${options_a[@]}"
     echo "Lhelper: done"
 }
@@ -298,7 +298,7 @@ library_remove () {
     fi
     remove_package "$prefix" "$package"
     unregister_package "$package"
-    echo "package \"$package\" successfully removed."
+    echo "Lhelper: package \"$package\" successfully removed."
 }
 
 start_subshell () {
