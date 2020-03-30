@@ -209,7 +209,7 @@ library_install () {
 
     if $(package_is_installed "$LHELPER_ENV_PREFIX" "$package"); then
         remove_package "$LHELPER_ENV_PREFIX" "$package"
-        echo "Lhelper: removed previously installed package \"$package\""
+        echo "Removed previously installed package \"$package\""
     fi
 
     local version
@@ -250,9 +250,9 @@ library_install () {
             exit 1
         fi
         if [[ ${#options_a[@]} -eq 0 ]]; then
-            echo "Lhelper: using version $version"
+            echo "Using version $version"
         else
-            echo "Lhelper: using version $version with options: ${options_a[*]}"
+            echo "Using version $version with options: ${options_a[*]}"
         fi
     fi
 
@@ -273,32 +273,37 @@ library_install () {
     local digest=$(build_env_digest)
     local tar_package_filename="${package}${options_tag}_${version}_${digest}.tar.gz"
     if [[ "$version" != "git-"* && -f "$LHELPER_WORKING_DIR/packages/${tar_package_filename}" ]]; then
-        echo "Lhelper: found an existing package"
-        echo "Lhelper: extracting package"
+        echo "Found an existing package"
     else
         prepare_temp_dir "$LHELPER_WORKING_DIR"
         local log_dirname=$(prepare_log_dir)
 
-        echo "Lhelper: building library..."
+        echo "Building library..."
         # Execute the recipe
         bash -e "$LHELPER_DIR/recipes/${recipe_filename}" "${package}" "${version}" "${options_a[@]}" 2> "$log_dirname/$package-stderr.log" 1> "$log_dirname/$package-stdout.log"
         if [ $? -ne 0 ]; then
-            echo "Lhelper: error building library \"$package\""
+            echo "error: building library \"$package\""
+            echo "  Yoy may inspect the log files:"
+            echo
+            echo "    $package-stdout.log"
+            echo "    $package-stderr.log"
+            echo
+            echo "  located in the directory $log_dirname"
             exit 1
         fi
-        echo "Lhelper: build done"
+        echo "done"
 
         library_dir_reloc "$LHELPER_TEMP_ROOT" "$SED_PREFIX_PATTERN" '__LHELPER_PREFIX__'
 
-        echo "Lhelper: saving package"
         tar -C "$LHELPER_TEMP_ROOT" -czf "${tar_package_filename}" .
         mv "${tar_package_filename}" "$LHELPER_WORKING_DIR/packages"
+        echo "Saved package for \"$package\""
     fi
     set_prefix_variables "$LHELPER_ENV_PREFIX"
     local filename_list="$LHELPER_ENV_PREFIX/packages/${package}.list"
     extract_archive_reloc "${tar_package_filename}" '__LHELPER_PREFIX__' "$(sed_replace_escape "$WIN_INSTALL_PREFIX")" "$INSTALL_PREFIX" "$filename_list"
     register_package "$package" "$version" "${options_a[@]}"
-    echo "Lhelper: done"
+    echo "Package \"$package\" successfully installed"
 }
 
 library_remove () {
@@ -310,7 +315,7 @@ library_remove () {
     fi
     remove_package "$prefix" "$package"
     unregister_package "$package"
-    echo "Lhelper: package \"$package\" successfully removed."
+    echo "Package \"$package\" successfully removed."
 }
 
 start_subshell () {
