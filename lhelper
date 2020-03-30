@@ -196,8 +196,10 @@ library_install () {
     local package="$1"
     shift
 
-    # TODO: check if another package with the same name is already
-    # installed. If yes remove it before.
+    if $(package_is_installed "$LHELPER_ENV_PREFIX" "$package"); then
+        remove_package "$LHELPER_ENV_PREFIX" "$package"
+        echo "removed previously installed package \"$package\""
+    fi
 
     local version
     local options_a=()
