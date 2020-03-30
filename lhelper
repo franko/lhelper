@@ -164,6 +164,29 @@ unregister_package () {
     done
 }
 
+package_is_installed () {
+    local prefix="$1"
+    local package="$2"
+    test -f "$prefix/packages/$package.list"
+}
+
+remove_package () {
+    local prefix="$1"
+    local package="$2"
+    local filename_list="$prefix/packages/$package.list"
+    pushd "$prefix"
+    while IFS= read -r line; do
+        if [ -f "$line" ]; then
+            # remove the fild installed from package
+            rm "$line"
+        fi
+    done < "$filename_list"
+    # Removing empty directories
+    find "." -empty -type d -delete
+    popd
+    rm "$filename_list"
+}
+
 library_install () {
     if [ -z ${LHELPER_ENV_NAME+x} ]; then
         echo "error: no environment defined"
@@ -267,22 +290,11 @@ library_install () {
 library_remove () {
     local package="$1"
     local prefix="$LHELPER_ENV_PREFIX"
-    local file_list_filename="$prefix/packages/${package}.list"
-    if [ ! -f "$file_list_filename" ]; then
+    if ! $(package_is_installed "$prefix" "$package"); then
         echo "package \"$package\" not installed"
         exit 1
     fi
-    pushd "$prefix"
-    while IFS= read -r line; do
-        if [ -f "$line" ]; then
-            # remove the fild installed from package
-            rm "$line"
-        fi
-    done < "$file_list_filename"
-    # Removing empty directories
-    find "." -empty -type d -delete
-    popd
-    rm "$file_list_filename"
+    remove_package "$prefix" "$package"
     unregister_package "$package"
     echo "package \"$package\" successfully removed."
 }
