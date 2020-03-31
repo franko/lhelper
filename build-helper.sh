@@ -148,6 +148,7 @@ build_and_install () {
         processed_options="$(cmake_options "${@:2}")"
         mkdir build
         pushd_quiet build
+        echo "Using cmake command: " cmake -G "Ninja" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" "$processed_options" ..
         cmake -G "Ninja" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" "$processed_options" ..
         cmake --build .
         cmake --build . --target install
@@ -157,6 +158,7 @@ build_and_install () {
         processed_options="$(meson_options "${@:2}")"
         mkdir build
         pushd_quiet build
+        echo "Using meson command: " meson --prefix="$INSTALL_PREFIX" --buildtype="${BUILD_TYPE,,}" $processed_options ..
         meson --prefix="$INSTALL_PREFIX" --buildtype="${BUILD_TYPE,,}" $processed_options ..
         ninja
         ninja install
@@ -171,6 +173,7 @@ build_and_install () {
             CFLAGS="$CFLAGS -g"
             CXXFLAGS="$CXXFLAGS -g"
         fi
+        echo "Using configure commande: " configure --prefix="$WIN_INSTALL_PREFIX" $processed_options
         ./configure --prefix="$WIN_INSTALL_PREFIX" $processed_options
         make
         make install
