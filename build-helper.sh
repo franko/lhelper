@@ -101,7 +101,7 @@ meson_options () {
     while [ ! -z ${1+x} ]; do
         case $1 in
             -shared)
-                shared_option="both"
+                shared_option="shared"
                 shift
                 ;;
             -pic)
