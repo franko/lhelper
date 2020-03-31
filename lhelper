@@ -291,12 +291,12 @@ library_install () {
         bash -e "$recipe_filename" "$package" "$version" "${options_a[@]}" 2> "$log_dirname/$package-stderr.log" 1> "$log_dirname/$package-stdout.log"
         if [ $? -ne 0 ]; then
             echo "error: building library \"$package\""
-            echo "  Yoy may inspect the log files:"
+            echo "    You may inspect the log files:"
             echo
             echo "    $package-stdout.log"
             echo "    $package-stderr.log"
             echo
-            echo "  located in the directory $log_dirname"
+            echo "    located in the directory $log_dirname"
             exit 1
         fi
         echo "done"
