@@ -199,11 +199,11 @@ remove_package () {
 }
 
 library_install () {
-    if [ -z ${LHELPER_ENV_NAME+x} ]; then
-        echo "error: no environment defined"
-        exit 1
+    local local_recipe
+    if [ "$1" == "--local" ]; then
+        local_recipe="true"
+        shift
     fi
-
     local package="$1"
     shift
 
@@ -243,6 +243,10 @@ library_install () {
         options_tag="${options_tag/#-/_}"
     fi
 
+    if [[ "$local_recipe" == "true" && -z ${version+set} ]]; then
+        echo "error: version is required for local recipes"
+        exit 1
+    fi
     if [ -z "${version+set}" ]; then
         version="$(latest_package_version "$package")"
         if [ -z "$version" ]; then
@@ -257,7 +261,11 @@ library_install () {
     fi
 
     local recipe_filename="${package}_${version}.sh"
-    if [ ! -f "$LHELPER_DIR/recipes/${recipe_filename}" ]; then
+    if [ -z ${local_recipe+set} ]; then
+        recipe_filename="$LHELPER_DIR/recipes/${recipe_filename}"
+    fi
+
+    if [ ! -f "$recipe_filename" ]; then
         echo "error: no recipe found for \"${package}\" version ${version}."
         exit 1
     fi
@@ -272,7 +280,7 @@ library_install () {
 
     local digest=$(build_env_digest)
     local tar_package_filename="${package}${options_tag}_${version}_${digest}.tar.gz"
-    if [[ "$version" != "git-"* && -f "$LHELPER_WORKING_DIR/packages/${tar_package_filename}" ]]; then
+    if [[ -z ${local_recipe+set} && "$version" != "git-"* && -f "$LHELPER_WORKING_DIR/packages/${tar_package_filename}" ]]; then
         echo "Found an existing package"
     else
         prepare_temp_dir "$LHELPER_WORKING_DIR"
@@ -280,7 +288,7 @@ library_install () {
 
         echo "Building library..."
         # Execute the recipe
-        bash -e "$LHELPER_DIR/recipes/${recipe_filename}" "${package}" "${version}" "${options_a[@]}" 2> "$log_dirname/$package-stderr.log" 1> "$log_dirname/$package-stdout.log"
+        bash -e "$recipe_filename" "$package" "$version" "${options_a[@]}" 2> "$log_dirname/$package-stderr.log" 1> "$log_dirname/$package-stdout.log"
         if [ $? -ne 0 ]; then
             echo "error: building library \"$package\""
             echo "  Yoy may inspect the log files:"
