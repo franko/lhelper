@@ -142,6 +142,19 @@ cmake_options () {
     echo "${options_new[*]}"
 }
 
+# Do not use with cmake and meson based build.
+add_build_type_compiler_flags () {
+    # The double comma below is used to transform into lowercase
+    local build_type="${1,,}"
+    if [[ "$build_type" == "release" ]]; then
+        CFLAGS+="-O3"
+        CXXFLAGS+="-O3"
+    elif [[ "$build_type" == "debug" ]]; then
+        CFLAGS+="-g"
+        CXXFLAGS+="-g"
+    fi
+}
+
 build_and_install () {
     case $1 in
     cmake)
@@ -166,14 +179,8 @@ build_and_install () {
         ;;
     configure)
         processed_options="$(configure_options "${@:2}")"
-        if [ "${BUILD_TYPE,,}" = "release" ]; then
-            CFLAGS="$CFLAGS -O3"
-            CXXFLAGS="$CXXFLAGS -O3"
-        elif [ "${BUILD_TYPE,,}" = "debug" ]; then
-            CFLAGS="$CFLAGS -g"
-            CXXFLAGS="$CXXFLAGS -g"
-        fi
-        echo "Using configure commande: " configure --prefix="$WIN_INSTALL_PREFIX" $processed_options
+        add_build_type_compiler_flags "$BUILD_TYPE"
+        echo "Using configure command: " configure --prefix="$WIN_INSTALL_PREFIX" $processed_options
         ./configure --prefix="$WIN_INSTALL_PREFIX" $processed_options
         make
         make install

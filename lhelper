@@ -272,7 +272,7 @@ library_install () {
     fi
 
     source "$LHELPER_DIR/build-helper.sh"
-    export -f enter_git_repository enter_remote_archive inside_git_apply_patch inside_archive_apply_patch build_and_install install_pkgconfig_file interrupt_clean_archive configure_options meson_options cmake_options pushd_quiet popd_quiet
+    export -f enter_git_repository enter_remote_archive inside_git_apply_patch inside_archive_apply_patch build_and_install install_pkgconfig_file interrupt_clean_archive configure_options meson_options cmake_options add_build_type_compiler_flags pushd_quiet popd_quiet
 
     LHELPER_TEMP_ROOT="$LHELPER_WORKING_DIR/tmp"
     set_prefix_variables "$LHELPER_TEMP_ROOT"
