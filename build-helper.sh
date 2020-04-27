@@ -67,6 +67,12 @@ install_pkgconfig_file () {
     cp "$1" "${INSTALL_PREFIX}/$LHELPER_PKGCONFIG_RPATH"
 }
 
+check_commands () {
+    for command in "$@"; do
+        type "$command" > /dev/null 2>&1 || { echo >&2 "error: command \"${command}\" is required but it's not available"; exit 1; }
+    done
+}
+
 configure_options () {
     local shared_option="--disable-shared"
     local pic_option
