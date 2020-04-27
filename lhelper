@@ -465,6 +465,13 @@ list)
         exit 1
     fi
     ;;
+dir)
+    if [ -z ${LHELPER_ENV_NAME+x} ]; then
+        print_error_no_env
+        exit 1
+    fi
+    echo "${LHELPER_ENV_PREFIX}"
+    ;;
 update)
     if [ "$2" == recipes ]; then
         pushd_quiet "${LHELPER_DIR}/recipes"
