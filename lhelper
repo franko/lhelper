@@ -120,8 +120,13 @@ latest_package_version () {
 
 join_by () { local IFS="$1"; shift; echo "$*"; }
 
+get_env_directory () {
+    local env_name="$1"
+    echo "$LHELPER_PREFIX/var/lhenv/$env_name"
+}
+
 register_package () {
-    local env_dir="$LHELPER_WORKING_DIR/env/$LHELPER_ENV_NAME"
+    local env_dir="$(get_env_directory "$LHELPER_ENV_NAME")"
     local package_filename="$env_dir/bin/lhelper-packages"
     local package_name="$1"
     local found
@@ -148,7 +153,7 @@ register_package () {
 }
 
 unregister_package () {
-    local env_dir="$LHELPER_WORKING_DIR/env/$LHELPER_ENV_NAME"
+    local env_dir="$(get_env_directory "$LHELPER_ENV_NAME")"
     local package_filename="$env_dir/bin/lhelper-packages"
     local package_name="$1"
     packages_content=()
@@ -432,7 +437,7 @@ create)
         esac
         shift
     done
-    env_prefix="$LHELPER_WORKING_DIR/env/$env_name"
+    env_prefix="$(get_env_directory "$env_name")"
     create_env "$env_name" "$env_prefix" "${create_args[@]}" || exit 1
     if [ ! -z ${env_edit+x} ]; then
         "${EDITOR-vim}" "${env_prefix}/bin/lhelper-config"

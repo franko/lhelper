@@ -19,12 +19,12 @@ echo "Installing lhelper with prefix $DESTDIR"
 
 mkdir -p "$DESTDIR/bin"
 mkdir -p "$DESTDIR/share/lhelper/patch"
+mkdir -p "$DESTDIR/var/lhenv"
 mkdir -p "$DESTDIR/var/lib/lhelper/builds"
 mkdir -p "$DESTDIR/var/lib/lhelper/repos"
 mkdir -p "$DESTDIR/var/lib/lhelper/archives"
 mkdir -p "$DESTDIR/var/lib/lhelper/packages"
 mkdir -p "$DESTDIR/var/lib/lhelper/environments"
-mkdir -p "$DESTDIR/var/lib/lhelper/env"
 mkdir -p "$DESTDIR/var/lib/lhelper/digests"
 
 cp build-helper.sh "$DESTDIR/share/lhelper"
