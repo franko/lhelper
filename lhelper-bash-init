@@ -1,0 +1,11 @@
+if [ -f /etc/bash.bashrc ]; then
+    source /etc/bash.bashrc
+fi
+
+if [ -f "$HOME/.bashrc" ]; then
+    source "$HOME/.bashrc"
+fi
+
+if [ ! -z "${PS1+x}" ]; then
+    PS1="($LHELPER_ENV_NAME) $PS1"
+fi

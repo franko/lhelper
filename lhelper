@@ -52,6 +52,7 @@ prepare_temp_dir () {
     mkdir "$temp_dir"
 }
 
+# FIXME: move the log directory into the environment directory
 prepare_log_dir () {
     local log_dirname="$LHELPER_WORKING_DIR/logs/$LHELPER_ENV_NAME"
     if [ ! -d "$log_dirname" ]; then
@@ -341,12 +342,31 @@ library_remove () {
     echo "Package \"$package\" successfully removed."
 }
 
+print_installed_packages () {
+    local packages_file="${LHELPER_ENV_PREFIX}/bin/lhelper-packages"
+    if [ -s $packages_file ]; then
+        echo "Installed packages"
+        echo
+        while IFS= read -r line; do
+            echo "* $line"
+        done < $packages_file
+        echo
+    else
+        echo "No installed packages."
+        echo
+        echo "You can install new packages with the command:"
+        echo "> lhelper install <package-name>"
+    fi
+}
+
 start_subshell () {
-    bash --init-file "$LHELPER_WORKING_DIR/environments/$1"
+    source "$LHELPER_WORKING_DIR/environments/$1"
+    print_installed_packages
+    bash --init-file "$LHELPER_DIR/lhelper-bash-init"
 }
 
 create_env () {
-    bash "$LHELPER_DIR/create-env.sh" "$1" "$2"
+    bash "$LHELPER_DIR/create-env.sh" "$@"
 }
 
 # Take the environment name and its install prefix as arguments.
@@ -360,15 +380,6 @@ print_create_env_message () {
     echo ""
     echo "The build options can be modified with the command:"
     echo "> lhelper edit"
-}
-
-print_installed_packages () {
-    echo "Installed packages"
-    echo
-    while IFS= read -r line; do
-        echo "* $line"
-    done < "${LHELPER_ENV_PREFIX}/bin/lhelper-packages"
-    echo
 }
 
 print_package_files () {
@@ -405,14 +416,40 @@ activate)
     start_subshell "$2"
     ;;
 create)
-    if [ $# -lt 2 ]; then
-        echo "Usage: $LHELPER_COMMAND_NAME create <env-name> [env-root-dir]"
+    if [[ $# -lt 2 || $2 == "-"* ]]; then
+        echo "Usage: $LHELPER_COMMAND_NAME create <env-name> [options] [build-type] [compiler]"
         exit 1
     fi
-    env_prefix="${3-$LHELPER_WORKING_DIR/env/$2}"
-    create_env "$2" "$env_prefix"
-    "${EDITOR-vim}" "${env_prefix}/bin/lhelper-config"
-    print_create_env_message "$2" "$env_prefix"
+    env_name=$2
+    shift 2
+    create_args=()
+    while [ ! -z ${1+x} ]; do
+        case "$1" in
+            -a | --activate)        
+                env_activate=yes
+                ;;
+            -e | --edit)
+                env_edit=yes
+                ;;
+            -*)
+                echo "error: unknow option $1"
+                exit 1
+                ;;
+            *)
+                create_args+=($1)
+                ;;
+        esac
+        shift
+    done
+    env_prefix="$LHELPER_WORKING_DIR/env/$env_name"
+    create_env "$env_name" "$env_prefix" "${create_args[@]}" || exit 1
+    if [ ! -z ${env_edit+x} ]; then
+        "${EDITOR-vim}" "${env_prefix}/bin/lhelper-config"
+    fi
+    print_create_env_message "$env_name" "$env_prefix"
+    if [ ! -z ${env_activate+x} ]; then
+        start_subshell "$env_name"
+    fi
     ;;
 edit)
     if [ -z ${LHELPER_ENV_NAME+x} ]; then
@@ -433,6 +470,8 @@ delete)
         echo "Environment $_env_name not found."
         exit 1
     fi
+    # TODO: consider printing installed packages.
+    # TODO: consider asking no confirmation if environment is empty.
     if [ -n "$LHELPER_ENV_PREFIX" ]; then
         echo -n "Are you sure you want to delete the environment $_env_name (y/n) ? "
         read _sure_delete

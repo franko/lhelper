@@ -1,7 +1,24 @@
 # This script is executed from lhelper's main script when a command to create
-# a new environment is given.
+# a new environment.
 
 INSTALL_PREFIX="$2"
+_build_type="${3:-Release}"
+
+if [[ $_build_type != "Release" && $_build_type != "Debug" ]]; then
+    echo "Build type should be either Release or Debug, abort."
+    exit 1
+fi
+
+_compiler="$4"
+if [[ -z "$_compiler" || "$_compiler" == "gcc" ]]; then
+    CC=gcc
+    CXX=g++
+elif [[ $_compiler == "clang" ]]; then
+    CC=clang
+    CXX=clang++
+fi
+echo "Configuring environment to use C and C++ compilers $CC and $CXX."
+echo
 
 # Take a format and a list or aguments. Format each argument with
 # the given format using printf ang join all strings.
@@ -44,9 +61,24 @@ mkdir -p "${INSTALL_PREFIX}/include"
 mkdir -p "${INSTALL_PREFIX}/bin"
 mkdir -p "${INSTALL_PREFIX}/packages"
 
-# Copy the file containing the compiler config into the environment
-# bin directory.
-cp "$LHELPER_DIR/lhelper-config-default" "${INSTALL_PREFIX}/bin/lhelper-config"
+cat << _EOF_ > "${INSTALL_PREFIX}/bin/lhelper-config"
+# Edit here the compiler variables and flags for this
+# specific environment.
+
+# Avoid using generic debug or optimization flags as they
+# are automatically added by cmake or meson depending on
+# the BUILD_TYPE variable.
+
+export CC=$CC
+export CXX=$CXX
+export CFLAGS=
+export CXXFLAGS=
+export LDFLAGS=
+
+# Can be Release or Debug
+export BUILD_TYPE="$_build_type"
+_EOF_
+
 touch "${INSTALL_PREFIX}/bin/lhelper-packages"
 
 _pkgconfig_reldir=$(printf_join ":%s/pkgconfig" "${_libdir_array[0]}")
@@ -66,25 +98,4 @@ export LHELPER_ENV_PREFIX="\${_prefix}"
 export LHELPER_ENV_NAME="$1"
 
 source "\${LHELPER_ENV_PREFIX}/bin/lhelper-config"
-
-echo "Installed packages"
-echo
-while IFS= read -r line; do
-    echo "* \$line"
-done < "\${LHELPER_ENV_PREFIX}/bin/lhelper-packages"
-echo
-
-if [ -f /etc/bash.bashrc ]; then
-    source /etc/bash.bashrc
-fi
-
-if [ -f "$HOME/.bashrc" ]; then
-    source "$HOME/.bashrc"
-fi
-
-if [ ! -z "\${PS1+x}" ]; then
-    PS1="($1) \$PS1"
-fi
 EOF
-
-echo "$INSTALL_PREFIX"
