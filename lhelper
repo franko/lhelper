@@ -52,15 +52,6 @@ prepare_temp_dir () {
     mkdir "$temp_dir"
 }
 
-# FIXME: move the log directory into the environment directory
-prepare_log_dir () {
-    local log_dirname="$LHELPER_WORKING_DIR/logs/$LHELPER_ENV_NAME"
-    if [ ! -d "$log_dirname" ]; then
-        mkdir -p "$log_dirname"
-    fi
-    echo "$log_dirname"
-}
-
 # Relocate prefix path references for all files in a library install's
 # directory.
 library_dir_reloc () {
@@ -300,7 +291,7 @@ library_install () {
         echo "Found an existing package"
     else
         prepare_temp_dir "$LHELPER_WORKING_DIR"
-        local log_dirname=$(prepare_log_dir)
+        local log_dirname="${LHELPER_ENV_PREFIX}/logs"
 
         echo "Building library..."
         # Execute the recipe

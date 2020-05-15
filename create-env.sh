@@ -60,6 +60,7 @@ done
 mkdir -p "${INSTALL_PREFIX}/include"
 mkdir -p "${INSTALL_PREFIX}/bin"
 mkdir -p "${INSTALL_PREFIX}/packages"
+mkdir -p "${INSTALL_PREFIX}/logs"
 
 cat << _EOF_ > "${INSTALL_PREFIX}/bin/lhelper-config"
 # Edit here the compiler variables and flags for this
