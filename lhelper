@@ -59,7 +59,7 @@ library_dir_reloc () {
     local old_prefix="$2"
     local new_prefix="$3"
     find "$archive_dir" '(' -name '*.la' -or -name '*.pc' ')' -exec sed -i "s/${old_prefix}/${new_prefix}/g" '{}' \;
-    find "$archive_dir" -regex '.*/bin/[a-z]+-config' -exec sed -i "s/${old_prefix}/${new_prefix}/g" '{}' \;
+    find "$archive_dir" -regex '.*/bin/[a-z0-9_\-]+-config' -exec sed -i "s/${old_prefix}/${new_prefix}/g" '{}' \;
 }
 
 # Extract library archive and relocate prefix path references.
