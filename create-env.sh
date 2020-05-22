@@ -9,16 +9,8 @@ if [[ $_build_type != "Release" && $_build_type != "Debug" ]]; then
     exit 1
 fi
 
-_compiler="$4"
-if [[ -z "$_compiler" || "$_compiler" == "gcc" ]]; then
-    CC=gcc
-    CXX=g++
-elif [[ $_compiler == "clang" ]]; then
-    CC=clang
-    CXX=clang++
-fi
-echo "Configuring environment to use C and C++ compilers $CC and $CXX."
-echo
+if [ -z ${CC+x} ]; then CC="gcc"; fi
+if [ -z ${CXX+x} ]; then CXX="g++"; fi
 
 # Take a format and a list or aguments. Format each argument with
 # the given format using printf ang join all strings.
@@ -62,6 +54,10 @@ mkdir -p "${INSTALL_PREFIX}/bin"
 mkdir -p "${INSTALL_PREFIX}/packages"
 mkdir -p "${INSTALL_PREFIX}/logs"
 
+# To avoid deleting the directories when removing packages
+touch "${INSTALL_PREFIX}/logs/.keep"
+touch "${INSTALL_PREFIX}/packages/.keep"
+
 cat << _EOF_ > "${INSTALL_PREFIX}/bin/lhelper-config"
 # Edit here the compiler variables and flags for this
 # specific environment.
@@ -72,9 +68,9 @@ cat << _EOF_ > "${INSTALL_PREFIX}/bin/lhelper-config"
 
 export CC=$CC
 export CXX=$CXX
-export CFLAGS=
-export CXXFLAGS=
-export LDFLAGS=
+export CFLAGS=$CFLAGS
+export CXXFLAGS=$CXXFLAGS
+export LDFLAGS=$LDFLAGS
 
 # Can be Release or Debug
 export BUILD_TYPE="$_build_type"

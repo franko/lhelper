@@ -348,10 +348,7 @@ print_installed_packages () {
         done < $packages_file
         echo
     else
-        echo "No installed packages."
-        echo
-        echo "You can install new packages with the command:"
-        echo "> lhelper install <package-name>"
+        echo "No package installed."
     fi
 }
 
@@ -367,15 +364,7 @@ create_env () {
 
 # Take the environment name and its install prefix as arguments.
 print_create_env_message () {
-    echo "Environment $1 successfully created in directory:"
-    echo ""
-    echo "$2"
-    echo ""
-    echo "It can be activated using the command:"
-    echo "> lhelper activate $1"
-    echo ""
-    echo "The build options can be modified with the command:"
-    echo "> lhelper edit"
+    echo "Environment \"$1\" created [$2]"
 }
 
 print_package_files () {
@@ -413,37 +402,43 @@ activate)
     ;;
 create)
     if [[ $# -lt 2 || $2 == "-"* ]]; then
-        echo "Usage: $LHELPER_COMMAND_NAME create <env-name> [options] [build-type] [compiler]"
+        echo "Usage: $LHELPER_COMMAND_NAME create <env-name> [options] [build-type]"
         exit 1
     fi
     env_name=$2
     shift 2
-    create_args=()
     while [ ! -z ${1+x} ]; do
         case "$1" in
-            -a | --activate)        
-                env_activate=yes
+            -n | --create-only)
+                env_activate=no
                 ;;
             -e | --edit)
                 env_edit=yes
                 ;;
             -*)
-                echo "error: unknow option $1"
+                echo "error: unknown option $1"
                 exit 1
                 ;;
             *)
-                create_args+=($1)
+                if [ -z ${build_type+x} ]; then
+                    build_type=$1
+                else
+                    echo "error: unexpected argument: \"$1\""
+                    exit 1
+                fi
                 ;;
         esac
         shift
     done
+    build_type="${build_type:-Release}"
     env_prefix="$(get_env_directory "$env_name")"
-    create_env "$env_name" "$env_prefix" "${create_args[@]}" || exit 1
+    create_env "$env_name" "$env_prefix" "$build_type" || exit 1
     if [ ! -z ${env_edit+x} ]; then
         "${EDITOR-vim}" "${env_prefix}/bin/lhelper-config"
     fi
-    print_create_env_message "$env_name" "$env_prefix"
-    if [ ! -z ${env_activate+x} ]; then
+    print_create_env_message "$env_name" "$build_type"
+    if [ -z ${env_activate+x} ]; then
+        echo "Activating the new environment"
         start_subshell "$env_name"
     fi
     ;;
