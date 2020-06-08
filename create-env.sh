@@ -66,11 +66,11 @@ cat << _EOF_ > "${INSTALL_PREFIX}/bin/lhelper-config"
 # are automatically added by cmake or meson depending on
 # the BUILD_TYPE variable.
 
-export CC=$CC
-export CXX=$CXX
-export CFLAGS=$CFLAGS
-export CXXFLAGS=$CXXFLAGS
-export LDFLAGS=$LDFLAGS
+export CC="$CC"
+export CXX="$CXX"
+export CFLAGS="$CFLAGS"
+export CXXFLAGS="$CXXFLAGS"
+export LDFLAGS="$LDFLAGS"
 
 # Can be Release or Debug
 export BUILD_TYPE="$_build_type"
