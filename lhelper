@@ -205,11 +205,6 @@ library_install () {
     local package="$1"
     shift
 
-    if $(package_is_installed "$LHELPER_ENV_PREFIX" "$package"); then
-        remove_package "$LHELPER_ENV_PREFIX" "$package"
-        echo "Removed previously installed package \"$package\""
-    fi
-
     local version
     local options_a=()
     for opt in "${@:1}"; do
@@ -266,6 +261,11 @@ library_install () {
     if [ ! -f "$recipe_filename" ]; then
         echo "error: no recipe found for \"${package}\" version ${version}."
         exit 1
+    fi
+
+    if $(package_is_installed "$LHELPER_ENV_PREFIX" "$package"); then
+        remove_package "$LHELPER_ENV_PREFIX" "$package"
+        echo "Removed previously installed package \"$package\""
     fi
 
     source "$LHELPER_DIR/build-helper.sh"
