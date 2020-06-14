@@ -202,7 +202,7 @@ find_recipe_filename () {
     local version="$3"
     local recipe_filename
     for filename in "${recipe_dir}/"*; do
-        if [[ $filename == *"/${package}_${version}+"* ]]; then
+        if [[ $filename == *"/${package}_${version}" || $filename == *"/${package}_${version}+"* ]]; then
             recipe_filename="$filename"
         fi
     done
