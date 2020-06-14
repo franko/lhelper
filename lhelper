@@ -196,6 +196,19 @@ remove_package () {
     rm "$filename_list"
 }
 
+find_recipe_filename () {
+    local recipe_dir="$1"
+    local package="$2"
+    local version="$3"
+    local recipe_filename
+    for filename in "${recipe_dir}/"*; do
+        if [[ $filename == *"/${package}_${version}+"* ]]; then
+            recipe_filename="$filename"
+        fi
+    done
+    echo "${recipe_filename#$recipe_dir/}"
+}
+
 library_install () {
     local local_recipe
     if [ "$1" == "--local" ]; then
@@ -246,21 +259,24 @@ library_install () {
             echo "error: cannot find package \"${package}\""
             exit 1
         fi
-        if [[ ${#options_a[@]} -eq 0 ]]; then
-            echo "Using version $version"
-        else
-            echo "Using version $version with options: ${options_a[*]}"
-        fi
     fi
-
-    local recipe_filename="${package}_${version}.sh"
+    local recipe_dir
     if [ -z ${local_recipe+set} ]; then
-        recipe_filename="$LHELPER_DIR/recipes/${recipe_filename}"
+        recipe_dir="$LHELPER_DIR/recipes"
+    else
+        recipe_dir=.
     fi
-
-    if [ ! -f "$recipe_filename" ]; then
+    local recipe_filename="$(find_recipe_filename "${recipe_dir}" "$package" "$version")"
+    if [ -z "${recipe_filename}" ]; then
         echo "error: no recipe found for \"${package}\" version ${version}."
         exit 1
+    fi
+    local recipe_version="${recipe_filename#${package}_}"
+
+    if [[ ${#options_a[@]} -eq 0 ]]; then
+        echo "Using recipe version ${recipe_version}"
+    else
+        echo "Using recipe version ${recipe_version} with options: ${options_a[*]}"
     fi
 
     if $(package_is_installed "$LHELPER_ENV_PREFIX" "$package"); then
@@ -291,7 +307,7 @@ library_install () {
     source "$LHELPER_ENV_PREFIX/bin/lhelper-config"
 
     local digest=$(build_env_digest)
-    local tar_package_filename="${package}${options_tag}_${version}_${digest}.tar.gz"
+    local tar_package_filename="${package}${options_tag}_${recipe_version}_${digest}.tar.gz"
     if [[ -z ${local_recipe+set} && "$version" != "git-"* && -f "$LHELPER_WORKING_DIR/packages/${tar_package_filename}" ]]; then
         echo "Found an existing package"
     else
@@ -300,7 +316,7 @@ library_install () {
 
         echo "Building library..."
         # Execute the recipe
-        bash -e "$recipe_filename" "$package" "$version" "${options_a[@]}" 2> "$log_dirname/$package-stderr.log" 1> "$log_dirname/$package-stdout.log"
+        bash -e "${recipe_dir}/${recipe_filename}" "$package" "$version" "${options_a[@]}" 2> "$log_dirname/$package-stderr.log" 1> "$log_dirname/$package-stdout.log"
         if [ $? -ne 0 ]; then
             echo "error: building library \"$package\""
             echo "    You may inspect the log files:"
@@ -322,7 +338,7 @@ library_install () {
     set_prefix_variables "$LHELPER_ENV_PREFIX"
     local filename_list="$LHELPER_ENV_PREFIX/packages/${package}.list"
     extract_archive_reloc "${tar_package_filename}" '__LHELPER_PREFIX__' "$(sed_replace_escape "$WIN_INSTALL_PREFIX")" "$INSTALL_PREFIX" "$filename_list"
-    register_package "$package" "$version" "${options_a[@]}"
+    register_package "$package" "$recipe_version" "${options_a[@]}"
     echo "Package \"$package\" successfully installed"
 }
 
