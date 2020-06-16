@@ -211,10 +211,21 @@ find_recipe_filename () {
 
 library_install () {
     local local_recipe
-    if [ "$1" == "--local" ]; then
-        local_recipe="true"
+    local rebuild
+    while [[ "$1" == -* ]]; do
+        case "$1" in
+        --local)
+            local_recipe=true
+            ;;
+        --rebuild)
+            rebuild=true
+            ;;
+        *)
+            echo "unknown install option: $1"
+            exit 1
+        esac
         shift
-    fi
+    done
     local package="$1"
     shift
 
@@ -308,7 +319,7 @@ library_install () {
 
     local digest=$(build_env_digest)
     local tar_package_filename="${package}${options_tag}_${recipe_version}_${digest}.tar.gz"
-    if [[ -z ${local_recipe+set} && "$version" != "git-"* && -f "$LHELPER_WORKING_DIR/packages/${tar_package_filename}" ]]; then
+    if [[ -z ${rebuild+set} && -z ${local_recipe+set} && "$version" != "git-"* && -f "$LHELPER_WORKING_DIR/packages/${tar_package_filename}" ]]; then
         echo "Found an existing package"
     else
         prepare_temp_dir "$LHELPER_WORKING_DIR"
