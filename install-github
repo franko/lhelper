@@ -1,0 +1,61 @@
+#!/bin/bash
+
+IFS=':' read -ra path_a <<< "$PATH"
+for name in "${path_a[@]}"; do
+  if [[ -w "$name" && "$name" == */bin && -w "${name%/bin}" ]]; then
+    destdir="${name%/bin}"
+  fi
+done
+if [ -z ${destdir+set} ]; then
+  destdir="$HOME/.local"
+  need_path=true
+fi
+
+echo "Installing using prefix directory $destdir"
+
+recipes_repo="https://github.com/franko/lhelper-recipes.git"
+recipes_branch=master
+recipes_dir="$destdir/share/lhelper/recipes"
+
+echo "Installing lhelper with prefix $destdir"
+
+mkdir -p "$destdir/bin"
+mkdir -p "$destdir/share/lhelper/patch"
+mkdir -p "$destdir/var/lhenv"
+mkdir -p "$destdir/var/lib/lhelper/builds"
+mkdir -p "$destdir/var/lib/lhelper/repos"
+mkdir -p "$destdir/var/lib/lhelper/archives"
+mkdir -p "$destdir/var/lib/lhelper/packages"
+mkdir -p "$destdir/var/lib/lhelper/environments"
+mkdir -p "$destdir/var/lib/lhelper/digests"
+
+pushd /tmp
+wget "https://github.com/franko/lhelper/archive/v${version}.tar.gz" || exit 1
+tar xf "v${version}.tar.gz"
+
+pushd "lhelper-$version"
+cp build-helper.sh "$destdir/share/lhelper"
+cp create-env.sh "$destdir/share/lhelper"
+cp lhelper-bash-init "$destdir/share/lhelper"
+cp patch/*.patch "$destdir/share/lhelper/patch"
+cp lhelper "$destdir/bin"
+popd
+
+if [ -d "$recipes_dir" ]; then
+	echo "Deleting existing recipes dir: $recipes_dir"
+	rm -fr "$recipes_dir"
+fi
+
+git clone --depth 1 -b "$recipes_branch" "$recipes_repo" "$recipes_dir"
+
+chmod a+x "$destdir/bin/lhelper"
+if [ ! -z ${need_path+set} ]; then
+  echo "To use lhelper add the directory \"$destdir\" to your PATH."
+fi
+
+rm -fr "lhelper-$version"
+rm "v${version}.tar.gz"
+
+popd
+echo "done"
+
