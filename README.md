@@ -1,12 +1,36 @@
 # Little Library Helper
 
-An simple utility to help you install C and C++ libraries on Windows, using MSYS2 and on Linux.
+An simple utility to help you compile C and C++ libraries on Linux and on Windows, using MSYS2.
 
 It helps to simplify the develoment by creating separate environments each containing a collection of libraries compiled using specific a compiler and specific compiler's flags.
 
-For example you may have an environment for libraries compiled for x86 architecture and another one for x86_64.
+For example an environment may be used for libraries compiled for x86 architecture and another one for x86-64.
 
-Seamlessly change environment and start compiling your project using you favorite build system.
+Lhelper provides a set of ready-to-use recipes with useful defaults and options.
+By default each library will be compiled as a static library and with minimal options.
+Additional options can be enabled only if explicitly requested.
+
+If needed a library can be compiled as a shared library using the `-shared` option.
+
+## How to install
+
+Little Library Helper can be installed using the command:
+
+```sh
+wget -q -O - https://raw.githubusercontent.com/franko/lhelper/master/install-github | bash -
+```
+
+Or, aleternatively, by making a clone of the git repository and then using the 'install' script:
+
+```sh
+git clone https://github.com/franko/lhelper.git
+cd lhelper
+bash install <install-prefix-directory>
+```
+
+The `<install-prefix-directory>` can be any directory but it should contains a `bin` folder and it should be part of you PATH. The helper will install its files in the `<prefix>/share/lhelper` directory and it will use the directory `<prefix>/var/lib/lhelper` to store downloaded archives and build the libraries.
+
+On Ubuntu systems you may use the `$HOME/.local` directory as a prefix.
 
 ## Usage
 
@@ -115,26 +139,6 @@ The following software should be installed and available in the PATH:
 In practice Little Library Helper on Windows works well with Mingw and with Msys2. Msys2 provides all the applications above by installing the appropriate packages. If you do not use Msys2 it is up to you to ensure that they are available in the PATH from the bash shell.
 
 On Linux just make sure that the packages that provides the commands above are installed.
-
-## How to install
-
-Little Library Helper can be installed using the command:
-
-```sh
-wget -q -O - https://raw.githubusercontent.com/franko/lhelper/master/install-github | bash -
-```
-
-Or, aleternatively, by making a clone of the git repository and then using the 'install' script:
-
-```sh
-git clone https://github.com/franko/lhelper.git
-cd lhelper
-bash install <install-prefix-directory>
-```
-
-The `<install-prefix-directory>` can be any directory but it should contains a `bin` folder and it should be part of you PATH. The helper will install its files in the `<prefix>/share/lhelper` directory and it will use the directory `<prefix>/var/lib/lhelper` to store downloaded archives and build the libraries.
-
-On Ubuntu systems you may use the `$HOME/.local` directory as a prefix.
 
 ## How it is implemented
 
