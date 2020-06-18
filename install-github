@@ -2,6 +2,9 @@
 
 version="0.1"
 
+pushd_quiet () { builtin pushd "$@" > /dev/null; }
+popd_quiet () { builtin popd "$@" > /dev/null; }
+
 IFS=':' read -ra path_a <<< "$PATH"
 for name in "${path_a[@]}"; do
   if [[ -w "$name" && "$name" == */bin && -w "${name%/bin}" ]]; then
@@ -29,26 +32,33 @@ mkdir -p "$destdir/var/lib/lhelper/packages"
 mkdir -p "$destdir/var/lib/lhelper/environments"
 mkdir -p "$destdir/var/lib/lhelper/digests"
 
-pushd /tmp
-wget "https://github.com/franko/lhelper/archive/v${version}.tar.gz" || exit 1
-tar xf "v${version}.tar.gz"
+pushd_quiet /tmp
+echo "Downloading package from github..."
+wget -q "https://github.com/franko/lhelper/archive/v${version}.tar.gz" || exit 1
 
-pushd "lhelper-$version"
+echo "Extracting files from archive..."
+tar xf "v${version}.tar.gz"
+pushd_quiet "lhelper-$version"
+
+echo "Copying files into destination dir..."
 cp build-helper.sh "$destdir/share/lhelper"
 cp create-env.sh "$destdir/share/lhelper"
 cp lhelper-bash-init "$destdir/share/lhelper"
 cp patch/*.patch "$destdir/share/lhelper/patch"
 cp lhelper "$destdir/bin"
-popd
+popd_quiet
 
 if [ -d "$recipes_dir" ]; then
-	echo "Deleting existing recipes dir: $recipes_dir"
+	echo "Deleting existing recipes dir: $recipes_dir..."
 	rm -fr "$recipes_dir"
 fi
 
-git clone --depth 1 -b "$recipes_branch" "$recipes_repo" "$recipes_dir"
+echo "Installing build recipes..."
+git clone --depth 1 -b "$recipes_branch" "$recipes_repo" "$recipes_dir" &> /dev/null || exit 1
 
 chmod a+x "$destdir/bin/lhelper"
+
+echo "Lhelper successfully installed"
 if [ ! -z ${need_path+set} ]; then
   echo "To use lhelper add the directory \"$destdir\" to your PATH."
 fi
@@ -56,6 +66,5 @@ fi
 rm -fr "lhelper-$version"
 rm "v${version}.tar.gz"
 
-popd
-echo "done"
+popd_quiet
 
