@@ -1,5 +1,7 @@
 #!/bin/bash
 
+version="0.1"
+
 IFS=':' read -ra path_a <<< "$PATH"
 for name in "${path_a[@]}"; do
   if [[ -w "$name" && "$name" == */bin && -w "${name%/bin}" ]]; then
@@ -16,8 +18,6 @@ echo "Installing using prefix directory $destdir"
 recipes_repo="https://github.com/franko/lhelper-recipes.git"
 recipes_branch=master
 recipes_dir="$destdir/share/lhelper/recipes"
-
-echo "Installing lhelper with prefix $destdir"
 
 mkdir -p "$destdir/bin"
 mkdir -p "$destdir/share/lhelper/patch"
