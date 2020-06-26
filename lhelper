@@ -92,11 +92,11 @@ set_prefix_variables () {
         # The pattern is '\([cC]:\|\/c\)' but the backslash need to be escaped
         # of the RHS of sed's edit command, so it becomes: '\\([cC]:\\|\/c\/)'.
         sed_pattern="$(echo "${WIN_INSTALL_PREFIX}" | sed -e 's/\([a-zA-Z]\):/\\(\[\L\1\U\1\]:\\|\/\L\1\\)/')"
+        SED_PREFIX_PATTERN="${sed_pattern//\//\\\/}"
     else
         WIN_INSTALL_PREFIX="${INSTALL_PREFIX}"
-        sed_pattern="${INSTALL_PREFIX}"
+        SED_PREFIX_PATTERN="${INSTALL_PREFIX}"
     fi
-    SED_PREFIX_PATTERN="${sed_pattern//\//\\\/}"
     export INSTALL_PREFIX WIN_INSTALL_PREFIX SED_PREFIX_PATTERN
 }
 
@@ -348,7 +348,13 @@ library_install () {
     fi
     set_prefix_variables "$LHELPER_ENV_PREFIX"
     local filename_list="$LHELPER_ENV_PREFIX/packages/${package}.list"
-    extract_archive_reloc "${tar_package_filename}" '__LHELPER_PREFIX__' "$(sed_replace_escape "$WIN_INSTALL_PREFIX")" "$INSTALL_PREFIX" "$filename_list"
+    local old_prefix
+    if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* ]]; then
+        old_prefix="$(sed_replace_escape "$WIN_INSTALL_PREFIX")"
+    else
+        old_prefix="$WIN_INSTALL_PREFIX"
+    fi
+    extract_archive_reloc "${tar_package_filename}" '__LHELPER_PREFIX__' "$old_prefix" "$INSTALL_PREFIX" "$filename_list"
     register_package "$package" "$recipe_version" "${options_a[@]}"
     echo "Package \"$package\" successfully installed"
 }
