@@ -129,11 +129,16 @@ meson_options () {
 
 cmake_options () {
     local pic_option
+    local shared_lib="OFF"
     local options_new=()
     while [ ! -z ${1+x} ]; do
         case $1 in
             -pic)
                 pic_option="ON"
+                shift
+                ;;
+            -shared)
+                shared_lib="ON"
                 shift
                 ;;
             *)
@@ -142,6 +147,7 @@ cmake_options () {
                 ;;
         esac
     done
+    options_new+=("-DBUILD_SHARED_LIBS=${shared_lib}")
     if [ -n "$pic_option" ]; then
         options_new+=("-DCMAKE_POSITION_INDEPENDENT_CODE=$pic_option")
     fi
