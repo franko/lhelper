@@ -173,8 +173,11 @@ build_and_install () {
         processed_options="$(cmake_options "${@:2}")"
         mkdir build
         pushd_quiet build
-        echo "Using cmake command: " cmake -G "Ninja" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" "$processed_options" ..
-        cmake -G "Ninja" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" "$processed_options" ..
+        # It is very important below to pass $processed_options without
+        # quotes. Otherwise it will be passed as a big string without breaking
+        # on spaces.
+        echo "Using cmake command: " cmake -G "Ninja" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" $processed_options ..
+        cmake -G "Ninja" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" $processed_options ..
         cmake --build .
         cmake --build . --target install
         popd_quiet
