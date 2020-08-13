@@ -44,7 +44,8 @@ enter_remote_archive () {
     if [ ! -f "$LHELPER_WORKING_DIR/archives/$3" ]; then
         _current_archive_dir="$LHELPER_WORKING_DIR/archives/$3"
         trap interrupt_clean_archive INT
-        curl -L "$2" -o "$LHELPER_WORKING_DIR/archives/$3" || interrupt_clean_archive
+	# The option --insecure is used to ignore SSL certificate issues.
+        curl --insecure -L "$2" -o "$LHELPER_WORKING_DIR/archives/$3" || interrupt_clean_archive
         trap INT
     fi
     rm -fr "$LHELPER_WORKING_DIR/builds/$1"
