@@ -160,11 +160,11 @@ add_build_type_compiler_flags () {
     # The double comma below is used to transform into lowercase
     local build_type="${1,,}"
     if [[ "$build_type" == "release" ]]; then
-        CFLAGS+="-O3"
-        CXXFLAGS+="-O3"
+        CFLAGS+=" -O3"
+        CXXFLAGS+=" -O3"
     elif [[ "$build_type" == "debug" ]]; then
-        CFLAGS+="-g"
-        CXXFLAGS+="-g"
+        CFLAGS+=" -g"
+        CXXFLAGS+=" -g"
     fi
 }
 
