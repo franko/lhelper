@@ -68,6 +68,24 @@ install_pkgconfig_file () {
     cp "$1" "${INSTALL_PREFIX}/$LHELPER_PKGCONFIG_RPATH"
 }
 
+fix_pkgconfig_install () {
+    if [ "${LHELPER_LIBDIR}" != "lib" ]; then
+        local found_pkgconfig
+        if [ -d "${INSTALL_PREFIX}/lib/pkgconfig" ]; then
+            found_pkgconfig="lib/pkgconfig"
+        fi
+        if [ -d "${INSTALL_PREFIX}/share/pkgconfig" ]; then
+            found_pkgconfig="share/pkgconfig"
+        fi
+        if [ -n "${found_pkgconfig}" ]; then
+            echo "Moving pkgconfig directory from ${INSTALL_PREFIX}/${found_pkgconfig} to ${INSTALL_PREFIX}/${LHELPER_LIBDIR}/pkgconfig"
+            mkdir -p "${INSTALL_PREFIX}/${LHELPER_LIBDIR}/pkgconfig"
+            mv "${INSTALL_PREFIX}/${found_pkgconfig}" "${INSTALL_PREFIX}/${LHELPER_LIBDIR}"
+            # TODO: not required, delete ${INSTALL_PREFIX}/lib directory if empty.
+        fi
+    fi
+}
+
 check_commands () {
     for command in "$@"; do
         type "$command" > /dev/null 2>&1 || { echo >&2 "error: command \"${command}\" is required but it's not available"; exit 1; }

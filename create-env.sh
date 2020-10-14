@@ -78,6 +78,7 @@ _EOF_
 
 touch "${INSTALL_PREFIX}/bin/lhelper-packages"
 
+_libdir="${_libdir_array[0]}"
 _pkgconfig_reldir=$(printf_join ":%s/pkgconfig" "${_libdir_array[0]}")
 _pkgconfig_path=$(printf_join ":\${_prefix}/%s/pkgconfig" "${_libdir_array[@]}")
 _ldpath=$(printf_join ":\${_prefix}/%s" "${_libdir_array[@]}")
@@ -90,6 +91,7 @@ export LD_LIBRARY_PATH="${_ldpath}\${LD_LIBRARY_PATH:+:}\${LD_LIBRARY_PATH}"
 export PKG_CONFIG_PATH="${_pkgconfig_path}\${PKG_CONFIG_PATH:+:}\${PKG_CONFIG_PATH}"
 
 export CMAKE_PREFIX_PATH="\${_prefix}"
+export LHELPER_LIBDIR="${_libdir}"
 export LHELPER_PKGCONFIG_RPATH="${_pkgconfig_reldir}"
 export LHELPER_ENV_PREFIX="\${_prefix}"
 export LHELPER_ENV_NAME="$1"
