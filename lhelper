@@ -209,6 +209,24 @@ find_recipe_filename () {
     echo "${recipe_filename#$recipe_dir/}"
 }
 
+fix_pkgconfig_install () {
+    if [ "${LHELPER_LIBDIR}" != "lib" ]; then
+        local found_pkgconfig
+        if [ -d "${INSTALL_PREFIX}/lib/pkgconfig" ]; then
+            found_pkgconfig="lib/pkgconfig"
+        fi
+        if [ -d "${INSTALL_PREFIX}/share/pkgconfig" ]; then
+            found_pkgconfig="share/pkgconfig"
+        fi
+        if [ -n "${found_pkgconfig}" ]; then
+            echo "Moving pkgconfig directory from ${INSTALL_PREFIX}/${found_pkgconfig} to ${INSTALL_PREFIX}/${LHELPER_LIBDIR}/pkgconfig"
+            mkdir -p "${INSTALL_PREFIX}/${LHELPER_LIBDIR}/pkgconfig"
+            mv "${INSTALL_PREFIX}/${found_pkgconfig}" "${INSTALL_PREFIX}/${LHELPER_LIBDIR}"
+            # TODO: not required, delete ${INSTALL_PREFIX}/lib directory if empty.
+        fi
+    fi
+}
+
 library_install () {
     local local_recipe
     local rebuild
@@ -303,7 +321,6 @@ library_install () {
         inside_archive_apply_patch \
         build_and_install \
         install_pkgconfig_file \
-        fix_pkgconfig_install \
         interrupt_clean_archive \
         configure_options \
         meson_options \
@@ -339,6 +356,7 @@ library_install () {
             echo "    located in the directory $log_dirname"
             exit 1
         fi
+        fix_pkgconfig_install
         echo "done"
 
         library_dir_reloc "$LHELPER_TEMP_ROOT" "$SED_PREFIX_PATTERN" '__LHELPER_PREFIX__'
