@@ -21,6 +21,17 @@ fi
 pushd_quiet () { builtin pushd "$@" > /dev/null; }
 popd_quiet () { builtin popd "$@" > /dev/null; }
 
+find_os_release () {
+    local uname_out="$(uname -s)"
+    case "${uname_out}" in
+        Linux*)
+            (source /etc/os-release; echo "$ID-$VERSION_ID")
+            ;;
+        *)
+            echo "${uname_out}"
+    esac
+}
+
 cat_digest () {
     cat << EOF
 CC="$CC"
@@ -30,9 +41,7 @@ CXXFLAGS="$CXXFLAGS"
 LDFLAGS="$LDFLAGS"
 BUILD_TYPE="$BUILD_TYPE"
 MACHTYPE="$MACHTYPE"
-CC_VERSION="$($CC --version | head -n 1)"
-CXX_VERSION="$($CXX --version | head -n 1)"
-CC_DUMPMACHINE="$($CC -dumpmachine)"
+OS_VERSION="$(find_os_release)"
 EOF
 }
 
