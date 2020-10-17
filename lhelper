@@ -210,20 +210,20 @@ find_recipe_filename () {
 }
 
 fix_pkgconfig_install () {
-    if [ "${LHELPER_LIBDIR}" != "lib" ]; then
-        local found_pkgconfig
-        if [ -d "${INSTALL_PREFIX}/lib/pkgconfig" ]; then
-            found_pkgconfig="lib/pkgconfig"
-        fi
-        if [ -d "${INSTALL_PREFIX}/share/pkgconfig" ]; then
-            found_pkgconfig="share/pkgconfig"
-        fi
-        if [ -n "${found_pkgconfig}" ]; then
-            echo "Moving pkgconfig directory from ${INSTALL_PREFIX}/${found_pkgconfig} to ${INSTALL_PREFIX}/${LHELPER_LIBDIR}/pkgconfig"
-            mkdir -p "${INSTALL_PREFIX}/${LHELPER_LIBDIR}/pkgconfig"
-            mv "${INSTALL_PREFIX}/${found_pkgconfig}" "${INSTALL_PREFIX}/${LHELPER_LIBDIR}"
-            # TODO: not required, delete ${INSTALL_PREFIX}/lib directory if empty.
-        fi
+    local found_pkgconfig
+    if [[ "${LHELPER_LIBDIR}" != "lib" && -d "${INSTALL_PREFIX}/lib/pkgconfig" ]]; then
+        found_pkgconfig="lib/pkgconfig"
+    fi
+    if [[ "${LHELPER_LIBDIR}" != "lib" && -d "${INSTALL_PREFIX}/share/pkgconfig" ]]; then
+        found_pkgconfig="share/pkgconfig"
+    fi
+    if [ -n "${found_pkgconfig}" ]; then
+        local pkgconfig_libdir="$(dirname "${INSTALL_PREFIX}/${found_pkgconfig}")"
+        echo "Moving pkgconfig directory from \"$(dirname ${found_pkgconfig})\" to \"${LHELPER_LIBDIR}\""
+        mkdir -p "${INSTALL_PREFIX}/${LHELPER_LIBDIR}/pkgconfig"
+        mv "${INSTALL_PREFIX}/${found_pkgconfig}" "${INSTALL_PREFIX}/${LHELPER_LIBDIR}"
+        # Deleting empty directories in ${pkgconfig_libdir}
+        find "$pkgconfig_libdir" -empty -type d -delete
     fi
 }
 
