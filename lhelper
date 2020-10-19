@@ -25,7 +25,28 @@ find_os_release () {
     local uname_out="$(uname -s)"
     case "${uname_out}" in
         Linux*)
-            (source /etc/os-release; echo "$ID-$VERSION_ID")
+            if [ -f /etc/os-release ]; then
+                (source /etc/os-release; echo "$ID-$VERSION_ID")
+            elif [ -f /etc/redhat-release ]; then
+                rh_line=$(cat /etc/redhat-release)
+                rh_regex="Red Hat .* release ([^ ]+)"
+                if [[ $rh_line =~ $rh_regex ]]; then
+                    echo "rhel-${BASH_REMATCH[1]}"
+                else
+                    echo "rhel-unknown"
+                fi
+            elif hash lsb_release 2> /dev/null; then
+                while IFS= read -r line; do
+                    if [[ $line =~ "Distributor ID: +([^ ]+)" ]]; then
+                        os_dist="${BASH_REMATCH[1]}"
+                    elif [[ $line =~ "Release: +([^ ]+)" ]]; then
+                        os_release="${BASH_REMATCH[1]}"
+                    fi
+                done < lsb_release -i -r
+                echo "${os_dist:-linux}-${os_release:-unknown}"
+            else
+                echo "linux-unknown"
+            fi
             ;;
         *)
             echo "${uname_out}"
