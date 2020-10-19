@@ -36,13 +36,9 @@ find_os_release () {
                     echo "rhel-unknown"
                 fi
             elif hash lsb_release 2> /dev/null; then
-                lsb_release -i -r | while IFS= read -r line; do
-                    if [[ "$line" =~ Distributor\ ID:[[:space:]]*(.+) ]]; then
-                        echo -n "${BASH_REMATCH[1]}"
-                    elif [[ $line =~ Release:[[:space:]]*(.+) ]]; then
-                        echo "-${BASH_REMATCH[1]}"
-                    fi
-                done
+                dist="$(lsb_release -i)"
+                release="$(lsb_release -r)"
+                echo "${dist#*:$'\t'}-${release#*:$'\t'}"
             else
                 echo "linux-unknown"
             fi
