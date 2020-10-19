@@ -48,7 +48,12 @@ find_os_release () {
             fi
             ;;
         *)
-            echo "${uname_out}"
+            # On MSYS2 the output is MINGW32_NT-10.0-17763
+            if [[ $uname_out =~ ([^\-]+-[^\-]+) ]]; then
+                echo "${BASH_REMATCH[1]}"
+            else
+                echo "${uname_out}"
+            fi
     esac
 }
 
