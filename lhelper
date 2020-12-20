@@ -347,6 +347,7 @@ library_install () {
     export -f \
         enter_git_repository \
         enter_remote_archive \
+        enter_archive \
         inside_git_apply_patch \
         inside_archive_apply_patch \
         build_and_install \

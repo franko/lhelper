@@ -54,6 +54,47 @@ enter_remote_archive () {
     cd "$1"
 }
 
+# $1 = remote URL
+enter_archive () {
+    local url="$1"
+    local filename="${url##*/}"
+    if [ ! -f "$LHELPER_WORKING_DIR/archives/$filename" ]; then
+        _current_archive_dir="$LHELPER_WORKING_DIR/archives/$filename"
+        trap interrupt_clean_archive INT
+	    # The option --insecure is used to ignore SSL certificate issues.
+        curl --insecure -L "$url" -o "$LHELPER_WORKING_DIR/archives/$filename" || interrupt_clean_archive
+        trap INT
+    fi
+    cd "$LHELPER_WORKING_DIR/builds"
+    local tmp_expand_dir=".sas"
+    rm -fr "$tmp_expand_dir" && mkdir "$tmp_expand_dir" && pushd "$tmp_expand_dir"
+    if [[ $filename =~ ".tar."* ]]; then
+        tar xf "$LHELPER_WORKING_DIR/archives/$filename"
+    elif [[ $filename =~ ".zip" ]]; then
+        unzip "$LHELPER_WORKING_DIR/archives/$filename"
+    else
+        echo "error: unknown archive format: \"${filename}\""
+        exit 1
+    fi
+    local topdir
+    for xdir in "$(ls -d1 */)"; do
+        if [ -n "$topdir" ]; then
+            echo "error: multiple directories in archive $filename"
+            exit 1
+        fi
+        topdir="${xdir%/}"
+    done
+    if [ -z {topdir+x} ]; then
+        echo "error: empty erchive $filename from $url"
+        exit 1
+    fi
+    rm -fr "$LHELPER_WORKING_DIR/builds/$topdir"
+    mv "$topdir" "$LHELPER_WORKING_DIR/builds"
+    popd
+    rm -fr "$tmp_expand_dir"
+    cd "$topdir"
+}
+
 inside_git_apply_patch () {
     git apply "$LHELPER_DIR/patch/$1.patch"
 }
