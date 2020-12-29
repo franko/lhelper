@@ -15,25 +15,28 @@ interrupt_clean_archive () {
     exit 1
 }
 
-# $1 = git repository name
-# $2 = repository remote URL
-# $3 = branch or tag to use
+# $1 = repository remote URL
+# $2 = branch or tag to use
 enter_git_repository () {
-    if [ -d "$LHELPER_WORKING_DIR/repos/$1.git" ]; then
-        pushd_quiet "$LHELPER_WORKING_DIR/repos/$1.git"
+    local repo_url="$1"
+    local repo_name="${repo_url##*/}"
+    local repo_mirror="$LHELPER_WORKING_DIR/repos/$repo_name"
+    if [ -d "$repo_mirror" ]; then
+        pushd_quiet "$repo_mirror"
         git fetch --force origin '*:*'
         popd_quiet
     else
-        mkdir -p "$LHELPER_WORKING_DIR/repos/$1.git"
-        _current_archive_dir="$LHELPER_WORKING_DIR/repos/$1.git"
+        mkdir -p "$repo_mirror"
+        _current_archive_dir="$repo_mirror"
         trap interrupt_clean_archive INT
-        git clone --bare "$2" "$LHELPER_WORKING_DIR/repos/$1.git" || interrupt_clean_archive
+        git clone --bare "$repo_url" "$repo_mirror" || interrupt_clean_archive
         trap INT
     fi
-    rm -fr "$LHELPER_WORKING_DIR/builds/$1"
-    git clone "${@:4}" --shared "$LHELPER_WORKING_DIR/repos/$1.git" "$LHELPER_WORKING_DIR/builds/$1"
-    cd "$LHELPER_WORKING_DIR/builds/$1"
-    git checkout "$3"
+    local repo_working="$LHELPER_WORKING_DIR/builds/${repo_name%.git}"
+    rm -fr "$repo_working"
+    git clone "${@:3}" --shared "$repo_mirror" "$repo_working"
+    cd "$repo_working"
+    git checkout "$2"
 }
 
 # $1 = archive's name, name of the directory after extract
