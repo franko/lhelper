@@ -39,24 +39,6 @@ enter_git_repository () {
     git checkout "$2"
 }
 
-# $1 = archive's name, name of the directory after extract
-# $2 = remote URL
-# $3 = archive's filename
-# $4 = extract command using "ARCHIVE_FILENAME" for the archive's filename
-enter_remote_archive () {
-    if [ ! -f "$LHELPER_WORKING_DIR/archives/$3" ]; then
-        _current_archive_dir="$LHELPER_WORKING_DIR/archives/$3"
-        trap interrupt_clean_archive INT
-	# The option --insecure is used to ignore SSL certificate issues.
-        curl --insecure -L "$2" -o "$LHELPER_WORKING_DIR/archives/$3" || interrupt_clean_archive
-        trap INT
-    fi
-    rm -fr "$LHELPER_WORKING_DIR/builds/$1"
-    cd "$LHELPER_WORKING_DIR/builds"
-    eval "${4/ARCHIVE_FILENAME/$LHELPER_WORKING_DIR\/archives\/$3}"
-    cd "$1"
-}
-
 # $1 = remote URL
 enter_archive () {
     local url="$1"
