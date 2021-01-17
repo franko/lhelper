@@ -53,7 +53,7 @@ enter_archive () {
     cd "$LHELPER_WORKING_DIR/builds"
     local tmp_expand_dir=".sas"
     rm -fr "$tmp_expand_dir" && mkdir "$tmp_expand_dir" && pushd "$tmp_expand_dir"
-    if [[ $filename =~ ".tar."* ]]; then
+    if [[ $filename =~ ".tar."* || $filename =~ ".tgz" ]]; then
         tar xf "$LHELPER_WORKING_DIR/archives/$filename"
     elif [[ $filename =~ ".zip" ]]; then
         unzip "$LHELPER_WORKING_DIR/archives/$filename"
