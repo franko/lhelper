@@ -4,59 +4,31 @@
 # The functions defined below are explicitly exported from the lhelpers's
 # main script.
 
-_current_archive_dir=
+current_download=
 
 pushd_quiet () { builtin pushd "$@" > /dev/null; }
 popd_quiet () { builtin popd "$@" > /dev/null; }
 
 interrupt_clean_archive () {
-    echo "Cleaning up directory \"$_current_archive_dir\""
-    rm -fr "$_current_archive_dir"
-    exit 1
+    if [ -n "${current_download}" ]; then
+        echo "Cleaning up directory or file \"$current_download\""
+        rm -fr "$current_download"
+        exit 1
+    fi
 }
 
-# $1 = repository remote URL
-# $2 = branch or tag to use
-enter_git_repository () {
-    local repo_url="$1"
-    local repo_name="${repo_url##*/}"
-    local repo_mirror="$LHELPER_WORKING_DIR/repos/$repo_name"
-    if [ -d "$repo_mirror" ]; then
-        pushd_quiet "$repo_mirror"
-        git fetch --force origin '*:*'
-        popd_quiet
-    else
-        mkdir -p "$repo_mirror"
-        _current_archive_dir="$repo_mirror"
-        trap interrupt_clean_archive INT
-        git clone --bare "$repo_url" "$repo_mirror" || interrupt_clean_archive
-        trap INT
-    fi
-    local repo_working="$LHELPER_WORKING_DIR/builds/${repo_name%.git}"
-    rm -fr "$repo_working"
-    git clone "${@:3}" --shared "$repo_mirror" "$repo_working"
-    cd "$repo_working"
-    git checkout "$2"
-}
-
-# $1 = remote URL
-enter_archive () {
-    local url="$1"
-    local filename="${url##*/}"
-    if [ ! -f "$LHELPER_WORKING_DIR/archives/$filename" ]; then
-        _current_archive_dir="$LHELPER_WORKING_DIR/archives/$filename"
-        trap interrupt_clean_archive INT
-	    # The option --insecure is used to ignore SSL certificate issues.
-        curl --insecure -L "$url" -o "$LHELPER_WORKING_DIR/archives/$filename" || interrupt_clean_archive
-        trap INT
-    fi
-    cd "$LHELPER_WORKING_DIR/builds"
+expand_enter_archive_filename () {
+    echo "expand_enter_archive_filename: $1 $2"
+    local path_filename="$1"
+    local filename="$(basename "$path_filename")"
+    local dir_dest="$2"
+    cd "$dir_dest"
     local tmp_expand_dir=".sas"
     rm -fr "$tmp_expand_dir" && mkdir "$tmp_expand_dir" && pushd "$tmp_expand_dir"
     if [[ $filename =~ ".tar."* || $filename =~ ".tgz" ]]; then
-        tar xf "$LHELPER_WORKING_DIR/archives/$filename"
+        tar xf "$path_filename"
     elif [[ $filename =~ ".zip" ]]; then
-        unzip "$LHELPER_WORKING_DIR/archives/$filename"
+        unzip "$path_filename"
     else
         echo "error: unknown archive format: \"${filename}\""
         exit 1
@@ -73,11 +45,43 @@ enter_archive () {
         echo "error: empty erchive $filename from $url"
         exit 1
     fi
-    rm -fr "$LHELPER_WORKING_DIR/builds/$topdir"
-    mv "$topdir" "$LHELPER_WORKING_DIR/builds"
+    rm -fr "${dir_dest}/$topdir"
+    mv "$topdir" "${dir_dest}"
     popd
     rm -fr "$tmp_expand_dir"
     cd "$topdir"
+}
+
+# $1 = repository remote URL
+# $2 = branch or tag to use
+enter_git_repository () {
+    local repo_url="$1"
+    local repo_name="${repo_url##*/}"
+    local repo_dir="$LHELPER_WORKING_DIR/builds/${repo_name%.git}-$2"
+    rm -fr "$LHELPER_WORKING_DIR/builds/"*
+    _current_archive_dir="$repo_dir"
+    trap interrupt_clean_archive INT
+    git clone --depth 1 --branch "$2" "$repo_url" "$repo_dir" || interrupt_clean_archive
+    trap INT
+    cd "$repo_dir"
+    # TODO: create an archive and store it in "archives" directory.
+    # check "archives" to see if package is present and use it.
+}
+
+# $1 = remote URL
+enter_archive () {
+    local url="$1"
+    local filename="${url##*/}"
+    # FIXME: possible collisions in the filename, take the url into account
+    if [ ! -f "$LHELPER_WORKING_DIR/archives/$filename" ]; then
+        current_download="$LHELPER_WORKING_DIR/archives/$filename"
+        trap interrupt_clean_archive INT
+	    # The option --insecure is used to ignore SSL certificate issues.
+        curl --retry 5 --retry-delay 2 --insecure -L "$url" -o "$LHELPER_WORKING_DIR/archives/$filename" || interrupt_clean_archive
+        trap INT
+    fi
+    rm -fr "$LHELPER_WORKING_DIR/builds/"*
+    expand_enter_archive_filename "$LHELPER_WORKING_DIR/archives/$filename" "$LHELPER_WORKING_DIR/builds"
 }
 
 inside_git_apply_patch () {

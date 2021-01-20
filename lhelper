@@ -345,6 +345,7 @@ library_install () {
 
     source "$LHELPER_DIR/build-helper.sh"
     export -f \
+        expand_enter_archive_filename \
         enter_git_repository \
         enter_archive \
         inside_git_apply_patch \
