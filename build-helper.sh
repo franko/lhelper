@@ -215,8 +215,8 @@ build_and_install () {
         pushd_quiet build
         echo "Using meson command: " meson --prefix="$INSTALL_PREFIX" --buildtype="${BUILD_TYPE,,}" $processed_options ..
         meson --prefix="$INSTALL_PREFIX" --buildtype="${BUILD_TYPE,,}" $processed_options ..
-        ninja
-        ninja install
+        meson compile
+        meson install
         popd_quiet
         ;;
     configure)
