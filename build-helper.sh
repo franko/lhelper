@@ -56,16 +56,43 @@ expand_enter_archive_filename () {
 # $2 = branch or tag to use
 enter_git_repository () {
     local repo_url="$1"
+    local repo_tag="$2"
     local repo_name="${repo_url##*/}"
-    local repo_dir="$LHELPER_WORKING_DIR/builds/${repo_name%.git}-$2"
+    local repo_name_short="${repo_name%.git}"
+    local archive_filename="${repo_name_short}-${repo_tag}.tar.gz"
+    # FIXME: possible collisions in the filename, take the url into account
+    if [ ! -f "$LHELPER_WORKING_DIR/archives/$archive_filename" ]; then
+        local temp_dir = "$LHELPER_WORKING_DIR/archives/.tmp"
+        rm -fr "$temp_dir" && mkdir -p "$temp_dir"
+        pushd "$temp_dir"
+        current_download="$temp_dir"
+        trap interrupt_clean_archive INT
+        echo git clone --depth 1 --branch "$repo_tag" "$repo_url" "${repo_name_short}-${repo_tag}"
+
+        # Let retry if there is a network error. It can happens with bad
+        # networks.
+        local git_try_count=1
+        while [ $git_try_count -lt 3 ]; do
+          git clone --depth 1 --branch "$repo_tag" "$repo_url" "${repo_name_short}-${repo_tag}"
+          if [ $? -eq 0 ]; then
+            break
+          fi
+          git_try_count=$(($git_try_count + 1))
+          sleep 2
+        done
+        if [ $? -ne 0 ]; then
+            interrupt_clean_archive
+        fi
+
+        trap INT
+        rm -fr "${repo_name_short}-${repo_tag}/.git"*
+        tar czf "${archive_filename}" "${repo_name_short}-${repo_tag}"
+        mv "${archive_filename}" "$LHELPER_WORKING_DIR/archives"
+        echo "create archive ${archive_filename} in $LHELPER_WORKING_DIR/archives"
+        popd
+    fi
     rm -fr "$LHELPER_WORKING_DIR/builds/"*
-    _current_archive_dir="$repo_dir"
-    trap interrupt_clean_archive INT
-    git clone --depth 1 --branch "$2" "$repo_url" "$repo_dir" || interrupt_clean_archive
-    trap INT
-    cd "$repo_dir"
-    # TODO: create an archive and store it in "archives" directory.
-    # check "archives" to see if package is present and use it.
+    expand_enter_archive_filename "$LHELPER_WORKING_DIR/archives/$archive_filename" "$LHELPER_WORKING_DIR/builds"
 }
 
 # $1 = remote URL
