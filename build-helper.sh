@@ -224,7 +224,14 @@ build_and_install () {
         add_build_type_compiler_flags "$BUILD_TYPE"
         echo "Using configure command: " configure --prefix="$WIN_INSTALL_PREFIX" $processed_options
         ./configure --prefix="$WIN_INSTALL_PREFIX" $processed_options
-        make
+        local make_options=()
+        if command -v nproc; then
+            local cpu_cores="$(nproc --all)"
+            if [[ $? -eq 0 && -n "$cpu_cores" ]]; then
+                make_options+=(-j$cpu_cores)
+            fi
+        fi
+        make "${make_options[@]}"
         make install
         ;;
     *)
