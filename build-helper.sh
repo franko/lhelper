@@ -62,7 +62,7 @@ enter_git_repository () {
     local archive_filename="${repo_name_short}-${repo_tag}.tar.gz"
     # FIXME: possible collisions in the filename, take the url into account
     if [ ! -f "$LHELPER_WORKING_DIR/archives/$archive_filename" ]; then
-        local temp_dir = "$LHELPER_WORKING_DIR/archives/.tmp"
+        local temp_dir="$LHELPER_WORKING_DIR/archives/.tmp"
         rm -fr "$temp_dir" && mkdir -p "$temp_dir"
         pushd "$temp_dir"
         current_download="$temp_dir"
