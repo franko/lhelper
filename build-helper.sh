@@ -229,13 +229,19 @@ build_and_install () {
     case $1 in
     cmake)
         processed_options="$(cmake_options "${@:2}")"
+        local cmake_gen
+        if command -v ninja &> /dev/null; then
+            cmake_gen=Ninja
+        else
+            cmake_gen="Unix Makefiles"
+        fi
         mkdir build
         pushd_quiet build
         # It is very important below to pass $processed_options without
         # quotes. Otherwise it will be passed as a big string without breaking
         # on spaces.
-        echo "Using cmake command: " cmake -G "Ninja" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" $processed_options ..
-        cmake -G "Ninja" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" $processed_options ..
+        echo "Using cmake command: " cmake -G "$cmake_gen" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" $processed_options ..
+        cmake -G "$cmake_gen" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" $processed_options ..
         cmake --build .
         cmake --build . --target install
         popd_quiet
