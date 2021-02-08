@@ -34,10 +34,10 @@ expand_enter_archive_filename () {
         exit 1
     fi
     local topdir
-    for xdir in "$(ls -d1 */)"; do
+    for xdir in $(ls -1); do
         if [ -n "$topdir" ]; then
-            echo "error: multiple directories in archive $filename"
-            exit 1
+            topdir="."
+            break
         fi
         topdir="${xdir%/}"
     done
@@ -45,8 +45,19 @@ expand_enter_archive_filename () {
         echo "error: empty erchive $filename from $url"
         exit 1
     fi
-    rm -fr "${dir_dest}/$topdir"
-    mv "$topdir" "${dir_dest}"
+    if [ ! -d "${topdir}" ]; then
+        echo "error: no directory found in the archive"
+        exit 1
+    fi
+    if [ $topdir == "." ]; then
+        topdir="${filename%%.*}"
+        local xdest="${dir_dest}/$topdir"
+        rm -fr "$xdest" && mkdir "$xdest"
+        mv * "$xdest"
+    else
+        rm -fr "${dir_dest}/$topdir"
+        mv "$topdir" "${dir_dest}"
+    fi
     popd
     rm -fr "$tmp_expand_dir"
     cd "$topdir"
