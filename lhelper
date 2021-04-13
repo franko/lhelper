@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 LHELPER_COMMAND_NAME=`basename $0`
 
