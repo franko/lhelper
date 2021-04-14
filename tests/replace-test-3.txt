@@ -1,12 +1,12 @@
 #!/bin/sh
 
-prefix=C:/francesco/dev
+prefix=__XXX_SOME_REPLACEMENT__
 exec_prefix=${prefix}
 exec_prefix_set=no
 libdir=${exec_prefix}/lib
 
-goo=/c/francesco/dev
-foo=C:/francesco/devious
+goo=__XXX_SOME_REPLACEMENT__
+foo=/usr/francesco/devious
 #usage="\
 #Usage: $0 [--prefix[=DIR]] [--exec-prefix[=DIR]] [--version] [--cflags] [--libs]"
 usage="\
