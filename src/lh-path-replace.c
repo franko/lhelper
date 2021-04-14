@@ -1,3 +1,10 @@
+/* Helper utility. It replace all occurrences of an absolute path with a
+  replacement text within a file. If the absolute path begins with a drive
+  letter like "C:" it replace all occurrences of the given path whether
+  they begin by "c:/", "C:/" or /c/".
+*/
+
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,6 +42,11 @@ int add_string(struct string_buffer *dest, const char *text, int text_len) {
     return 0;
 }
 
+int char_is_alpha(int code) {
+    return (code >= 'a' && code <= 'z') ||
+        (code >= 'A' && code <= 'Z');
+}
+
 int char_is_alphanum_dash(int code) {
     return (code >= 'a' && code <= 'z') ||
         (code >= 'A' && code <= 'Z') ||
@@ -65,7 +77,7 @@ static int write_file_content(const char *filename, struct string_buffer *buf) {
 }
 
 
-int find_replace_prefix_path(const char *filename, const char *prefix[], int prefix_len, const char *pattern, const char *replacement) {
+int find_replace_prefix_path(const char *filename, char *prefix[], int prefix_len, const char *pattern, const char *replacement) {
     const int replacement_len = strlen(replacement);
     const int pattern_len = strlen(pattern);
     long length;
@@ -156,9 +168,20 @@ error_exit:
 }
 
 int main(int argc, char *argv[]) {
-    if (argc < 2) return 1;
-    const char *prefix_array[3] = {"c:", "C:", "/c"};
-    find_replace_prefix_path(argv[1], prefix_array, 3, "/francesco/dev", "__SOME_REPLACEMENT_TEXT__");
+    if (argc < 4) return 1;
+    const char *pattern = argv[2];
+    const char *replacement = argv[3];
+    if (char_is_alpha(*pattern) && pattern[1] == ':') {
+        const int drive_letter = tolower(*pattern);
+        char prefix_data[64];
+        char *prefix_array[3] = {prefix_data, prefix_data + 8, prefix_data + 16};
+        sprintf(prefix_array[0], "%c:", drive_letter);
+        sprintf(prefix_array[1], "%c:", toupper(drive_letter));
+        sprintf(prefix_array[2], "/%c", drive_letter);
+        return find_replace_prefix_path(argv[1], prefix_array, 3, pattern + 2, replacement);
+    } else {
+        return find_replace_path(argv[1], pattern, replacement);
+    }
     return 0;
 }
 
