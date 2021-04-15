@@ -1,28 +1,29 @@
 #!/usr/bin/env bash
 
-LHELPER_COMMAND_NAME=`basename $0`
+LHELPER_COMMAND_NAME="$(basename "$0")"
 
 if [ "$#" -lt 1 ]; then
     echo "Usage: $LHELPER_COMMAND_NAME <command> [<other options>]"
     exit 1
 fi
 
-LHELPER_BIN_DIRNAME="$(dirname $0)"
+LHELPER_BIN_DIRNAME="$(dirname "$0")"
 LHELPER_PREFIX="${LHELPER_BIN_DIRNAME%/bin}"
 
 export LHELPER_WORKING_DIR="$LHELPER_PREFIX/var/lib/lhelper"
 export LHELPER_DIR="$LHELPER_PREFIX/share/lhelper"
 
 if [ ! -d "${LHELPER_DIR}" ]; then
-    echo "error: directory "${LHELPER_DIR}" not found."
+    echo "error: directory \"${LHELPER_DIR}\" not found."
     echo "Lhelper may be not properly installed."
 fi
 
 pushd_quiet () { builtin pushd "$@" > /dev/null; }
-popd_quiet () { builtin popd "$@" > /dev/null; }
+popd_quiet () { builtin popd > /dev/null; }
 
 find_os_release () {
-    local uname_out="$(uname -s)"
+    local uname_out
+    uname_out="$(uname -s)"
     case "${uname_out}" in
         Linux*)
             if [ -f /etc/os-release ]; then
@@ -94,7 +95,7 @@ library_dir_reloc () {
 
 # Extract library archive and relocate prefix path references.
 extract_archive_reloc () {
-    $(prepare_temp_dir "$LHELPER_WORKING_DIR")
+    prepare_temp_dir "$LHELPER_WORKING_DIR"
     local tar_package_filename="$1"
     local old_prefix="$2"
     local new_prefix="$3"
@@ -162,7 +163,7 @@ register_package () {
     local found
     packages_content=()
     while IFS= read -r line; do
-        IFS=' ' read -ra line_a <<< $line
+        IFS=' ' read -ra line_a <<< "$line"
         if [ ${#line_a[@]} -eq 0 ]; then
             continue
         fi
@@ -338,7 +339,7 @@ library_install () {
         echo "Using recipe version ${recipe_version} with options: ${options_a[*]}"
     fi
 
-    if $(package_is_installed "$LHELPER_ENV_PREFIX" "$package"); then
+    if package_is_installed "$LHELPER_ENV_PREFIX" "$package"; then
         remove_package "$LHELPER_ENV_PREFIX" "$package"
         echo "Removed previously installed package \"$package\""
     fi
@@ -416,7 +417,7 @@ library_install () {
 library_remove () {
     local package="$1"
     local prefix="$LHELPER_ENV_PREFIX"
-    if ! $(package_is_installed "$prefix" "$package"); then
+    if ! package_is_installed "$prefix" "$package"; then
         echo "package \"$package\" not installed"
         exit 1
     fi
