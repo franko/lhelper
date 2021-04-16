@@ -114,7 +114,6 @@ extract_archive_reloc () {
 set_prefix_variables () {
     local prefix_dir="$1"
     INSTALL_PREFIX="$prefix_dir"
-    local sed_pattern
     if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* ]]; then
         WIN_INSTALL_PREFIX="${INSTALL_PREFIX/#\/c\//c:\/}"
     else
@@ -559,7 +558,7 @@ list)
     if [ "$2" == environments ]; then
         ls -1 "$LHELPER_WORKING_DIR/environments"
     elif [ "$2" == recipes ]; then
-        ls -1 "$LHELPER_DIR/recipes" | sed 's/\.sh//'
+        ls -1 "$LHELPER_DIR/recipes"
     elif [ "$2" == packages ]; then
         if [ -z ${LHELPER_ENV_NAME+x} ]; then
             print_error_no_env
