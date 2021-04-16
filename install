@@ -57,6 +57,11 @@ lhcomp="$(find_compiler)"
 pushd_quiet src
 echo "compiling lh-path-replace"
 lhcompile lh-path-replace lh-path-replace.c
+if [ $? -ne 0 ]; then
+    echo "error: cannot compile helper tool lh-path-replace"
+    exit 1
+fi
+cp lh-path-replace "$DESTDIR/bin"
 popd_quiet
 
 echo "Installing lhelper with prefix $DESTDIR"

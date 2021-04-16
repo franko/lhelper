@@ -54,23 +54,38 @@ int char_is_alphanum_dash(int code) {
         (code == '-' || code == '_');
 }
 
-static char *read_file_content(const char *filename, long *length) {
+int string_buffer_init_read_file(const char *filename, struct string_buffer *buf) {
+#ifdef _WIN32
     FILE *f = fopen(filename, "rb");
-    if (!f) return NULL;
+#else
+    FILE *f = fopen(filename, "r");
+#endif
+    if (!f) return -1;
     fseek(f, 0, SEEK_END);
-    *length = ftell(f);
+    long length = ftell(f);
     fseek(f, 0, SEEK_SET);
-    char *buffer = malloc(*length);
-    if (buffer) {
-      fread(buffer, 1, *length, f);
+    if (string_buffer_init(buf, length + 1)) goto read_error_exit;
+    long nread = fread(buf->data, 1, length, f);
+    if (nread != length) {
+        fprintf(stderr, "error reading file: %s\n", filename);
+        goto read_error_exit;
     }
+    buf->data[length] = 0;
+    buf->len = length;
     fclose(f);
-    return buffer;
+    return 0;
+read_error_exit:
+    fclose(f);
+    return -1;
 }
 
 
 static int write_file_content(const char *filename, struct string_buffer *buf) {
+#ifdef _WIN32
+    FILE *of = fopen(filename, "wb");
+#else
     FILE *of = fopen(filename, "w");
+#endif
     size_t nwrite = fwrite(buf->data, 1, buf->len, of);
     fclose(of);
     return (nwrite < buf->len ? -1 : 0);
@@ -80,16 +95,16 @@ static int write_file_content(const char *filename, struct string_buffer *buf) {
 int find_replace_prefix_path(const char *filename, char *prefix[], int prefix_len, const char *pattern, const char *replacement) {
     const int replacement_len = strlen(replacement);
     const int pattern_len = strlen(pattern);
-    long length;
-    char * const buffer = read_file_content(filename, &length);
-    if (!buffer) return -1;
+    struct string_buffer buffer[1];
+    if (string_buffer_init_read_file(filename, buffer)) return -1;
+    size_t length = buffer->len;
 
     struct string_buffer new_content[1];
     if (string_buffer_init(new_content, length + 64)) return -1;
 
-    char *current = buffer;
-    char *buffer_end = buffer + length;
-    while (*current) {
+    char *current = buffer->data;
+    char *buffer_end = buffer->data + length;
+    while (current < buffer_end) {
         int prefix_i;
         for (prefix_i = 0; prefix_i < prefix_len; prefix_i++) {
             char *p = strstr(current, prefix[prefix_i]);
@@ -111,36 +126,36 @@ int find_replace_prefix_path(const char *filename, char *prefix[], int prefix_le
             current = buffer_end;
         }
     }
-        
+
     if (write_file_content(filename, new_content)) {
         fprintf(stderr, "Fatal error writing modification in file: %s", filename);
         goto error_exit;
     }
 
     free(new_content->data);
-    free(buffer);
+    free(buffer->data);
     return 0;
 
 error_exit:
     free(new_content->data);
-    free(buffer);
+    free(buffer->data);
     return -1;
-}            
+}
 
 
 int find_replace_path(const char *filename, const char *pattern, const char *replacement) {
     const int replacement_len = strlen(replacement);
     const int pattern_len = strlen(pattern);
-    long length;
-    char *const buffer = read_file_content(filename, &length);
-    if (!buffer) return -1;
+    struct string_buffer buffer[1];
+    if (string_buffer_init_read_file(filename, buffer)) return -1;
+    size_t length = buffer->len;
 
     struct string_buffer new_content[1];
     if (string_buffer_init(new_content, length + 64)) return -1;
 
-    char *current = buffer;
-    char *buffer_end = buffer + length;
-    while (*current) {
+    char *current = buffer->data;
+    char *buffer_end = buffer->data + length;
+    while (current < buffer_end) {
         char *p = strstr(current, pattern);
         if (p && !char_is_alphanum_dash(*(p + pattern_len))) {
             if (add_string(new_content, current, p - current)) goto error_exit;
@@ -151,19 +166,19 @@ int find_replace_path(const char *filename, const char *pattern, const char *rep
             current = buffer_end;
         }
     }
-        
+
     if (write_file_content(filename, new_content)) {
         fprintf(stderr, "Fatal error writing modification in file: %s", filename);
         goto error_exit;
     }
 
     free(new_content->data);
-    free(buffer);
+    free(buffer->data);
     return 0;
 
 error_exit:
     free(new_content->data);
-    free(buffer);
+    free(buffer->data);
     return -1;
 }
 
@@ -171,7 +186,7 @@ int main(int argc, char *argv[]) {
     if (argc < 4) return 1;
     const char *pattern = argv[2];
     const char *replacement = argv[3];
-    if (char_is_alpha(*pattern) && pattern[1] == ':') {
+    if (char_is_alpha(*pattern) && pattern[1] == ':' && pattern[2] == '/') {
         const int drive_letter = tolower(*pattern);
         char prefix_data[64];
         char *prefix_array[3] = {prefix_data, prefix_data + 8, prefix_data + 16};

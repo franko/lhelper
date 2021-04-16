@@ -89,8 +89,7 @@ library_dir_reloc () {
     local archive_dir="$1"
     local old_prefix="$2"
     local new_prefix="$3"
-    find "$archive_dir" '(' -name '*.la' -or -name '*.pc' ')' -exec sed -i "s@${old_prefix}@${new_prefix}@g" '{}' \;
-    find "$archive_dir" -regex '.*/bin/[a-z0-9_\-]+-config' -exec sed -i "s@${old_prefix}@${new_prefix}@g" '{}' \;
+    find "$archive_dir" '(' -name '*.la' -or -name '*.pc' -or -name '*-config' ')' -exec lh-path-replace '{}' "$old_prefix" "$new_prefix" \;
 }
 
 # Extract library archive and relocate prefix path references.
@@ -118,23 +117,10 @@ set_prefix_variables () {
     local sed_pattern
     if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* ]]; then
         WIN_INSTALL_PREFIX="${INSTALL_PREFIX/#\/c\//c:\/}"
-        # We need to produce a sed pattern that match both 'c:/' and '/c/' for the
-        # drive letter.
-        # The pattern is '\([cC]:\|\/c\)' but the backslash need to be escaped
-        # of the RHS of sed's edit command, so it becomes: '\\([cC]:\\|\/c\/)'.
-        sed_pattern="$(echo "${WIN_INSTALL_PREFIX}" | sed -e 's/\([a-zA-Z]\):/\\(\[\L\1\U\1\]:\\|\/\L\1\\)/')"
-        SED_PREFIX_PATTERN="${sed_pattern//\//\\\/}"
     else
         WIN_INSTALL_PREFIX="${INSTALL_PREFIX}"
-        SED_PREFIX_PATTERN="${INSTALL_PREFIX}"
     fi
-    export INSTALL_PREFIX WIN_INSTALL_PREFIX SED_PREFIX_PATTERN
-}
-
-# Escape the '/' so that it is suitable for sed as a RHS term in
-# substitute (s) command, like in sed -e 's/this/that/' after the 2nd /.
-sed_replace_escape () {
-    echo "${1//\//\\\/}"
+    export INSTALL_PREFIX WIN_INSTALL_PREFIX
 }
 
 latest_package_version () {
@@ -395,7 +381,7 @@ library_install () {
         fix_pkgconfig_install
         echo "done"
 
-        library_dir_reloc "$LHELPER_TEMP_ROOT" "$SED_PREFIX_PATTERN" '__LHELPER_PREFIX__'
+        library_dir_reloc "$LHELPER_TEMP_ROOT" "$WIN_INSTALL_PREFIX" "__LHELPER_PREFIX__"
 
         tar -C "$LHELPER_TEMP_ROOT" -czf "${tar_package_filename}" .
         mv "${tar_package_filename}" "$LHELPER_WORKING_DIR/packages"
@@ -403,13 +389,7 @@ library_install () {
     fi
     set_prefix_variables "$LHELPER_ENV_PREFIX"
     local filename_list="$LHELPER_ENV_PREFIX/packages/${package}.list"
-    local old_prefix
-    if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* ]]; then
-        old_prefix="$(sed_replace_escape "$WIN_INSTALL_PREFIX")"
-    else
-        old_prefix="$WIN_INSTALL_PREFIX"
-    fi
-    extract_archive_reloc "${tar_package_filename}" '__LHELPER_PREFIX__' "$old_prefix" "$INSTALL_PREFIX" "$filename_list"
+    extract_archive_reloc "${tar_package_filename}" '__LHELPER_PREFIX__' "$WIN_INSTALL_PREFIX" "$INSTALL_PREFIX" "$filename_list"
     register_package "$package" "$recipe_version" "${options_a[@]}"
     echo "Package \"$package\" successfully installed"
 }
