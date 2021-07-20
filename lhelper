@@ -330,22 +330,6 @@ library_install () {
     fi
 
     source "$LHELPER_DIR/build-helper.sh"
-    export -f \
-        expand_enter_archive_filename \
-        enter_git_repository \
-        enter_archive \
-        inside_git_apply_patch \
-        inside_archive_apply_patch \
-        build_and_install \
-        install_pkgconfig_file \
-        interrupt_clean_archive \
-        configure_options \
-        meson_options \
-        cmake_options \
-        add_build_type_compiler_flags \
-        pushd_quiet \
-        popd_quiet \
-        check_commands
 
     LHELPER_TEMP_ROOT="$LHELPER_WORKING_DIR/tmp"
     set_prefix_variables "$LHELPER_TEMP_ROOT"
@@ -366,7 +350,7 @@ library_install () {
         # For some reason when using "-e" below with bash the variables package and version cannot be
         # passed on the command line. I get an error about environments and '=' sign.
         # To avoid the problem we export the variables before calling the recipe's script.
-        bash -e "${recipe_dir}/${recipe_filename}" "${options_a[@]}" 2> "$log_dirname/$package-stderr.log" 1> "$log_dirname/$package-stdout.log"
+        source "${recipe_dir}/${recipe_filename}" "${options_a[@]}" 2> "$log_dirname/$package-stderr.log" 1> "$log_dirname/$package-stdout.log"
         if [ $? -ne 0 ]; then
             echo "error: building library \"$package\""
             echo "    You may inspect the log files:"
