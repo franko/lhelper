@@ -69,6 +69,14 @@ lhelper activate <env-name>
 
 When an environment is activated a new shell is started in the new environment.
 
+To activate an environement without starting a new sub-shell the following command can be used:
+
+```sh
+source "$(lhelper env-source <env-name>)"
+```
+
+to define the variables of a given environemnts in the current shell session.
+
 ### Install commands
 
 Once inside an environment any library can be installed using a simple command:

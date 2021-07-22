@@ -446,7 +446,7 @@ activate)
         exit 1
     fi
     if [ ! -f "$LHELPER_WORKING_DIR/environments/$2" ]; then
-        echo "The environment \"$2\" does not exists"
+        echo "The environment \"$2\" does not exist"
         exit 1
     fi
     start_subshell "$2"
@@ -579,6 +579,17 @@ update)
         echo "Usage: $LHELPER_COMMAND_NAME update recipes"
         exit 1
     fi
+    ;;
+env-source)
+    if [ $# -lt 2 ]; then
+        echo "usage: $LHELPER_COMMAND_NAME env-source <environment>"
+        exit 1
+    fi
+    if [ ! -f "$LHELPER_WORKING_DIR/environments/$2" ]; then
+        echo "The environment \"$2\" does not exist"
+        exit 1
+    fi
+    echo "$LHELPER_WORKING_DIR/environments/$2"
     ;;
 *)
     echo "error: unknown command $1"
