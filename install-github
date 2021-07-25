@@ -1,43 +1,7 @@
 #!/usr/bin/env bash
 
-version="0.1"
-
 pushd_quiet () { builtin pushd "$@" > /dev/null; }
 popd_quiet () { builtin popd > /dev/null; }
-
-have_command () {
-    command -v "$1" &> /dev/null
-}
-
-find_compiler () {
-    if [ -z ${CC+x} ]; then
-        if have_command gcc; then
-            echo gcc
-        elif have_command clang; then
-            echo clang
-        else
-            echo "error: cannot find a C compiler."
-            echo "The variable CC is not set and neither gcc or clang are found."
-            exit 1
-        fi
-    else
-        echo "$CC"
-    fi
-}
-
-lhcompile () {
-    local exec_name="$1"
-    if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* ]]; then
-        exec_name="${exec_name}.exe"
-    fi
-    local objs=()
-    for src in "${@:2}"; do
-        obj="${src/%.c/.o}"
-        objs+=("$obj")
-    done
-    $lhcomp -c "$src" -o "$obj"
-    $lhcomp -o $exec_name "${objs[@]}" && rm "${objs[@]}"
-}
 
 IFS=':' read -ra path_a <<< "$PATH"
 for name in "${path_a[@]}"; do
@@ -50,66 +14,20 @@ if [ -z ${destdir+set} ]; then
   need_path=true
 fi
 
-lhcomp="$(find_compiler)"
-
-pushd_quiet src
-echo "compiling lh-path-replace"
-lhcompile lh-path-replace lh-path-replace.c
-if [ $? -ne 0 ]; then
-    echo "error: cannot compile helper tool lh-path-replace"
-    exit 1
-fi
-cp lh-path-replace "$destdir/bin"
-popd_quiet
-
-echo "Installing using prefix directory $destdir"
-
-recipes_repo="https://github.com/franko/lhelper-recipes.git"
-recipes_branch=master
-recipes_dir="$destdir/share/lhelper/recipes"
-
-mkdir -p "$destdir/bin"
-mkdir -p "$destdir/share/lhelper/patch"
-mkdir -p "$destdir/var/lhenv"
-mkdir -p "$destdir/var/lib/lhelper/builds"
-mkdir -p "$destdir/var/lib/lhelper/archives"
-mkdir -p "$destdir/var/lib/lhelper/packages"
-mkdir -p "$destdir/var/lib/lhelper/environments"
-mkdir -p "$destdir/var/lib/lhelper/digests"
-
 pushd_quiet /tmp
 echo "Downloading package from github..."
-wget -q "https://github.com/franko/lhelper/archive/v${version}.tar.gz" || exit 1
+rm -fr lh-install
+git clone https://github.com/franko/lhelper.git lh-install
+pushd_quiet lh-install
 
-echo "Extracting files from archive..."
-tar xf "v${version}.tar.gz"
-pushd_quiet "lhelper-$version"
-
-echo "Copying files into destination dir..."
-cp build-helper.sh "$destdir/share/lhelper"
-cp create-env.sh "$destdir/share/lhelper"
-cp lhelper-bash-init "$destdir/share/lhelper"
-cp patch/*.patch "$destdir/share/lhelper/patch"
-cp lhelper "$destdir/bin"
-popd_quiet
-
-if [ -d "$recipes_dir" ]; then
-	echo "Deleting existing recipes dir: $recipes_dir..."
-	rm -fr "$recipes_dir"
-fi
-
-echo "Installing build recipes..."
-git clone --depth 1 -b "$recipes_branch" "$recipes_repo" "$recipes_dir" &> /dev/null || exit 1
-
-chmod a+x "$destdir/bin/lhelper"
+bash install "$destdir"
 
 echo "Lhelper successfully installed"
 if [ ! -z ${need_path+set} ]; then
   echo "To use lhelper add the directory \"$destdir\" to your PATH."
 fi
 
-rm -fr "lhelper-$version"
-rm "v${version}.tar.gz"
-
+popd_quiet
+rm -fr lh-install
 popd_quiet
 
