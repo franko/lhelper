@@ -1,30 +1,48 @@
 #!/usr/bin/env bash
 
+if [[ "$OSTYPE" == msys || "$OSTYPE" == win32 ]]; then
+  tmpdir="$tmp"
+else
+  tmpdir="$TMPDIR"
+fi
+
 pushd_quiet () { builtin pushd "$@" > /dev/null; }
 popd_quiet () { builtin popd > /dev/null; }
 
-IFS=':' read -ra path_a <<< "$PATH"
-for name in "${path_a[@]}"; do
-  if [[ -w "$name" && "$name" == */bin && -w "${name%/bin}" ]]; then
-    destdir="${name%/bin}"
-  fi
-done
-if [ -z ${destdir+set} ]; then
-  destdir="$HOME/.local"
+echo -n "Please enter the prefix directory to install: "
+read prefix
+
+destdir="$prefix"
+if [[ ":$PATH:" == *":$prefix/bin:"* ]]; then
+  echo "Fine, $prefix/bin is in the PATH."
+else
+  echo "Warning: $prefix/bin is *not* in the PATH."
   need_path=true
 fi
 
-pushd_quiet /tmp
-echo "Downloading package from github..."
-rm -fr lh-install
-git clone https://github.com/franko/lhelper.git lh-install
-pushd_quiet lh-install
+if [ ! -d "$destdir/bin" ]; then
+  mkdir -p "$destdir/bin"
+  if [ $? -ne 0 ]; then
+    echo "Fatal error: Cannot create directory: $destdir/bin"
+    echo "Aborting install"
+    exit 1
+  fi
+fi
 
+pushd_quiet "$tmpdir"
+echo -n "Downloading package from github... "
+rm -fr lh-install
+git clone --depth 1 https://github.com/franko/lhelper.git lh-install &> /dev/null
+pushd_quiet lh-install
+echo "done"
+
+echo "Installing lhelper in directory $prefix... "
 bash install "$destdir"
 
+echo
 echo "Lhelper successfully installed"
 if [ ! -z ${need_path+set} ]; then
-  echo "To use lhelper add the directory \"$destdir\" to your PATH."
+  echo "To use lhelper add the directory \"$destdir/bin\" to your PATH."
 fi
 
 popd_quiet

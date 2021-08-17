@@ -86,8 +86,11 @@ if [ -d "$recipes_dir" ]; then
 	rm -fr "$recipes_dir"
 fi
 
-git clone --depth 1 -b "$recipes_branch" "$recipes_repo" "$recipes_dir"
-
 chmod a+x "$DESTDIR/bin/lhelper"
 
+echo -n "Installing recipes... "
+git clone --depth 1 -b "$recipes_branch" "$recipes_repo" "$recipes_dir" &> /dev/null
+pushd "$recipes_dir"
+rm -fr .git*
+popd
 echo "done"
