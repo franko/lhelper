@@ -90,7 +90,4 @@ chmod a+x "$DESTDIR/bin/lhelper"
 
 echo -n "Installing recipes... "
 git clone --depth 1 -b "$recipes_branch" "$recipes_repo" "$recipes_dir" &> /dev/null
-pushd_quiet "$recipes_dir"
-rm -fr .git*
-popd_quiet
 echo "done"
