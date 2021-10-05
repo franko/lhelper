@@ -347,9 +347,6 @@ library_install () {
         echo "Building library..."
         # Execute the recipe
         export package version
-        # For some reason when using "-e" below with bash the variables package and version cannot be
-        # passed on the command line. I get an error about environments and '=' sign.
-        # To avoid the problem we export the variables before calling the recipe's script.
         source "${recipe_dir}/${recipe_filename}" "${options_a[@]}" 2> "$log_dirname/$package-stderr.log" 1> "$log_dirname/$package-stdout.log"
         if [ $? -ne 0 ]; then
             echo "error: building library \"$package\""
