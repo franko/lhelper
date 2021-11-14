@@ -141,10 +141,16 @@ get_env_directory () {
     echo "$LHELPER_PREFIX/var/lhenv/$env_name"
 }
 
-register_package () {
-    local env_dir="$(get_env_directory "$LHELPER_ENV_NAME")"
-    local package_filename="$env_dir/bin/lhelper-packages"
-    local package_name="$1"
+# FIXME: this is duplicated in build-helper
+
+# Write a package line in the form "<package-name> [options] [version]" into
+# a register file, a line for each package. If the package is already
+# in the "register" file the line is updated otherwise it is added at the
+# end.
+package_file_add () {
+    local package_filename="$1"
+    local package_name="$2"
+    local package_line="${*:2}"
     local found
     packages_content=()
     while IFS= read -r line; do
@@ -154,13 +160,13 @@ register_package () {
         fi
         local line_package_name="${line_a[0]}"
         if [ "$line_package_name" == "$package_name" ]; then
-            line="$*"
+            line="$package_line"
             found=yes
         fi
         packages_content+=("$line")
     done < "$package_filename"
     if [ -z ${found+x} ]; then
-        packages_content+=("$*")
+        packages_content+=("$package_line")
     fi
     true > "$package_filename"
     for line in "${packages_content[@]}"; do
@@ -168,10 +174,9 @@ register_package () {
     done
 }
 
-unregister_package () {
-    local env_dir="$(get_env_directory "$LHELPER_ENV_NAME")"
-    local package_filename="$env_dir/bin/lhelper-packages"
-    local package_name="$1"
+package_file_remove () {
+    local package_filename="$1"
+    local package_name="$2"
     packages_content=()
     while IFS= read -r line; do
         IFS=' ' read -ra line_a <<< $line
@@ -187,6 +192,18 @@ unregister_package () {
     for line in "${packages_content[@]}"; do
         echo "$line" >> "$package_filename"
     done
+}
+
+register_package () {
+    local env_dir="$(get_env_directory "$LHELPER_ENV_NAME")"
+    local package_filename="$env_dir/bin/lhelper-packages"
+    package_file_add "$package_filename" "$@"
+}
+
+unregister_package () {
+    local env_dir="$(get_env_directory "$LHELPER_ENV_NAME")"
+    local package_filename="$env_dir/bin/lhelper-packages"
+    package_file_remove "$package_filename" "$@"
 }
 
 package_is_installed () {
@@ -334,7 +351,15 @@ library_install () {
 
     source "$LHELPER_ENV_PREFIX/bin/lhelper-config"
 
+    export package version
+    # Running recipe to get dependencies
+    export _lh_recipe_run="dependencies"
+    BASH_ENV="$LHELPER_DIR/build-helper.sh" bash -e "${recipe_dir}/${recipe_filename}" "${options_a[@]}"
+
     local digest=$(build_env_digest)
+
+    _lh_recipe_run="build"
+
     local tar_package_filename="${package}${options_tag}_${recipe_version}_${digest}.tar.gz"
     if [[ -z ${rebuild+set} && -z ${local_recipe+set} && "$version" != "git-"* && -f "$LHELPER_WORKING_DIR/packages/${tar_package_filename}" ]]; then
         echo "Found an existing package"
@@ -344,7 +369,6 @@ library_install () {
 
         echo "Building library..."
         # Execute the recipe
-        export package version
         BASH_ENV="$LHELPER_DIR/build-helper.sh" bash -e "${recipe_dir}/${recipe_filename}" "${options_a[@]}" 2> "$log_dirname/$package-stderr.log" 1> "$log_dirname/$package-stdout.log"
         if [ $? -ne 0 ]; then
             echo "error: building library \"$package\""

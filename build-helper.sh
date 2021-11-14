@@ -9,6 +9,57 @@ current_download=
 pushd_quiet () { builtin pushd "$@" > /dev/null; }
 popd_quiet () { builtin popd "$@" > /dev/null; }
 
+# Write a package line in the form "<package-name> [options] [version]" into
+# a register file, a line for each package. If the package is already
+# in the "register" file the line is updated otherwise it is added at the
+# end.
+package_file_add () {
+    local package_filename="$1"
+    local package_name="$2"
+    local package_line="${*:2}"
+    local found
+    packages_content=()
+    while IFS= read -r line; do
+        IFS=' ' read -ra line_a <<< "$line"
+        if [ ${#line_a[@]} -eq 0 ]; then
+            continue
+        fi
+        local line_package_name="${line_a[0]}"
+        if [ "$line_package_name" == "$package_name" ]; then
+            line="$package_line"
+            found=yes
+        fi
+        packages_content+=("$line")
+    done < "$package_filename"
+    if [ -z ${found+x} ]; then
+        packages_content+=("$package_line")
+    fi
+    true > "$package_filename"
+    for line in "${packages_content[@]}"; do
+        echo "$line" >> "$package_filename"
+    done
+}
+
+package_file_remove () {
+    local package_filename="$1"
+    local package_name="$2"
+    packages_content=()
+    while IFS= read -r line; do
+        IFS=' ' read -ra line_a <<< $line
+        if [ ${#line_a[@]} -eq 0 ]; then
+            continue
+        fi
+        local line_package_name="${line_a[0]}"
+        if [ "$line_package_name" != "$package_name" ]; then
+            packages_content+=("$line")
+        fi
+    done < "$package_filename"
+    true > "$package_filename"
+    for line in "${packages_content[@]}"; do
+        echo "$line" >> "$package_filename"
+    done
+}
+
 interrupt_clean_archive () {
     if [ -n "${current_download}" ]; then
         echo "Cleaning up directory or file \"$current_download\""
@@ -66,6 +117,7 @@ expand_enter_archive_filename () {
 # $1 = repository remote URL
 # $2 = branch or tag to use
 enter_git_repository () {
+    if [[ "${_lh_recipe_run}" == "dependencies" ]]; then return 0; fi
     local repo_url="$1"
     local repo_tag="$2"
     local repo_name="${repo_url##*/}"
@@ -108,6 +160,7 @@ enter_git_repository () {
 
 # $1 = remote URL
 enter_archive () {
+    if [[ "${_lh_recipe_run}" == "dependencies" ]]; then return 0; fi
     local url="$1"
     local filename="${url##*/}"
     # FIXME: possible collisions in the filename, take the url into account
@@ -123,10 +176,12 @@ enter_archive () {
 }
 
 inside_git_apply_patch () {
+    if [[ "${_lh_recipe_run}" == "dependencies" ]]; then return 0; fi
     git apply "$LHELPER_DIR/patch/$1.patch"
 }
 
 inside_archive_apply_patch () {
+    if [[ "${_lh_recipe_run}" == "dependencies" ]]; then return 0; fi
     patch -p1 < "$LHELPER_DIR/patch/$1.patch"
 }
 
@@ -137,6 +192,7 @@ install_pkgconfig_file () {
 }
 
 check_commands () {
+    if [[ "${_lh_recipe_run}" == "dependencies" ]]; then return 0; fi
     for command in "$@"; do
         type "$command" > /dev/null 2>&1 || { echo >&2 "error: command \"${command}\" is required but it's not available"; exit 1; }
     done
@@ -237,6 +293,7 @@ add_build_type_compiler_flags () {
 }
 
 build_and_install () {
+    if [[ "${_lh_recipe_run}" == "dependencies" ]]; then return 0; fi
     case $1 in
     cmake)
         processed_options="$(cmake_options "${@:2}")"
@@ -287,3 +344,15 @@ build_and_install () {
         exit 1
     esac
 }
+
+declare_dependencies () {
+    if [[ "${_lh_recipe_run}" != "dependencies" ]]; then return 0; fi
+    echo "declare_dependencies for package $package: $@"
+    # before the recipe run the package name is exported using the "package"
+    # variable.
+    local dep_filename="$LHELPER_ENV_PREFIX/logs/$package-dependencies"
+    for name in "$@"; do
+        package_file_add "$dep_filename" "$name"
+    done
+}
+
