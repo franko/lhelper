@@ -275,6 +275,7 @@ system_library_found () {
 
 # fill the _missing array variable
 check_dependencies () {
+    _missing=()
     while IFS= read -r line; do
         IFS=' ' read -ra line_a <<< "$line"
         local name="${line_a[0]}"
@@ -312,7 +313,11 @@ check_dependencies () {
 }
 
 
+# The first argument, $run_mode, should be either "dependencies" or "run"
 library_install () {
+    local run_mode="$1"
+    shift
+
     local local_recipe
     local rebuild
     while [[ "$1" == -* ]]; do
@@ -404,20 +409,17 @@ library_install () {
     source "$LHELPER_ENV_PREFIX/bin/lhelper-config"
 
     export package version
-    # Running recipe to get dependencies
-    export _lh_recipe_run="dependencies"
-    true > "$LHELPER_ENV_PREFIX/logs/$package-dependencies"
-    BASH_ENV="$LHELPER_DIR/build-helper.sh" bash -e "${recipe_dir}/${recipe_filename}" "${options_a[@]}"
-
-    check_dependencies
-    if [[ ${#_missing[@]} -ne 0 ]]; then
-        echo "Found missing packages, interrupting install"
+    export _lh_recipe_run=$run_mode
+    if [ $run_mode == "dependencies" ]; then
+        # Running recipe to get dependencies
+        true > "$LHELPER_ENV_PREFIX/logs/$package-dependencies"
+        BASH_ENV="$LHELPER_DIR/build-helper.sh" bash -e "${recipe_dir}/${recipe_filename}" "${options_a[@]}"
+        check_dependencies
+        unset _lh_recipe_run
         return 0
     fi
 
     local digest=$(build_env_digest)
-
-    _lh_recipe_run="build"
 
     local tar_package_filename="${package}${options_tag}_${recipe_version}_${digest}.tar.gz"
     if [[ -z ${rebuild+set} && -z ${local_recipe+set} && "$version" != "git-"* && -f "$LHELPER_WORKING_DIR/packages/${tar_package_filename}" ]]; then
@@ -448,6 +450,7 @@ library_install () {
         mv "${tar_package_filename}" "$LHELPER_WORKING_DIR/packages"
         echo "Saved package for \"$package\""
     fi
+    unset _lh_recipe_run
     set_prefix_variables "$LHELPER_ENV_PREFIX"
     local filename_list="$LHELPER_ENV_PREFIX/packages/${package}.list"
     extract_archive_reloc "${tar_package_filename}" '__LHELPER_PREFIX__' "$WIN_INSTALL_PREFIX" "$INSTALL_PREFIX" "$filename_list"
@@ -516,20 +519,19 @@ install)
         print_error_no_env
         exit 1
     fi
-    _missing=()
-    library_install "${@:2}" || exit 1
+    export _missing=()
+    # get dependencies
+    library_install dependencies "${@:2}"
     if [[ ${#_missing[@]} -ne 0 ]]; then
-        echo "Installing missing packages"
+        echo "Found missing packages"
         for line in "${_missing[@]}"; do
-            # no quoting there for $line, we need to break on spaces
-            echo "Installing: $line"
-            _missing=()
-            library_install $line || exit 1
+            echo "Installing missing package: $line"
+            # no quoting below for $line, we need to break on spaces
+            library_install run $line || exit 1
         done
-        echo "Attempt again to install the package"
-        _missing=()
-        library_install "${@:2}"
     fi
+    echo "Install the requested package: ${@:2}"
+    library_install run "${@:2}"
     unset _missing
     ;;
 activate)
