@@ -194,6 +194,23 @@ package_file_remove () {
     done
 }
 
+package_file_query () {
+    local package_filename="$1"
+    local package_name="$2"
+    packages_content=()
+    while IFS= read -r line; do
+        IFS=' ' read -ra line_a <<< $line
+        if [ ${#line_a[@]} -eq 0 ]; then
+            continue
+        fi
+        local line_package_name="${line_a[0]}"
+        if [ "$line_package_name" == "$package_name" ]; then
+            echo "$line"
+            return 0
+        fi
+    done < "$package_filename"
+}
+
 register_package () {
     local env_dir="$(get_env_directory "$LHELPER_ENV_NAME")"
     local package_filename="$env_dir/bin/lhelper-packages"
@@ -204,6 +221,12 @@ unregister_package () {
     local env_dir="$(get_env_directory "$LHELPER_ENV_NAME")"
     local package_filename="$env_dir/bin/lhelper-packages"
     package_file_remove "$package_filename" "$@"
+}
+
+query_package () {
+    local env_dir="$(get_env_directory "$LHELPER_ENV_NAME")"
+    local package_filename="$env_dir/bin/lhelper-packages"
+    package_file_query "$package_filename" "$@"
 }
 
 package_is_installed () {
