@@ -260,6 +260,58 @@ fix_pkgconfig_install () {
     fi
 }
 
+# FIXME: complete the function and take into account the
+# version provided as a 2nd argument.h
+system_library_found () {
+    if pkg-config --exists "$1"; then
+        return 0
+    fi
+    if command -v "$1-config"; then
+        return 0
+    fi
+    return 1
+}
+
+
+# fill the _missing array variable
+check_dependencies () {
+    while IFS= read -r line; do
+        IFS=' ' read -ra line_a <<< "$line"
+        local name="${line_a[0]}"
+        local options=()
+        local version
+        for a in "${line_a[@]:1}"; do
+            case "$a" in
+            -*)
+                options+=("$a")
+                ;;
+            '>'* | '<'* | '='*)
+                version="$a"
+                ;;
+            *)
+                echo "invalid package options or version"
+                exit 1
+            esac
+        done
+        if package_is_installed "$LHELPER_ENV_PREFIX" "$name"; then
+            # FIXME: check the version and options of the package.
+            # Gives an error is the installed version of options doesn't
+            # match.
+            echo "ok, package $name is installed"
+        else
+            if system_library_found "$name" "$version"; then
+                # FIXME: check the version and options of the package.
+                # Gives an error is the installed version of options doesn't
+                # match.
+                echo "using system library for $name"
+            else
+                _missing+=("$line")
+            fi
+        fi
+    done < "$LHELPER_ENV_PREFIX/logs/$package-dependencies"
+}
+
+
 library_install () {
     local local_recipe
     local rebuild
@@ -354,7 +406,14 @@ library_install () {
     export package version
     # Running recipe to get dependencies
     export _lh_recipe_run="dependencies"
+    true > "$LHELPER_ENV_PREFIX/logs/$package-dependencies"
     BASH_ENV="$LHELPER_DIR/build-helper.sh" bash -e "${recipe_dir}/${recipe_filename}" "${options_a[@]}"
+
+    check_dependencies
+    if [[ ${#_missing[@]} -ne 0 ]]; then
+        echo "Found missing packages, interrupting install"
+        return 0
+    fi
 
     local digest=$(build_env_digest)
 
@@ -457,7 +516,21 @@ install)
         print_error_no_env
         exit 1
     fi
-    library_install "${@:2}"
+    _missing=()
+    library_install "${@:2}" || exit 1
+    if [[ ${#_missing[@]} -ne 0 ]]; then
+        echo "Installing missing packages"
+        for line in "${_missing[@]}"; do
+            # no quoting there for $line, we need to break on spaces
+            echo "Installing: $line"
+            _missing=()
+            library_install $line || exit 1
+        done
+        echo "Attempt again to install the package"
+        _missing=()
+        library_install "${@:2}"
+    fi
+    unset _missing
     ;;
 activate)
     if [ $# -lt 2 ]; then
