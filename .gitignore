@@ -1,4 +1,9 @@
-source
-downloads
-builds
-
+.build*/
+subprojects/lua/
+subprojects/reproc/
+*.diff
+*.exe
+*.tar.gz
+*.zip
+*.DS_Store
+*App*
