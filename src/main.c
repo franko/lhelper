@@ -45,12 +45,14 @@ static void get_exe_filename(char *buf, int sz) {
 #endif
 
 extern int luaopen_process(lua_State *L);
+extern int luaopen_env(lua_State *L);
 
 int main(int argc, char **argv) {
   lua_State *L = luaL_newstate();
   luaL_openlibs(L);
 
   luaL_requiref(L, "process", luaopen_process, 1);
+  luaL_requiref(L, "env",     luaopen_env, 1);
 
   lua_newtable(L);
   for (int i = 0; i < argc; i++) {

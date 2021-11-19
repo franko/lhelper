@@ -5,7 +5,8 @@ function core.init()
 end
 
 function core.run()
-    local p = process.start({"ls", "-l"}, {stdout = process.REDIRECT_PIPE})
+    env.setenv("AMI", "World")
+    local p = process.start({"printenv", "AMI"}, {stdout = process.REDIRECT_PIPE})
     repeat
         local s = p:read_stdout()
         if s and s ~= "" then print("OUTPUT:", s) end

@@ -1,5 +1,6 @@
 lhelper_sources = [
     'process.c',
+    'env.c',
     'main.c',
 ]
 
