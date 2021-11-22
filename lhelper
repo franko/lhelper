@@ -295,22 +295,83 @@ system_library_found () {
     return 1
 }
 
+# From: https://stackoverflow.com/questions/4023830/how-to-compare-two-strings-in-dot-separated-version-format-in-bash
+vercomp () {
+    if [[ $1 == $2 ]]
+    then
+        return 0
+    fi
+    local IFS=.
+    local i ver1=($1) ver2=($2)
+    # fill empty fields in ver1 with zeros
+    for ((i=${#ver1[@]}; i<${#ver2[@]}; i++))
+    do
+        ver1[i]=0
+    done
+    for ((i=0; i<${#ver1[@]}; i++))
+    do
+        if [[ -z ${ver2[i]} ]]
+        then
+            # fill empty fields in ver2 with zeros
+            ver2[i]=0
+        fi
+        if ((10#${ver1[i]} > 10#${ver2[i]}))
+        then
+            return 1
+        fi
+        if ((10#${ver1[i]} < 10#${ver2[i]}))
+        then
+            return 2
+        fi
+    done
+    return 0
+}
+
+testvercomp () {
+    vercomp $1 $2
+    case $? in
+    0)
+        if [[ $3 == *"=" ]]; then
+            return 0
+        fi
+        ;;
+    1)
+        if [[ $3 == ">"* ]]; then
+            return 0
+        fi
+        ;;
+    2)
+        if [[ $3 == "<"* ]]; then
+            return 0
+        fi
+        ;;
+    esac
+    return 1
+}
 
 # fill the _missing array variable
 check_dependencies () {
     _missing=()
+    local version
+    local comp
     while IFS= read -r line; do
         IFS=' ' read -ra line_a <<< "$line"
         local name="${line_a[0]}"
         local options=()
-        local version
+        unset version
+        unset comp
         for a in "${line_a[@]:1}"; do
             case "$a" in
             -*)
                 options+=("$a")
                 ;;
-            '>'* | '<'* | '='*)
-                version="$a"
+            '>='* | '<=')
+                comp="${a:0:2}"
+                version="${a:2}"
+                ;;
+            '>'* | '<'*)
+                comp="${a:0:1}"
+                version="${a:1}"
                 ;;
             *)
                 echo "invalid package options or version"
@@ -318,10 +379,36 @@ check_dependencies () {
             esac
         done
         if package_is_installed "$LHELPER_ENV_PREFIX" "$name"; then
-            # FIXME: check the version and options of the package.
-            # Gives an error is the installed version of options doesn't
-            # match.
-            echo "ok, package $name is installed"
+            local pinst="$(query_package $name)"
+            IFS=' ' read -ra pline_a <<< "$pinst"
+            local p_options=()
+            local p_version
+            for a in "${pline_a[@]:1}"; do
+                case "$a" in
+                -*)
+                    p_options+=("$a")
+                    ;;
+                *)
+                    p_version="$a"
+                esac
+            done
+            local opt1
+            local opt2
+            IFS=$'\n' opt1=($(sort <<<"${p_options[*]}"))
+            IFS=$'\n' opt2=($(sort <<<"${options[*]}"))
+            unset IFS
+            if [[ "${opt1[*]}" != "${opt2[*]}" ]]; then
+                echo "Error: options for installed package $name does not match."
+                exit 1
+            fi
+            if [ ! -z ${version+x} ]; then
+                echo testvercomp "$p_version" "$version" "$comp"
+                if ! testvercomp "$p_version" "$version" "$comp"; then
+                    echo "Error: incompatible version for installed package $name."
+                    exit 1
+                fi
+            fi
+            echo "ok, package $name is installed: $pinst"
         else
             if system_library_found "$name" "$version"; then
                 # FIXME: check the version and options of the package.
