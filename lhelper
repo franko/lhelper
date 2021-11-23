@@ -349,6 +349,16 @@ testvercomp () {
     return 1
 }
 
+# Check that "$1" is a subset of "$2". Each argument is a space-separated
+# list of options.
+test_options () {
+    for e in $1; do
+        if [[ " $2 " != *" $e "* ]]; then
+            return 1
+        fi
+    done
+}
+
 # fill the _missing array variable
 check_dependencies () {
     _missing=()
@@ -392,17 +402,15 @@ check_dependencies () {
                     p_version="$a"
                 esac
             done
-            local opt1
-            local opt2
-            IFS=$'\n' opt1=($(sort <<<"${p_options[*]}"))
-            IFS=$'\n' opt2=($(sort <<<"${options[*]}"))
-            unset IFS
-            if [[ "${opt1[*]}" != "${opt2[*]}" ]]; then
+            # checks that all the required options (variable "options") are included
+            # in the options of the package found (variable "p_options")
+            if ! test_options "${options[*]}" "${p_options[*]}"; then
                 echo "Error: options for installed package $name does not match."
+                echo "Required options are: ${options[*]}."
+                echo "Installed package options are: ${p_options[*]}."
                 exit 1
             fi
             if [ ! -z ${version+x} ]; then
-                echo testvercomp "$p_version" "$version" "$comp"
                 if ! testvercomp "$p_version" "$version" "$comp"; then
                     echo "Error: incompatible version for installed package $name."
                     exit 1
