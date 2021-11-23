@@ -141,8 +141,6 @@ get_env_directory () {
     echo "$LHELPER_PREFIX/var/lhenv/$env_name"
 }
 
-# FIXME: this is duplicated in build-helper
-
 # Write a package line in the form "<package-name> [options] [version]" into
 # a register file, a line for each package. If the package is already
 # in the "register" file the line is updated otherwise it is added at the
@@ -432,6 +430,19 @@ check_dependencies () {
     done < "$LHELPER_ENV_PREFIX/logs/$package-dependencies"
 }
 
+compute_package_list () {
+    true > "$LHELPER_ENV_PREFIX/logs/$package-usage"
+    while IFS= read -r line; do
+        local p_version
+        if package_is_installed "$LHELPER_ENV_PREFIX" "$name"; then
+            query_package $name >> "$LHELPER_ENV_PREFIX/logs/$package-usage"
+        elif system_library_version "$name"; then
+            p_version="$(system_library_version "$name")"
+            echo "${name}[system] ${p_version}" >> "$LHELPER_ENV_PREFIX/logs/$package-usage"
+        fi
+    done < "$LHELPER_ENV_PREFIX/logs/$package-dependencies"
+}
+
 
 # The first argument, $run_mode, should be either "dependencies" or "run"
 library_install () {
@@ -533,7 +544,7 @@ library_install () {
     if [ $run_mode == "dependencies" ]; then
         # Running recipe to get dependencies
         true > "$LHELPER_ENV_PREFIX/logs/$package-dependencies"
-        BASH_ENV="$LHELPER_DIR/build-helper.sh" bash -e "${recipe_dir}/${recipe_filename}" "${options_a[@]}"
+        BASH_ENV="$LHELPER_DIR/build-helper.sh" bash -e "${recipe_dir}/${recipe_filename}" "${options_a[@]}" 2> "$log_dirname/deps-$package-stderr.log" 1> "$log_dirname/deps-$package-stdout.log"
         check_dependencies
         unset _lh_recipe_run
         return 0
