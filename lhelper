@@ -283,16 +283,16 @@ fix_pkgconfig_install () {
     fi
 }
 
-# FIXME: complete the function and take into account the
-# version provided as a 2nd argument.h
-system_library_found () {
+# FIXME: add methods to detect CMake libraries and other system libraries
+# that may not have a pkg-config or cmake configuration.
+system_library_version () {
     if pkg-config --exists "$1"; then
-        return 0
+        pkg-config --modversion "$1"
+    elif command -v "$1-config"; then
+        "$1-config" --version
+    else
+        return 1
     fi
-    if command -v "$1-config"; then
-        return 0
-    fi
-    return 1
 }
 
 # From: https://stackoverflow.com/questions/4023830/how-to-compare-two-strings-in-dot-separated-version-format-in-bash
@@ -388,11 +388,11 @@ check_dependencies () {
                 exit 1
             esac
         done
+        local p_version
         if package_is_installed "$LHELPER_ENV_PREFIX" "$name"; then
             local pinst="$(query_package $name)"
             IFS=' ' read -ra pline_a <<< "$pinst"
             local p_options=()
-            local p_version
             for a in "${pline_a[@]:1}"; do
                 case "$a" in
                 -*)
@@ -416,16 +416,18 @@ check_dependencies () {
                     exit 1
                 fi
             fi
-            echo "ok, package $name is installed: $pinst"
-        else
-            if system_library_found "$name" "$version"; then
-                # FIXME: check the version and options of the package.
-                # Gives an error is the installed version of options doesn't
-                # match.
-                echo "using system library for $name"
-            else
-                _missing+=("$line")
+            echo "Package $name is already installed with options : ${pline_a[@]:1}"
+        elif system_library_version "$name"; then
+            p_version="$(system_library_version "$name")"
+            if [ ! -z ${version+x} ]; then
+                if ! testvercomp "$p_version" "$version" "$comp"; then
+                    echo "Error: incompatible version for system library $name."
+                    exit 1
+                fi
             fi
+            echo "Using system library for $name."
+        else
+            _missing+=("$line")
         fi
     done < "$LHELPER_ENV_PREFIX/logs/$package-dependencies"
 }
