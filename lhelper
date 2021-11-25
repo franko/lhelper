@@ -560,6 +560,7 @@ library_install () {
 
     export package version
     export _lh_recipe_run=$run_mode
+    local log_dirname="${LHELPER_ENV_PREFIX}/logs"
     if [ $run_mode == "dependencies" ]; then
         # Running recipe to get dependencies
         true > "$LHELPER_ENV_PREFIX/logs/$package-dependencies"
@@ -576,8 +577,6 @@ library_install () {
         echo "Found an existing package"
     else
         prepare_temp_dir "$LHELPER_WORKING_DIR"
-        local log_dirname="${LHELPER_ENV_PREFIX}/logs"
-
         echo "Building library..."
         # Execute the recipe
         BASH_ENV="$LHELPER_DIR/build-helper.sh" bash -e "${recipe_dir}/${recipe_filename}" "${options_a[@]}" 2> "$log_dirname/$package-stderr.log" 1> "$log_dirname/$package-stdout.log"
