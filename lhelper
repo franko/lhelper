@@ -672,14 +672,14 @@ install)
     # get dependencies
     library_install dependencies "${@:2}"
     if [[ ${#_missing[@]} -ne 0 ]]; then
-        echo "Found missing packages"
+        echo "Found missing packages:"; echo
         for line in "${_missing[@]}"; do
-            echo "Installing missing package: $line"
-            # no quoting below for $line, we need to break on spaces
-            library_install run $line || exit 1
+            echo "- $line"
         done
+        echo; echo "The package $2 cannot be installed due to missing dependencies."
+        exit 1
     fi
-    echo "Install the requested package: ${@:2}"
+    echo "Installing the requested package: ${@:2}"
     library_install run "${@:2}"
     unset _missing
     ;;
