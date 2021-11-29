@@ -505,6 +505,8 @@ library_install () {
         esac
     done
 
+    options_a=($(lh-sort "${options_a[*]}"))
+
     local options_tag=""
     if [[ ${#options_a[@]} -ne 0 ]]; then
         options_tag=$(join_by '' "${options_a[@]}")
