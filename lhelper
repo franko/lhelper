@@ -337,12 +337,9 @@ test_options () {
 # fill the _missing array variable
 check_dependencies () {
     _missing=()
+    if [ ! -f "$LHELPER_ENV_PREFIX/logs/$package-dependencies" ]; then return 0; fi
     local version
     local comp
-    # FIXME: check if this is really needed and why.
-    if [ ! -f "$LHELPER_ENV_PREFIX/logs/$package-dependencies" ]; then
-        true > "$LHELPER_ENV_PREFIX/logs/$package-dependencies"
-    fi
     while IFS= read -r line; do
         IFS=' ' read -ra line_a <<< "$line"
         local name="${line_a[0]}"
@@ -413,9 +410,8 @@ check_dependencies () {
 
 compute_package_list () {
     true > "$LHELPER_ENV_PREFIX/logs/$package-usage"
-    # FIXME: check if the following is really needed.
     if [ ! -f "$LHELPER_ENV_PREFIX/logs/$package-dependencies" ]; then
-        true > "$LHELPER_ENV_PREFIX/logs/$package-dependencies"
+        return 0
     fi
     while IFS= read -r line; do
         IFS=' ' read -ra line_a <<< "$line"
@@ -453,9 +449,6 @@ build_env_digest () {
     source "$LHELPER_ENV_PREFIX/bin/lhelper-config"
     local digest_a=($(cat_digest | md5sum))
     local digest="${digest_a[0]}"
-    # FIXME: we may no longer want to store digests because they no
-    # longer map to compiler environments. The reason is they now depends
-    # on the list of dependencies of each package.
     if [ ! -f "$LHELPER_WORKING_DIR/digests/$digest" ]; then
         cat_digest > "$LHELPER_WORKING_DIR/digests/$digest"
     fi
