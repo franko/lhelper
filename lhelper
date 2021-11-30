@@ -537,15 +537,17 @@ library_install () {
     fi
     local recipe_version="${recipe_filename#${package}_}"
 
-    if [[ ${#options_a[@]} -eq 0 ]]; then
-        echo "Using recipe version ${recipe_version}"
-    else
-        echo "Using recipe version ${recipe_version} with options: ${options_a[*]}"
-    fi
+    if [ $run_mode == "run" ]; then
+        if [[ ${#options_a[@]} -eq 0 ]]; then
+            echo "Using recipe version ${recipe_version}"
+        else
+            echo "Using recipe version ${recipe_version} with options: ${options_a[*]}"
+        fi
 
-    if package_is_installed "$LHELPER_ENV_PREFIX" "$package"; then
-        remove_package "$LHELPER_ENV_PREFIX" "$package"
-        echo "Removed previously installed package \"$package\""
+        if package_is_installed "$LHELPER_ENV_PREFIX" "$package"; then
+            remove_package "$LHELPER_ENV_PREFIX" "$package"
+            echo "Removed previously installed package \"$package\""
+        fi
     fi
 
     LHELPER_TEMP_ROOT="$LHELPER_WORKING_DIR/tmp"
