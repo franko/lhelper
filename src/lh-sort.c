@@ -88,7 +88,13 @@ void lh_quicksort(LH_SORT_TYPE *words, int first, int last){
 
 int main(int argc, char *argv[]) {
     /* Takes a single argument as a string of space separated words. */
-    if (argc != 2) return 1;
+    if (argc != 2) {
+        fprintf(stderr, "error: the command accept a single argument.\n");
+        fprintf(stderr, "The list of words should be passed as a single argument with\n"
+            "words separated by a space.\n\n");
+        fprintf(stderr, "usage: %s <text>\n", argv[0]);
+        return 1;
+    }
     const char *text = argv[1];
     lh_array *words = split_text(text);
     lh_quicksort(words->data, 0, words->length - 1);
