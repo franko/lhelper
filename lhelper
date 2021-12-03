@@ -190,6 +190,12 @@ register_package () {
     local env_dir="$(get_env_directory "$LHELPER_ENV_NAME")"
     local package_filename="$env_dir/bin/lhelper-packages"
     package_file_add "$package_filename" "$@"
+
+    if [ -f "$LHELPER_ENV_PREFIX/logs/$package-provides" ]; then
+        while IFS= read -r provide_line; do
+            echo "$provide_line : $*" >> "$env_dir/bin/lhelper-provides"
+        done < "$LHELPER_ENV_PREFIX/logs/$package-provides"
+    fi
 }
 
 unregister_package () {
@@ -334,76 +340,123 @@ test_options () {
     done
 }
 
+# Test if a package entry, second argument, for example "sdl2 -threads -opengl >=2.16.0",
+# matches a package spec, first argument, for example "sdl2 -opengl 2.14.0"
+#
+# The package spec should give a version with a comparison sign >, >=, < or <=.
+# FIXME: should support the '=' sign.
+test_package_spec () {
+    local line_spec="$1"
+    local line_entry="$2"
+    local skip_options="$3"
+
+    IFS=' ' read -ra spec_a <<< "$line_spec"
+    local spec_name="${spec_a[0]}"
+    local spec_options=()
+    local spec_version
+    local spec_comp
+    for a in "${spec_a[@]:1}"; do
+        case "$a" in
+        -*)
+            spec_options+=("$a")
+            ;;
+        '>='* | '<=')
+            spec_comp="${a:0:2}"
+            spec_version="${a:2}"
+            ;;
+        '>'* | '<'*)
+            spec_comp="${a:0:1}"
+            spec_version="${a:1}"
+            ;;
+        *)
+            # return 100 means abnormal error happended
+            return 100
+        esac
+    done
+    # spec_version may be unset
+
+    IFS=' ' read -ra entry_a <<< "$line_entry"
+    local entry_options=()
+    local entry_version
+    for a in "${entry_a[@]:1}"; do
+        case "$a" in
+        -*)
+            entry_options+=("$a")
+            ;;
+        *)
+            entry_version="$a"
+        esac
+    done
+    # entry_version must be set
+
+    # checks that all the spec options are included in the entry options
+    if [ "${skip_options}" != --skip ] && ! test_options "${spec_options[*]}" "${entry_options[*]}"; then
+        # return 1 means options do not match
+        return 1
+    fi
+
+    if [ ! -z ${spec_version+x} ] && [ ! testvercomp "$entry_version" "$spec_version" "$spec_comp" ]; then
+        # return 2 means version do not match
+        return 2
+    fi
+}
+
+# Return the actual package entry that match a given package requirement.
+query_provided () {
+    local env_dir="$(get_env_directory "$LHELPER_ENV_NAME")"
+    local provides_filename="$env_dir/bin/lhelper-provides"
+    local package_spec="$1"
+    while IFS= read -r line; do
+        provide_line="${line% : *}"
+        package_line="${line#* : }"
+        if test_package_spec "$package_spec" "$provide_line"; then
+            echo "$package_line"
+            return 0
+        fi
+    done < "$provides_filename"
+    return 1
+}
+
 # fill the _missing array variable
 check_dependencies () {
     _missing=()
     if [ ! -f "$LHELPER_ENV_PREFIX/logs/$package-dependencies" ]; then return 0; fi
-    local version
-    local comp
-    while IFS= read -r line; do
-        IFS=' ' read -ra line_a <<< "$line"
-        local name="${line_a[0]}"
-        local options=()
-        unset version
-        unset comp
-        for a in "${line_a[@]:1}"; do
-            case "$a" in
-            -*)
-                options+=("$a")
+    while IFS= read -r package_spec; do
+        local spec_name=${package_spec/ */}
+        local package_entry
+        # FIXME: package_is_installed is redundant with query_package
+        if package_is_installed "$LHELPER_ENV_PREFIX" "$spec_name"; then
+            package_entry="$(query_package $spec_name)"
+        elif query_provided "$package_spec" &> /dev/null; then
+            package_entry="$(query_provided "$package_spec")"
+        fi
+        if [ ! -z ${package_entry+x} ]; then
+            test_package_spec "$package_spec" "$package_entry"
+            case $? in
+            1)
+                echo "Error: options for installed package $spec_name does not match."
+                exit 1
                 ;;
-            '>='* | '<=')
-                comp="${a:0:2}"
-                version="${a:2}"
+            2)
+                echo "Error: incompatible version for installed package $spec_name."
+                exit 1
                 ;;
-            '>'* | '<'*)
-                comp="${a:0:1}"
-                version="${a:1}"
+            100)
+                echo "Error: Invalid package spec: \"$package_spec\""
+                exit 1
                 ;;
             *)
-                echo "invalid package options or version"
-                exit 1
+                echo "Package $name is already installed"
             esac
-        done
-        local p_version
-        if package_is_installed "$LHELPER_ENV_PREFIX" "$name"; then
-            local pinst="$(query_package $name)"
-            IFS=' ' read -ra pline_a <<< "$pinst"
-            local p_options=()
-            for a in "${pline_a[@]:1}"; do
-                case "$a" in
-                -*)
-                    p_options+=("$a")
-                    ;;
-                *)
-                    p_version="$a"
-                esac
-            done
-            # checks that all the required options (variable "options") are included
-            # in the options of the package found (variable "p_options")
-            if ! test_options "${options[*]}" "${p_options[*]}"; then
-                echo "Error: options for installed package $name does not match."
-                echo "Required options are: ${options[*]}."
-                echo "Installed package options are: ${p_options[*]}."
+        elif system_library_version "$spec_name"; then
+            package_entry="$name $(system_library_version "$spec_name")"
+            if ! test_package_spec "$package_spec" "$package_entry" --skip; then
+                echo "Error: incompatible version for system library $name."
                 exit 1
-            fi
-            if [ ! -z ${version+x} ]; then
-                if ! testvercomp "$p_version" "$version" "$comp"; then
-                    echo "Error: incompatible version for installed package $name."
-                    exit 1
-                fi
-            fi
-            echo "Package $name is already installed with options : ${pline_a[@]:1}"
-        elif system_library_version "$name"; then
-            p_version="$(system_library_version "$name")"
-            if [ ! -z ${version+x} ]; then
-                if ! testvercomp "$p_version" "$version" "$comp"; then
-                    echo "Error: incompatible version for system library $name."
-                    exit 1
-                fi
             fi
             echo "Using system library for $name."
         else
-            _missing+=("$line")
+            _missing+=("$package_spec")
         fi
     done < "$LHELPER_ENV_PREFIX/logs/$package-dependencies"
 }
@@ -413,11 +466,14 @@ compute_package_list () {
     if [ ! -f "$LHELPER_ENV_PREFIX/logs/$package-dependencies" ]; then
         return 0
     fi
-    while IFS= read -r line; do
-        IFS=' ' read -ra line_a <<< "$line"
-        local name="${line_a[0]}"
+    while IFS= read -r xline; do
+        local name=${xline/ */}
+        # FIXME: package_is_installed is redundant with query_package
+        # like in the function check_dependencies
         if package_is_installed "$LHELPER_ENV_PREFIX" "$name"; then
             query_package $name >> "$LHELPER_ENV_PREFIX/logs/$package-usage"
+        elif query_provided "$xline" &> /dev/null; then
+            query_provided "$xline" >> "$LHELPER_ENV_PREFIX/logs/$package-usage"
         elif system_library_version "$name"; then
             local p_version="$(system_library_version "$name")"
             echo "${name}[system] ${p_version}" >> "$LHELPER_ENV_PREFIX/logs/$package-usage"

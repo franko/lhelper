@@ -297,7 +297,13 @@ build_and_install () {
 declare_dependency () {
     if [[ "${_lh_recipe_run}" != "dependencies" ]]; then return 0; fi
     echo "declare_dependency for package $package: $@"
-    sorted=($(lh-sort "$*"))
+    local sorted=($(lh-sort "$*"))
     echo "$*" >> "$LHELPER_ENV_PREFIX/logs/$package-dependencies"
+}
+
+provides () {
+    if [[ "${_lh_recipe_run}" != "dependencies" ]]; then return 0; fi
+    local sorted=($(lh-sort "$*"))
+    echo "$*" >> "$LHELPER_ENV_PREFIX/logs/$package-provides"
 }
 
