@@ -406,16 +406,24 @@ test_package_spec () {
 }
 
 # Return the actual package entry that match a given package requirement.
+# The first argument should be "base" or "link". The argument "base" requests
+# to return the provided package while "link" requests the package actually
+# provide the implementation.
 query_provided () {
     local env_dir="$(get_env_directory "$LHELPER_ENV_NAME")"
     local provides_filename="$env_dir/bin/lhelper-provides"
-    local package_spec="$1"
+    local get_option="$1"
+    local package_spec="$2"
     local line provide_line package_line
     while IFS= read -r line; do
         provide_line="${line% : *}"
         package_line="${line#* : }"
         if test_package_spec "$package_spec" "$provide_line"; then
-            echo "$package_line"
+            if [ ${get_option} == base ]; then
+                echo "$provide_line"
+            else
+                echo "$package_line"
+            fi
             return 0
         fi
     done < "$provides_filename"
@@ -433,8 +441,8 @@ check_dependencies () {
         # FIXME: package_is_installed is redundant with query_package
         if package_is_installed "$LHELPER_ENV_PREFIX" "$spec_name"; then
             package_entry="$(query_package $spec_name)"
-        elif query_provided "$package_spec" &> /dev/null; then
-            package_entry="$(query_provided "$package_spec")"
+        elif query_provided base "$package_spec" &> /dev/null; then
+            package_entry="$(query_provided base "$package_spec")"
         fi
         if [ ! -z ${package_entry+x} ]; then
             test_package_spec "$package_spec" "$package_entry"
@@ -482,8 +490,8 @@ compute_package_list () {
         # like in the function check_dependencies
         if package_is_installed "$LHELPER_ENV_PREFIX" "$name"; then
             _pack_usage+=("$(query_package $name)")
-        elif query_provided "$package_spec" &> /dev/null; then
-            _pack_usage+=("$(query_provided "$package_spec")")
+        elif query_provided link "$package_spec" &> /dev/null; then
+            _pack_usage+=("$(query_provided link "$package_spec")")
         elif system_library_version "$name"; then
             local p_version="$(system_library_version "$name")"
             _pack_usage+=("${name}[system] ${p_version}")

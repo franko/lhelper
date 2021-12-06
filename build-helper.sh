@@ -305,6 +305,8 @@ normalize_package_spec () {
         fi
     done
     local sorted_options=($(lh-sort "${options[*]}"))
+    # By creating an array below we get rid of the trailing spaces we may
+    # have is there are no options or version.
     local coll=("$1" "${sorted_options[@]}" "${rem[@]}")
     echo "${coll[@]}"
 }
