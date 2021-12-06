@@ -389,15 +389,19 @@ test_package_spec () {
     done
     # entry_version must be set
 
-    # checks that all the spec options are included in the entry options
-    if [ "${skip_options}" != --skip ] && ! test_options "${spec_options[*]}" "${entry_options[*]}"; then
-        # return 1 means options do not match
+    if [ "$spec_name" != "${entry_a[0]}" ]; then
         return 1
     fi
 
-    if [ ! -z ${spec_version+x} ] && [ ! testvercomp "$entry_version" "$spec_version" "$spec_comp" ]; then
-        # return 2 means version do not match
+    # checks that all the spec options are included in the entry options
+    if [ "${skip_options}" != --skip ] && ! test_options "${spec_options[*]}" "${entry_options[*]}"; then
+        # return 2 means options do not match
         return 2
+    fi
+
+    if [ ! -z ${spec_version+x} ] && [ ! testvercomp "$entry_version" "$spec_version" "$spec_comp" ]; then
+        # return 3 means version do not match
+        return 3
     fi
 }
 
@@ -406,6 +410,7 @@ query_provided () {
     local env_dir="$(get_env_directory "$LHELPER_ENV_NAME")"
     local provides_filename="$env_dir/bin/lhelper-provides"
     local package_spec="$1"
+    local line provide_line package_line
     while IFS= read -r line; do
         provide_line="${line% : *}"
         package_line="${line#* : }"
@@ -419,11 +424,12 @@ query_provided () {
 
 # fill the _missing array variable
 check_dependencies () {
+    local spec_name package_entry
     _missing=()
     if [ ! -f "$LHELPER_ENV_PREFIX/logs/$package-dependencies" ]; then return 0; fi
     while IFS= read -r package_spec; do
-        local spec_name=${package_spec/ */}
-        local package_entry
+        spec_name=${package_spec/ */}
+        unset package_entry
         # FIXME: package_is_installed is redundant with query_package
         if package_is_installed "$LHELPER_ENV_PREFIX" "$spec_name"; then
             package_entry="$(query_package $spec_name)"
@@ -434,10 +440,14 @@ check_dependencies () {
             test_package_spec "$package_spec" "$package_entry"
             case $? in
             1)
-                echo "Error: options for installed package $spec_name does not match."
+                echo "Error: internal error, package name mismatch."
                 exit 1
                 ;;
             2)
+                echo "Error: options for installed package $spec_name does not match."
+                exit 1
+                ;;
+            3)
                 echo "Error: incompatible version for installed package $spec_name."
                 exit 1
                 ;;
@@ -446,7 +456,7 @@ check_dependencies () {
                 exit 1
                 ;;
             *)
-                echo "Package $name is already installed"
+                echo "Package $spec_name is already installed"
             esac
         elif system_library_version "$spec_name"; then
             package_entry="$name $(system_library_version "$spec_name")"
