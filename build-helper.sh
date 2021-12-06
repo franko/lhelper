@@ -294,16 +294,29 @@ build_and_install () {
     esac
 }
 
+normalize_package_spec () {
+    local options=()
+    local rem=()
+    for o in "${@:2}"; do
+        if [[ "$o" == "-"* ]]; then
+            options+=("$o")
+        else
+            rem+=("$o")
+        fi
+    done
+    local sorted_options=($(lh-sort "${options[*]}"))
+    local coll=("$1" "${sorted_options[@]}" "${rem[@]}")
+    echo "${coll[@]}"
+}
+
 declare_dependency () {
     if [[ "${_lh_recipe_run}" != "dependencies" ]]; then return 0; fi
     echo "declare_dependency for package $package: $@"
-    local sorted=($(lh-sort "$*"))
-    echo "$*" >> "$LHELPER_ENV_PREFIX/logs/$package-dependencies"
+    echo "$(normalize_package_spec $@)" >> "$LHELPER_ENV_PREFIX/logs/$package-dependencies"
 }
 
 provides () {
     if [[ "${_lh_recipe_run}" != "dependencies" ]]; then return 0; fi
-    local sorted=($(lh-sort "$*"))
-    echo "$*" >> "$LHELPER_ENV_PREFIX/logs/$package-provides"
+    echo "$(normalize_package_spec $@)" >> "$LHELPER_ENV_PREFIX/logs/$package-provides"
 }
 
