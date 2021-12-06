@@ -189,11 +189,11 @@ package_file_query () {
 register_package () {
     local env_dir="$(get_env_directory "$LHELPER_ENV_NAME")"
     local package_filename="$env_dir/bin/lhelper-packages"
+    local provide_line
     package_file_add "$package_filename" "$@"
-
     if [ -f "$LHELPER_ENV_PREFIX/logs/$package-provides" ]; then
         while IFS= read -r provide_line; do
-            echo "$provide_line : $*" >> "$env_dir/bin/lhelper-provides"
+            echo "$provide_line : $*" >> "$env_dir/bin/lhelper-packages"
         done < "$LHELPER_ENV_PREFIX/logs/$package-provides"
     fi
 }
@@ -207,7 +207,25 @@ unregister_package () {
 query_package () {
     local env_dir="$(get_env_directory "$LHELPER_ENV_NAME")"
     local package_filename="$env_dir/bin/lhelper-packages"
-    package_file_query "$package_filename" "$@"
+    local use_link=no
+    if [ "$1" == -link ]; then
+        use_link=yes
+        shift
+    fi
+    local line="$(package_file_query "$package_filename" "$@")"
+
+    # returns error is line is empty: package not found
+    if [[ -z "${line// }" ]]; then return 1; fi
+
+    if [[ "$line" == *" : "* ]]; then
+        if [ $use_link == yes ]; then
+            echo "${line#* : }"
+        else
+            echo "${line% : *}"
+        fi
+    else
+        echo "$line"
+    fi
 }
 
 package_is_installed () {
@@ -405,31 +423,6 @@ test_package_spec () {
     fi
 }
 
-# Return the actual package entry that match a given package requirement.
-# The first argument should be "base" or "link". The argument "base" requests
-# to return the provided package while "link" requests the package actually
-# provide the implementation.
-query_provided () {
-    local env_dir="$(get_env_directory "$LHELPER_ENV_NAME")"
-    local provides_filename="$env_dir/bin/lhelper-provides"
-    local get_option="$1"
-    local package_spec="$2"
-    local line provide_line package_line
-    while IFS= read -r line; do
-        provide_line="${line% : *}"
-        package_line="${line#* : }"
-        if test_package_spec "$package_spec" "$provide_line"; then
-            if [ ${get_option} == base ]; then
-                echo "$provide_line"
-            else
-                echo "$package_line"
-            fi
-            return 0
-        fi
-    done < "$provides_filename"
-    return 1
-}
-
 # fill the _missing array variable
 check_dependencies () {
     local spec_name package_entry
@@ -438,11 +431,8 @@ check_dependencies () {
     while IFS= read -r package_spec; do
         spec_name=${package_spec/ */}
         unset package_entry
-        # FIXME: package_is_installed is redundant with query_package
-        if package_is_installed "$LHELPER_ENV_PREFIX" "$spec_name"; then
+        if query_package $spec_name &> /dev/null; then
             package_entry="$(query_package $spec_name)"
-        elif query_provided base "$package_spec" &> /dev/null; then
-            package_entry="$(query_provided base "$package_spec")"
         fi
         if [ ! -z ${package_entry+x} ]; then
             test_package_spec "$package_spec" "$package_entry"
@@ -486,12 +476,8 @@ compute_package_list () {
     local package_spec
     while IFS= read -r package_spec; do
         local name=${package_spec/ */}
-        # FIXME: package_is_installed is redundant with query_package
-        # like in the function check_dependencies
-        if package_is_installed "$LHELPER_ENV_PREFIX" "$name"; then
-            _pack_usage+=("$(query_package $name)")
-        elif query_provided link "$package_spec" &> /dev/null; then
-            _pack_usage+=("$(query_provided link "$package_spec")")
+        if query_package $name &> /dev/null; then
+            _pack_usage+=("$(query_package -link $name)")
         elif system_library_version "$name"; then
             local p_version="$(system_library_version "$name")"
             _pack_usage+=("${name}[system] ${p_version}")
@@ -700,7 +686,11 @@ print_installed_packages () {
         echo "Installed packages"
         echo
         while IFS= read -r line; do
-            echo "* $line"
+            if [[ "$line" == *" : "* ]]; then
+                echo "${line% : *} : provided by * ${line#* : }"
+            else
+                echo "* $line"
+            fi
         done < $packages_file
         echo
     else

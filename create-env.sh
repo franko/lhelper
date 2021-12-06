@@ -77,7 +77,6 @@ export BUILD_TYPE="$_build_type"
 _EOF_
 
 touch "${INSTALL_PREFIX}/bin/lhelper-packages"
-touch "${INSTALL_PREFIX}/bin/lhelper-provides"
 
 _libdir="${_libdir_array[0]}"
 _pkgconfig_reldir=$(printf_join ":%s/pkgconfig" "${_libdir_array[0]}")
