@@ -462,21 +462,21 @@ check_dependencies () {
 }
 
 compute_package_list () {
-    true > "$LHELPER_ENV_PREFIX/logs/$package-usage"
     if [ ! -f "$LHELPER_ENV_PREFIX/logs/$package-dependencies" ]; then
         return 0
     fi
-    while IFS= read -r xline; do
-        local name=${xline/ */}
+    local package_spec
+    while IFS= read -r package_spec; do
+        local name=${package_spec/ */}
         # FIXME: package_is_installed is redundant with query_package
         # like in the function check_dependencies
         if package_is_installed "$LHELPER_ENV_PREFIX" "$name"; then
-            query_package $name >> "$LHELPER_ENV_PREFIX/logs/$package-usage"
-        elif query_provided "$xline" &> /dev/null; then
-            query_provided "$xline" >> "$LHELPER_ENV_PREFIX/logs/$package-usage"
+            _pack_usage+=("$(query_package $name)")
+        elif query_provided "$package_spec" &> /dev/null; then
+            _pack_usage+=("$(query_provided "$package_spec")")
         elif system_library_version "$name"; then
             local p_version="$(system_library_version "$name")"
-            echo "${name}[system] ${p_version}" >> "$LHELPER_ENV_PREFIX/logs/$package-usage"
+            _pack_usage+=("${name}[system] ${p_version}")
         fi
     done < "$LHELPER_ENV_PREFIX/logs/$package-dependencies"
 }
@@ -495,12 +495,16 @@ OS_VERSION="$(find_os_release)"
 EOF
     echo '# dependencies'
     echo 'cat << END_OF_DEPENDENCIES'
-    cat "$LHELPER_ENV_PREFIX/logs/$package-usage"
+    local line
+    for line in "${_pack_usage[@]}"; do
+        echo "$line"
+    done
     echo 'END_OF_DEPENDENCIES'
 }
 
 
 build_env_digest () {
+    local _pack_usage=()
     compute_package_list
     source "$LHELPER_ENV_PREFIX/bin/lhelper-config"
     local digest_a=($(cat_digest | md5sum))
