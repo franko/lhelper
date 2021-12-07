@@ -477,8 +477,8 @@ compute_package_list () {
     local cp_dependency cp_name cp_version
     while IFS= read -r cp_dependency; do
         cp_name=${cp_dependency/ */}
-        cp_name="${cp_name#?}"
-        if query_package $cp_name &> /dev/null; then
+        cp_name=${cp_name#\?}
+        if query_package "$cp_name" &> /dev/null; then
             _pack_usage+=("$(query_package -link $cp_name)")
         elif system_library_version "$cp_name" &> /dev/null; then
             cp_version="$(system_library_version "$cp_name")"
