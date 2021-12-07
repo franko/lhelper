@@ -229,7 +229,7 @@ query_package () {
     local query_line="$(package_file_query "$package_filename" "$@")"
 
     # returns error is line is empty: package not found
-    if [[ -z "${line// }" ]]; then return 1; fi
+    if [[ -z "${query_line// }" ]]; then return 1; fi
 
     if [[ "$query_line" == *" : "* ]]; then
         if [ $use_link == yes ]; then
