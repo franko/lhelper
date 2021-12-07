@@ -295,13 +295,12 @@ build_and_install () {
 }
 
 normalize_package_spec () {
-    local options=()
-    local rem=()
-    for o in "${@:2}"; do
-        if [[ "$o" == "-"* ]]; then
-            options+=("$o")
+    local options=() rem=() opt
+    for opt in "${@:2}"; do
+        if [[ "$opt" == "-"* ]]; then
+            options+=("$opt")
         else
-            rem+=("$o")
+            rem+=("$opt")
         fi
     done
     local sorted_options=($(lh-sort "${options[*]}"))

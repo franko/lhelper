@@ -123,18 +123,14 @@ get_env_directory () {
 # in the "register" file the line is updated otherwise it is added at the
 # end.
 package_file_add () {
-    local package_filename="$1"
-    local package_name="$2"
-    local package_line="${*:2}"
-    local found
-    packages_content=()
+    local package_filename="$1" package_name="$2" package_line="${*:2}" found
+    local packages_content=() line line_a
     while IFS= read -r line; do
         IFS=' ' read -ra line_a <<< "$line"
         if [ ${#line_a[@]} -eq 0 ]; then
             continue
         fi
-        local line_package_name="${line_a[0]}"
-        if [ "$line_package_name" == "$package_name" ]; then
+        if [ "${line_a[0]}" == "$package_name" ]; then
             line="$package_line"
             found=yes
         fi
