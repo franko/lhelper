@@ -314,13 +314,11 @@ normalize_package_spec () {
 declare_dependency () {
     if [[ "${_lh_recipe_run}" != "dependencies" ]]; then return 0; fi
     echo "declare_dependency for package $package: $@"
-    echo "DEBUG DEPENDENCY: sorted :$(normalize_package_spec $@):" >&2
     echo "$(normalize_package_spec $@)" >> "$LHELPER_ENV_PREFIX/logs/$package-dependencies"
 }
 
 provides () {
     if [[ "${_lh_recipe_run}" != "dependencies" ]]; then return 0; fi
-    echo "DEBUG PROVIDE: sorted :$(normalize_package_spec $@):" >&2
     echo "$(normalize_package_spec $@)" >> "$LHELPER_ENV_PREFIX/logs/$package-provides"
 }
 
