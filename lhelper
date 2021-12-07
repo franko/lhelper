@@ -152,7 +152,7 @@ package_file_remove () {
         if [ -z "${line// }" ]; then
             continue
         fi
-        if [ "${line% *}" != "$package_name" ]; then
+        if [ "${line%% *}" != "$package_name" ]; then
             packages_content+=("$line")
         fi
     done < "$package_filename"
@@ -169,7 +169,7 @@ package_file_query () {
         if [ -z "${line// }" ]; then
             continue
         fi
-        if [ "${line% *}" == "$package_name" ]; then
+        if [[ "${line%% *}" == "$package_name" ]]; then
             echo "$line"
             return 0
         fi
@@ -195,8 +195,8 @@ unregister_package () {
         if [[ "$un_package" == *" : "* ]]; then
             local pprov="${un_package% : *}"
             local pimpl="${un_package#* : }"
-            if [[ ${pimpl% *} == $1 ]]; then
-                un_provided+=("${pprov% *}")
+            if [[ ${pimpl%% *} == $1 ]]; then
+                un_provided+=("${pprov%% *}")
             fi
         fi
     done < "$env_dir/bin/lhelper-packages"
