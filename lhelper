@@ -146,16 +146,13 @@ package_file_add () {
 }
 
 package_file_remove () {
-    local package_filename="$1"
-    local package_name="$2"
-    packages_content=()
+    local package_filename="$1" package_name="$2"
+    local packages_content=() line
     while IFS= read -r line; do
-        IFS=' ' read -ra line_a <<< $line
-        if [ ${#line_a[@]} -eq 0 ]; then
+        if [ -z "${line// }" ]; then
             continue
         fi
-        local line_package_name="${line_a[0]}"
-        if [ "$line_package_name" != "$package_name" ]; then
+        if [ "${line% *}" != "$package_name" ]; then
             packages_content+=("$line")
         fi
     done < "$package_filename"
@@ -166,16 +163,13 @@ package_file_remove () {
 }
 
 package_file_query () {
-    local package_filename="$1"
-    local package_name="$2"
-    packages_content=()
+    local package_filename="$1" package_name="$2"
+    local line
     while IFS= read -r line; do
-        IFS=' ' read -ra line_a <<< $line
-        if [ ${#line_a[@]} -eq 0 ]; then
+        if [ -z "${line// }" ]; then
             continue
         fi
-        local line_package_name="${line_a[0]}"
-        if [ "$line_package_name" == "$package_name" ]; then
+        if [ "${line% *}" == "$package_name" ]; then
             echo "$line"
             return 0
         fi
@@ -184,9 +178,8 @@ package_file_query () {
 
 register_package () {
     local env_dir="$(get_env_directory "$LHELPER_ENV_NAME")"
-    local package_filename="$env_dir/bin/lhelper-packages"
     local provide_line
-    package_file_add "$package_filename" "$@"
+    package_file_add "$env_dir/bin/lhelper-packages" "$@"
     if [ -f "$LHELPER_ENV_PREFIX/logs/$package-provides" ]; then
         while IFS= read -r provide_line; do
             echo "$provide_line : $*" >> "$env_dir/bin/lhelper-packages"
@@ -197,9 +190,7 @@ register_package () {
 unregister_package () {
     local env_dir="$(get_env_directory "$LHELPER_ENV_NAME")"
     package_file_remove "$env_dir/bin/lhelper-packages" "$@"
-    # find the list of provided packages and remove them.
-    local un_package
-    local un_provided=()
+    local un_provided=() un_package
     while IFS= read -r un_package; do
         if [[ "$un_package" == *" : "* ]]; then
             local pprov="${un_package% : *}"
@@ -216,13 +207,12 @@ unregister_package () {
 
 query_package () {
     local env_dir="$(get_env_directory "$LHELPER_ENV_NAME")"
-    local package_filename="$env_dir/bin/lhelper-packages"
     local use_link=no
-    if [ "$1" == -link ]; then
+    if [[ "$1" == -link ]]; then
         use_link=yes
         shift
     fi
-    local query_line="$(package_file_query "$package_filename" "$@")"
+    local query_line="$(package_file_query "$env_dir/bin/lhelper-packages" "$@")"
 
     # returns error is line is empty: package not found
     if [[ -z "${query_line// }" ]]; then return 1; fi
@@ -239,14 +229,12 @@ query_package () {
 }
 
 package_is_installed () {
-    local prefix="$1"
-    local package="$2"
+    local prefix="$1" package="$2"
     test -f "$prefix/packages/$package.list"
 }
 
 remove_package () {
-    local prefix="$1"
-    local package="$2"
+    local prefix="$1" package="$2"
     local filename_list="$prefix/packages/$package.list"
     pushd_quiet "$prefix"
     while IFS= read -r line; do
@@ -262,10 +250,8 @@ remove_package () {
 }
 
 find_recipe_filename () {
-    local recipe_dir="$1"
-    local package="$2"
-    local version="$3"
-    local recipe_filename
+    local recipe_dir="$1" package="$2" version="$3"
+    local filename recipe_filename
     for filename in "${recipe_dir}/"*; do
         if [[ $filename == *"/${package}_${version}" || $filename == *"/${package}_${version}+"* ]]; then
             recipe_filename="$filename"
