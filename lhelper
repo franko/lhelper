@@ -124,13 +124,9 @@ get_env_directory () {
 # end.
 package_file_add () {
     local package_filename="$1" package_name="$2" package_line="${*:2}" found
-    local packages_content=() line line_a
+    local packages_content=() line
     while IFS= read -r line; do
-        IFS=' ' read -ra line_a <<< "$line"
-        if [ ${#line_a[@]} -eq 0 ]; then
-            continue
-        fi
-        if [ "${line_a[0]}" == "$package_name" ]; then
+        if [[ "${line%% *}" == "$package_name" ]]; then
             line="$package_line"
             found=yes
         fi
@@ -149,10 +145,7 @@ package_file_remove () {
     local package_filename="$1" package_name="$2"
     local packages_content=() line
     while IFS= read -r line; do
-        if [ -z "${line// }" ]; then
-            continue
-        fi
-        if [ "${line%% *}" != "$package_name" ]; then
+        if [[ "${line%% *}" != "$package_name" ]]; then
             packages_content+=("$line")
         fi
     done < "$package_filename"
@@ -166,9 +159,6 @@ package_file_query () {
     local package_filename="$1" package_name="$2"
     local line
     while IFS= read -r line; do
-        if [ -z "${line// }" ]; then
-            continue
-        fi
         if [[ "${line%% *}" == "$package_name" ]]; then
             echo "$line"
             return 0
