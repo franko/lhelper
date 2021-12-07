@@ -200,8 +200,22 @@ register_package () {
 
 unregister_package () {
     local env_dir="$(get_env_directory "$LHELPER_ENV_NAME")"
-    local package_filename="$env_dir/bin/lhelper-packages"
-    package_file_remove "$package_filename" "$@"
+    package_file_remove "$env_dir/bin/lhelper-packages" "$@"
+    # find the list of provided packages and remove them.
+    local un_package
+    local un_provided=()
+    while IFS= read -r un_package; do
+        if [[ "$un_package" == *" : "* ]]; then
+            local pprov="${un_package% : *}"
+            local pimpl="${un_package#* : }"
+            if [[ ${pimpl% *} == $1 ]]; then
+                un_provided+=("${pprov% *}")
+            fi
+        fi
+    done < "$env_dir/bin/lhelper-packages"
+    for un_package in "${un_provided[@]}"; do
+        package_file_remove "$env_dir/bin/lhelper-packages" "$un_package"
+    done
 }
 
 query_package () {
@@ -212,19 +226,19 @@ query_package () {
         use_link=yes
         shift
     fi
-    local line="$(package_file_query "$package_filename" "$@")"
+    local query_line="$(package_file_query "$package_filename" "$@")"
 
     # returns error is line is empty: package not found
     if [[ -z "${line// }" ]]; then return 1; fi
 
-    if [[ "$line" == *" : "* ]]; then
+    if [[ "$query_line" == *" : "* ]]; then
         if [ $use_link == yes ]; then
-            echo "${line#* : }"
+            echo "${query_line#* : }"
         else
-            echo "${line% : *}"
+            echo "${query_line% : *}"
         fi
     else
-        echo "$line"
+        echo "$query_line"
     fi
 }
 
@@ -351,6 +365,7 @@ testvercomp () {
 # Check that "$1" is a subset of "$2". Each argument is a space-separated
 # list of options.
 test_options () {
+    local e
     for e in $1; do
         if [[ " $2 " != *" $e "* ]]; then
             return 1
@@ -425,46 +440,50 @@ test_package_spec () {
 
 # fill the _missing array variable
 check_dependencies () {
-    local spec_name package_entry
+    local cd_package cd_dependency cd_package_found
     _missing=()
     if [ ! -f "$LHELPER_ENV_PREFIX/logs/$package-dependencies" ]; then return 0; fi
-    while IFS= read -r package_spec; do
-        spec_name=${package_spec/ */}
-        unset package_entry
-        if query_package $spec_name &> /dev/null; then
-            package_entry="$(query_package $spec_name)"
+    while IFS= read -r cd_dependency; do
+        if [[ "$cd_dependency" == "?"* ]]; then
+            # skip packages marked with '?' as they are not required.
+            continue
         fi
-        if [ ! -z ${package_entry+x} ]; then
-            test_package_spec "$package_spec" "$package_entry"
+        cd_package=${cd_dependency/ */}
+        unset cd_package_found
+        if query_package $cd_package &> /dev/null; then
+            cd_package_found="$(query_package $cd_package)"
+        fi
+        if [ ! -z ${cd_package_found+x} ]; then
+            test_package_spec "$cd_dependency" "$cd_package_found"
             case $? in
             1)
                 echo "Error: internal error, package name mismatch."
                 exit 1
                 ;;
             2)
-                echo "Error: options for installed package $spec_name does not match."
+                echo "Error: options for installed package $cd_package does not match."
                 exit 1
                 ;;
             3)
-                echo "Error: incompatible version for installed package $spec_name."
+                echo "Error: incompatible version for installed package $cd_package."
                 exit 1
                 ;;
             100)
-                echo "Error: Invalid package spec: \"$package_spec\""
+                echo "Error: Invalid package spec: \"$cd_dependency\""
                 exit 1
                 ;;
             *)
-                echo "Package $spec_name is already installed"
+                echo "Package $cd_package is already installed"
             esac
-        elif system_library_version "$spec_name"; then
-            package_entry="$name $(system_library_version "$spec_name")"
-            if ! test_package_spec "$package_spec" "$package_entry" --skip; then
+        elif system_library_version "$cd_package" &> /dev/null; then
+            cd_package_found="$name $(system_library_version "$cd_package")"
+            if ! test_package_spec "$cd_dependency" "$cd_package_found" --skip; then
                 echo "Error: incompatible version for system library $name."
                 exit 1
             fi
-            echo "Using system library for $name."
+            echo "Using system library for $cd_package."
         else
-            _missing+=("$package_spec")
+            _missing+=("$cd_dependency")
         fi
     done < "$LHELPER_ENV_PREFIX/logs/$package-dependencies"
 }
@@ -473,14 +492,17 @@ compute_package_list () {
     if [ ! -f "$LHELPER_ENV_PREFIX/logs/$package-dependencies" ]; then
         return 0
     fi
-    local package_spec
-    while IFS= read -r package_spec; do
-        local name=${package_spec/ */}
-        if query_package $name &> /dev/null; then
-            _pack_usage+=("$(query_package -link $name)")
-        elif system_library_version "$name"; then
-            local p_version="$(system_library_version "$name")"
-            _pack_usage+=("${name}[system] ${p_version}")
+    local cp_dependency cp_name cp_version
+    while IFS= read -r cp_dependency; do
+        cp_name=${cp_dependency/ */}
+        cp_name="${cp_name#?}"
+        if query_package $cp_name &> /dev/null; then
+            _pack_usage+=("$(query_package -link $cp_name)")
+        elif system_library_version "$cp_name" &> /dev/null; then
+            cp_version="$(system_library_version "$cp_name")"
+            _pack_usage+=("${cp_name}[system] ${cp_version}")
+        else
+            _pack_usage+=("${cp_name}[not-found]")
         fi
     done < "$LHELPER_ENV_PREFIX/logs/$package-dependencies"
 }
@@ -670,12 +692,11 @@ library_install () {
 
 library_remove () {
     local package="$1"
-    local prefix="$LHELPER_ENV_PREFIX"
-    if ! package_is_installed "$prefix" "$package"; then
+    if ! package_is_installed "$LHELPER_ENV_PREFIX" "$package"; then
         echo "package \"$package\" not installed"
         exit 1
     fi
-    remove_package "$prefix" "$package"
+    remove_package "$LHELPER_ENV_PREFIX" "$package"
     unregister_package "$package"
     echo "Package \"$package\" successfully removed."
 }
@@ -687,7 +708,7 @@ print_installed_packages () {
         echo
         while IFS= read -r line; do
             if [[ "$line" == *" : "* ]]; then
-                echo "${line% : *} : provided by * ${line#* : }"
+                echo "* ${line% : *} (provided by ${line#* : })"
             else
                 echo "* $line"
             fi
