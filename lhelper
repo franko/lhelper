@@ -349,7 +349,6 @@ test_options () {
 # matches a package spec, first argument, for example "sdl2 -opengl 2.14.0"
 #
 # The package spec should give a version with a comparison sign >, >=, < or <=.
-# FIXME: should support the '=' sign.
 test_package_spec () {
     local line_spec="$1"
     local line_entry="$2"
@@ -365,11 +364,11 @@ test_package_spec () {
         -*)
             spec_options+=("$a")
             ;;
-        '>='* | '<=')
+        '>='* | '<='*)
             spec_comp="${a:0:2}"
             spec_version="${a:2}"
             ;;
-        '>'* | '<'*)
+        '>'* | '<'* | '='*)
             spec_comp="${a:0:1}"
             spec_version="${a:1}"
             ;;
