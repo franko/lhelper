@@ -310,18 +310,18 @@ normalize_package_spec () {
     echo "${coll[@]}"
 }
 
-declare_dependency () {
+dependency () {
     if [[ "${_lh_recipe_run}" != "dependencies" ]]; then return 0; fi
-    echo "$(normalize_package_spec $@)" >> "$LHELPER_ENV_PREFIX/logs/$package-dependencies"
+    local opt_flag=""
+    if [[ "$1" == --optional ]]; then
+        opt_flag="?"
+        shift
+    fi
+    echo "${opt_flag}$(normalize_package_spec $@)" >> "$LHELPER_ENV_PREFIX/logs/$package-dependencies"
 }
 
 provides () {
     if [[ "${_lh_recipe_run}" != "dependencies" ]]; then return 0; fi
     echo "$(normalize_package_spec $@)" >> "$LHELPER_ENV_PREFIX/logs/$package-provides"
-}
-
-declare_use () {
-    if [[ "${_lh_recipe_run}" != "dependencies" ]]; then return 0; fi
-    echo "?$(normalize_package_spec $@)" >> "$LHELPER_ENV_PREFIX/logs/$package-dependencies"
 }
 
