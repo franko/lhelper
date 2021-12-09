@@ -506,6 +506,13 @@ build_env_digest () {
     source "$LHELPER_ENV_PREFIX/bin/lhelper-config"
     local digest_a=($(cat_digest | md5sum))
     local digest="${digest_a[0]}"
+
+    true > "$LHELPER_ENV_PREFIX/logs/$package-usage"
+    local line
+    for line in "${_pack_usage[@]}"; do
+        echo "$line" >> "$LHELPER_ENV_PREFIX/logs/$package-usage"
+    done
+
     if [ ! -f "$LHELPER_WORKING_DIR/digests/$digest" ]; then
         cat_digest > "$LHELPER_WORKING_DIR/digests/$digest"
     fi
@@ -625,6 +632,21 @@ library_install () {
     fi
 
     local digest=$(build_env_digest)
+    local pu_line
+    local pu_list=()
+    while IFS= read -r pu_line; do
+        pu_list+=("$pu_line")
+    done < "$LHELPER_ENV_PREFIX/logs/$package-usage"
+    rm "$LHELPER_ENV_PREFIX/logs/$package-usage"
+    if [[ ${#pu_list[@]} -gt 0 ]]; then
+        echo "The package dependencies are:"; echo
+        for pu_line in "${pu_list[@]}"; do
+            echo "* $pu_line"
+        done
+        echo
+    else
+        echo "The package has no dependencies."
+    fi
 
     local tar_package_filename="${package}${options_tag}_${recipe_version}_${digest}.tar.gz"
     if [[ -z ${rebuild+set} && -z ${local_recipe+set} && "$version" != "git-"* && -f "$LHELPER_WORKING_DIR/packages/${tar_package_filename}" ]]; then
