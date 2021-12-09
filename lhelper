@@ -871,9 +871,10 @@ update)
     if [ "$2" == recipes ]; then
         pushd_quiet "${LHELPER_DIR}/recipes"
         echo "Updating recipes"
-        git fetch origin master
-        git checkout -q -f master
-        git reset --hard origin/master
+        _branch_name="$(git rev-parse --abbrev-ref HEAD)"
+        git fetch origin "$_branch_name"
+        git checkout -q -f "$_branch_name"
+        git reset --hard "origin/$_branch_name"
         popd_quiet
     else
         echo "Usage: $LHELPER_COMMAND_NAME update recipes"

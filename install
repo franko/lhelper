@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+recipes_branch=master
+if [[ "$1" == "--use="* ]]; then
+    recipes_branch="${1#--use=}"
+    echo "Using recipes from branch: ${recipes_branch}"
+    shift
+fi
+
 if [ $# != "1" ]; then
     echo "Usage: $0 <prefix>"
     exit 1
@@ -49,7 +56,6 @@ if [ -z "${DESTDIR+x}" ]; then
 fi
 
 recipes_repo="https://github.com/franko/lhelper-recipes.git"
-recipes_branch=master
 recipes_dir="$DESTDIR/share/lhelper/recipes"
 
 lhcomp="$(find_compiler)"
