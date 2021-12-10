@@ -459,16 +459,26 @@ check_dependencies () {
     done < "$LHELPER_ENV_PREFIX/logs/$package-dependencies"
 }
 
+contains_element () {
+  local e match="$1"
+  shift
+  for e; do [[ "$e" == "$match" ]] && return 0; done
+  return 1
+}
+
 compute_package_list () {
     if [ ! -f "$LHELPER_ENV_PREFIX/logs/$package-dependencies" ]; then
         return 0
     fi
-    local cp_dependency cp_name cp_version
+    local cp_dependency cp_name cp_version cp_entry
     while IFS= read -r cp_dependency; do
         cp_name=${cp_dependency/ */}
         cp_name=${cp_name#\?}
         if query_package "$cp_name" &> /dev/null; then
-            _pack_usage+=("$(query_package -link $cp_name)")
+            cp_entry="$(query_package -link $cp_name)"
+            if ! contains_element "$cp_entry" "${_pack_usage[@]}"; then
+                _pack_usage+=("$cp_entry")
+            fi
         elif system_library_version "$cp_name" &> /dev/null; then
             cp_version="$(system_library_version "$cp_name")"
             _pack_usage+=("${cp_name}[system] ${cp_version}")
