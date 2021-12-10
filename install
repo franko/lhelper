@@ -98,5 +98,10 @@ fi
 chmod a+x "$DESTDIR/bin/lhelper"
 
 echo -n "Installing recipes... "
-git clone --depth 1 -b "$recipes_branch" "$recipes_repo" "$recipes_dir" &> /dev/null
-echo "done"
+if git clone --depth 1 -b "$recipes_branch" "$recipes_repo" "$recipes_dir" &> /dev/null; then
+    echo "done"
+else
+    echo "fail"
+    echo "Error cloning recipes from $recipes_repo"
+    exit 1
+fi
