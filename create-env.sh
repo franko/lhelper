@@ -79,6 +79,7 @@ _EOF_
 touch "${INSTALL_PREFIX}/bin/lhelper-packages"
 
 _libdir="${_libdir_array[0]}"
+_datadir="${INSTALL_PREFIX}/share"
 _pkgconfig_reldir=$(printf_join ":%s/pkgconfig" "${_libdir_array[0]}")
 _pkgconfig_path=$(printf_join ":\${_prefix}/%s/pkgconfig" "${_libdir_array[@]}")
 _ldpath=$(printf_join ":\${_prefix}/%s" "${_libdir_array[@]}")
@@ -88,7 +89,11 @@ _prefix="${INSTALL_PREFIX}"
 export PATH="\${_prefix}/bin\${PATH:+:}\${PATH}"
 
 export LD_LIBRARY_PATH="${_ldpath}\${LD_LIBRARY_PATH:+:}\${LD_LIBRARY_PATH}"
-export PKG_CONFIG_PATH="${_pkgconfig_path}\${PKG_CONFIG_PATH:+:}\${PKG_CONFIG_PATH}"
+if [ -z \${PKG_CONFIG_PATH+x} ]; then
+  export PKG_CONFIG_PATH="${_pkgconfig_path}:${_libdir}/pkgconfig:${_datadir}/pkgconfig"
+else
+  export PKG_CONFIG_PATH="${_pkgconfig_path}\${PKG_CONFIG_PATH:+:}\${PKG_CONFIG_PATH}"
+fi
 
 export CMAKE_PREFIX_PATH="\${_prefix}"
 export LHELPER_LIBDIR="${_libdir}"
