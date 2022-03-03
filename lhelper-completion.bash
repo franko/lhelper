@@ -1,14 +1,7 @@
 #!/bin/bash
 
-lhcomp_set_dirs () {
-  local lh_bindir="$(dirname $(which lhelper))"
-  LH_COMP_PREFIX="${lh_bindir%/bin}"
-  LH_COMP_WORKDIR="$LH_COMP_PREFIX/var/lib/lhelper"
-  LH_COMP_DIR="$LH_COMP_PREFIX/share/lhelper"
-}
-
 lhcomp_package_list () {
-  local env_prefix="$LH_COMP_PREFIX/var/lhenv/$LHELPER_ENV_NAME"
+  local env_prefix="$lhcomp_prefix/var/lhenv/$LHELPER_ENV_NAME"
   local packages_file="${env_prefix}/bin/lhelper-packages"
   lhcomp_packages=()
   if [ -s $packages_file ]; then
@@ -22,15 +15,19 @@ lhcomp_package_list () {
 
 lhcomp_recipes_list () {
   lhcomp_recipes=()
-  for line in $(ls -1 "$LH_COMP_DIR/recipes"); do
+  for line in $(ls -1 "$lhcomp_dir/recipes"); do
     lhcomp_recipes+=(${line%%_*})
   done
 }
 
-lhcomp_set_dirs
-
-lh_completion () {
+_lhelper () {
   local IFS=$' \t\n'    # normalize IFS
+
+  local lh_bindir="$(dirname $(which lhelper))"
+  local lhcomp_prefix="${lh_bindir%/bin}"
+  local lhcomp_workdir="$lhcomp_prefix/var/lib/lhelper"
+  local lhcomp_dir="$lhcomp_prefix/share/lhelper"
+
   local lhcomp_packages=()
   local lhcomp_recipes=()
 
@@ -41,7 +38,7 @@ lh_completion () {
   2)
     case "${COMP_WORDS[1]}" in
     activate|delete|env-source)
-      COMPREPLY=($(compgen -W "$(ls -1 "$LH_COMP_WORKDIR/environments")" "${COMP_WORDS[2]}"))
+      COMPREPLY=($(compgen -W "$(ls -1 "$lhcomp_workdir/environments")" "${COMP_WORDS[2]}"))
       ;;
     install)
       lhcomp_recipes_list
@@ -67,4 +64,4 @@ lh_completion () {
   esac
 }
 
-complete -F lh_completion lhelper
+complete -F _lhelper lhelper
