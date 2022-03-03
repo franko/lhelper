@@ -88,6 +88,7 @@ cp build-helper.sh "$DESTDIR/share/lhelper"
 cp create-env.sh "$DESTDIR/share/lhelper"
 cp lhelper-bash-init "$DESTDIR/share/lhelper"
 cp patch/*.patch "$DESTDIR/share/lhelper/patch"
+cp lhelper-completion.bash "/usr/share/bash-completion/completions/lhelper"
 cp lhelper "$DESTDIR/bin"
 
 if [ -d "$recipes_dir" ]; then
