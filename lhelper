@@ -488,44 +488,10 @@ compute_package_list () {
     done < "$LHELPER_ENV_PREFIX/logs/$package-dependencies"
 }
 
-# https://gcc.gnu.org/onlinedocs/gcc/x86-Options.html
-# https://en.wikipedia.org/wiki/List_of_Intel_CPU_microarchitectures#x86_microarchitectures
-# https://en.wikipedia.org/wiki/X86-64#Microarchitecture_levels
-# https://en.wikipedia.org/wiki/X86#Chronology
-
-# x86-64 => INTEL: prescott (ok GCC), AMD: (GCC) k8, opteron, athlon64, athlon-fx, includes MMX, SSE, SSE2
-# x86-64-v2 => nehalem (ok GCC), AMD: jaguar (bdver1 for GCC), includes SSE3, SSE4_1, SSE4_2, SSSE3
-# x86-64-v3 => haswell (ok GCC), AMD: (bdver4 for GCC), includes AVX, AVX2
-# x86-64-v4 => AVX512
-
-# Clang available march: llc -march=x86-64 -mattr=help
-
-# We do not cover all the OpenBLAS targets for x86/x86-64
-# FIXME: x86 32 bit is not covered
-# FIXME: ARM is not covered
-# meaning: "architecture", "OpenBLAS name", "uname -m", "c compiler arch name", "c compiler arch fallback name 1 et 2"
-known_cpu_spec = (
-    "x86    p2          x86    pentium2       i686      i686"
-    "x86    prescott    x86    prescott       pentium4  i686"
-    "x86    nehalem     x86    nehalem        pentium4  i686"
-    "x86    haswell     x86    haswell        pentium4  i686"
-    "x86-64 prescott    x86_64 prescott       x86-64    x86-64"
-    "x86-64 athlon      x86_64 athlon         x86-64    x86-64"
-    "x86-64 opteron     x86_64 opteron        x86-64    x86-64"
-    "x86-64 barcelona   x86_64 barcelona      x86-64    x86-64"
-    "x86-64 bulldozer   x86_64 bdver1         x86-64-v2 x86-64"
-    "x86-64 jaguar      x86_64 bdver3         x86-64-v2 x86-64" # verifier
-    "x86-64 nehalem     x86_64 nehalem        x86-64-v2 x86-64"
-    "x86-64 sandybridge x86_64 sandybridge    x86-64-v2 x86-64"
-    "x86-64 haswell     x86_64 haswell        x86-64-v3 x86-64"
-    "x86-64 excavator   x86_64 bdver4         x86-64-v3 x86-64"
-    "x86-64 skylakex    x86_64 skylake-avx512 x86-64-v4 x86-64" # verifier
-)
-
 cat_digest () {
     cat << EOF
-CC="$CC"
-CXX="$CXX"
+CC="$CC_BARE"
+CXX="$CXX_BARE"
 CFLAGS="$CFLAGS"
 CXXFLAGS="$CXXFLAGS"
 LDFLAGS="$LDFLAGS"
@@ -854,17 +820,13 @@ create)
     done
     if [ -z ${arch_target+x} ]; then
         echo "error: please provide the -target=* option."
-        echo "The target should be in the form like for example \"x86:prescott\" or \"x86-64:prescott\""
-        echo "The first part select the instruction set and the second part the CPU architecture"
+        echo "The target should be in the form similar to: \"x86:prescott\" or \"x86-64:prescott\""
+        echo "The first part select the instruction set and the second part the CPU micro-architecture"
         exit 1
     fi
-    IFS=$':' read -a arch_arr <<< "$arch_target"
-    export CPU_TYPE="${arch_arr[0]}"
-    export CPU_TARGET="${arch_arr[1]}"
-    # TODO: we should consider downgrading the CPU_TARGET if the compiler doesn't support it.
     build_type="${build_type:-Release}"
     env_prefix="$(get_env_directory "$env_name")"
-    create_env "$env_name" "$env_prefix" "$build_type" || exit 1
+    create_env "$env_name" "$env_prefix" "$build_type" "$arch_target" || exit 1
     if [ ! -z ${env_edit+x} ]; then
         "${EDITOR-vim}" "${env_prefix}/bin/lhelper-config"
     fi
