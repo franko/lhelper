@@ -32,24 +32,38 @@ if [ -z ${CXX+x} ]; then CXX="g++"; fi
 
 # We do not cover all the OpenBLAS targets for x86/x86-64
 # FIXME: ARM is not covered
-# meaning: "architecture", "OpenBLAS name", "uname -m", "c compiler arch name", "c compiler arch fallback name 1 et 2"
-# "additional flags"
+# meaning: "architecture", "CPU target's name", ""gcc/clang arch name", "additional flags"
 known_cpu_spec=(
-    "x86    p2          x86    pentium2       i686      i686     -mfpmath=sse,-msse"
-    "x86    prescott    x86    prescott       pentium4  i686     -mfpmath=sse,-msse2"
-    "x86    nehalem     x86    nehalem        pentium4  i686     -mfpmath=sse,-msse2"
-    "x86    haswell     x86    haswell        pentium4  i686     -mfpmath=sse,-msse2"
-    "x86-64 prescott    x86_64 prescott       x86-64    x86-64"
-    "x86-64 athlon      x86_64 athlon         x86-64    x86-64"
-    "x86-64 opteron     x86_64 opteron        x86-64    x86-64"
-    "x86-64 barcelona   x86_64 barcelona      x86-64    x86-64"
-    "x86-64 bulldozer   x86_64 bdver1         x86-64-v2 x86-64"
-    "x86-64 jaguar      x86_64 bdver3         x86-64-v2 x86-64" # verifier
-    "x86-64 nehalem     x86_64 nehalem        x86-64-v2 x86-64"
-    "x86-64 sandybridge x86_64 sandybridge    x86-64-v2 x86-64"
-    "x86-64 haswell     x86_64 haswell        x86-64-v3 x86-64"
-    "x86-64 excavator   x86_64 bdver4         x86-64-v3 x86-64"
-    "x86-64 skylakex    x86_64 skylake-avx512 x86-64-v4 x86-64" # verifier
+    "x86    pentium2    pentium2         -mfpmath=sse,-msse"
+    "x86    pentium4    pentium4         -mfpmath=sse,-msse"
+    "x86    prescott    prescott         -mfpmath=sse,-msse2"
+    "x86    nehalem     nehalem          -mfpmath=sse,-msse2"
+    "x86    haswell     haswell          -mfpmath=sse,-msse2"
+    "x86-64 x86-64      x86-64        "
+    "x86-64 northwood   pentium4      "
+    "x86-64 prescott    prescott      "
+    "x86-64 core2       core2         "
+    "x86-64 athlon      athlon        "
+    "x86-64 opteron     opteron       "
+    "x86-64 barcelona   barcelona     "
+    "x86-64 bobcat      btver1        " # Bobcat, 1st gen
+    "x86-64 jaguar      btver2        " # Bobcat, 2nd gen
+    "x86-64 bulldozer   bdver1        " # Bulldozer, 1st gen
+    "x86-64 piledriver  bdver2        "
+    "x86-64 steamroller bdver3        "
+    "x86-64 excavator   bdver4        "
+    "x86-64 zen         znver1        "
+    "x86-64 x86-64-v2   x86-64-v2     "
+    "x86-64 nehalem     nehalem       "
+    "x86-64 sandybridge sandybridge   "
+    "x86-64 x86-64-v3   x86-64-v3     "
+    "x86-64 haswell     haswell       "
+    "x86-64 broadwell   broadwell     "
+    "x86-64 skylake     skylake       "
+    "x86-64 cooperlake  cooperlake    "
+    "x86-64 atom        bonnell       "
+    "x86-64 x86-64-v4   x86-64-v4     "
+    "x86-64 skylakex    skylake-avx512"
 )
 
 cpu_mflag=""
@@ -59,7 +73,7 @@ fi
 for line in "${known_cpu_spec[@]}"; do
     read -a line_a <<< "$line"
     if [[ "${line_a[0]}:${line_a[1]}" == "$CPU_TYPE:$CPU_TARGET" ]]; then
-        CPU_CFLAGS="$cpu_mflag -march=${line_a[3]} ${line_a[6]//,/ }"
+        CPU_CFLAGS="$cpu_mflag -march=${line_a[2]} ${line_a[3]//,/ }"
     fi
 done
 
