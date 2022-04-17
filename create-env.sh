@@ -23,11 +23,6 @@ if [ -z ${CXX+x} ]; then CXX="g++"; fi
 # https://en.wikipedia.org/wiki/X86-64#Microarchitecture_levels
 # https://en.wikipedia.org/wiki/X86#Chronology
 
-# x86-64 => INTEL: prescott (ok GCC), AMD: (GCC) k8, opteron, athlon64, athlon-fx, includes MMX, SSE, SSE2
-# x86-64-v2 => nehalem (ok GCC), AMD: jaguar (bdver1 for GCC), includes SSE3, SSE4_1, SSE4_2, SSSE3
-# x86-64-v3 => haswell (ok GCC), AMD: (bdver4 for GCC), includes AVX, AVX2
-# x86-64-v4 => AVX512
-
 # Clang available march: llc -march=x86-64 -mattr=help
 
 # We do not cover all the OpenBLAS targets for x86/x86-64
