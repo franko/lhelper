@@ -59,6 +59,11 @@ known_cpu_spec=(
     "x86-64 atom        bonnell       "
     "x86-64 x86-64-v4   x86-64-v4     "
     "x86-64 skylakex    skylake-avx512"
+    "arm64  armv8       armv8-a       "
+    "arm64  cortexa53   armv8-a        -mtune=cortex-a53"
+    "arm64  cortexa57   armv8-a        -mtune=cortex-a57"
+    "arm64  cortexa72   armv8-a        -mtune=cortex-a72"
+    "arm64  cortexa73   armv8-a       "
 )
 
 cpu_mflag=""
