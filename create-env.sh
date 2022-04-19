@@ -19,6 +19,8 @@ if [ -z ${CC+x} ]; then CC="gcc"; fi
 if [ -z ${CXX+x} ]; then CXX="g++"; fi
 
 # https://gcc.gnu.org/onlinedocs/gcc/x86-Options.html
+# https://gcc.gnu.org/onlinedocs/gcc/ARM-Options.html#ARM-Options
+
 # https://en.wikipedia.org/wiki/List_of_Intel_CPU_microarchitectures#x86_microarchitectures
 # https://en.wikipedia.org/wiki/X86-64#Microarchitecture_levels
 # https://en.wikipedia.org/wiki/X86#Chronology
@@ -59,6 +61,13 @@ known_cpu_spec=(
     "x86-64 atom        bonnell       "
     "x86-64 x86-64-v4   x86-64-v4     "
     "x86-64 skylakex    skylake-avx512"
+    "arm    armv6       armv6         "
+    "arm    armv6+fp    armv6+fp      "
+    "arm    armv7       armv7         "
+    "arm    armv7a      armv7-a       "
+    "arm    armv7a+fp   armv7-a+fp    "
+    "arm    cortexa15   armv7-a+fp     -mtune=cortex-a15"
+    "arm    cortexa9    armv7-a+fp     -mtune=cortex-a9"
     "arm64  armv8       armv8-a       "
     "arm64  cortexa53   armv8-a        -mtune=cortex-a53"
     "arm64  cortexa57   armv8-a        -mtune=cortex-a57"
