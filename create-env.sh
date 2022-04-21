@@ -26,16 +26,18 @@ if [ -z ${CXX+x} ]; then CXX="g++"; fi
 # https://en.wikipedia.org/wiki/X86#Chronology
 
 # Clang available march: llc -march=x86-64 -mattr=help
+# gcc -march=native -Q --help=target
 
 # We do not cover all the OpenBLAS targets for x86/x86-64
-# FIXME: ARM is not covered
+# FIXME: We assume that GCC targets natively 64bit x86 but that may not be
+#        always true.
 # meaning: "architecture", "CPU target's name", ""gcc/clang arch name", "additional flags"
 known_cpu_spec=(
-    "x86    pentium2    pentium2         -mfpmath=sse,-msse"
-    "x86    pentium4    pentium4         -mfpmath=sse,-msse"
-    "x86    prescott    prescott         -mfpmath=sse,-msse2"
-    "x86    nehalem     nehalem          -mfpmath=sse,-msse2"
-    "x86    haswell     haswell          -mfpmath=sse,-msse2"
+    "x86    pentium2    pentium2         -m32,-mfpmath=sse,-msse"
+    "x86    pentium4    pentium4         -m32,-mfpmath=sse,-msse"
+    "x86    prescott    prescott         -m32,-mfpmath=sse,-msse2"
+    "x86    nehalem     nehalem          -m32,-mfpmath=sse,-msse2"
+    "x86    haswell     haswell          -m32,-mfpmath=sse,-msse2"
     "x86-64 x86-64      x86-64        "
     "x86-64 northwood   pentium4      "
     "x86-64 prescott    prescott      "
@@ -75,14 +77,10 @@ known_cpu_spec=(
     "arm64  cortexa73   armv8-a       "
 )
 
-cpu_mflag=""
-if [[ $CPU_TYPE == x86 ]]; then
-    cpu_mflag="-m32"
-fi
 for line in "${known_cpu_spec[@]}"; do
     read -a line_a <<< "$line"
     if [[ "${line_a[0]}:${line_a[1]}" == "$CPU_TYPE:$CPU_TARGET" ]]; then
-        CPU_CFLAGS="$cpu_mflag -march=${line_a[2]} ${line_a[3]//,/ }"
+        CPU_CFLAGS="-march=${line_a[2]} ${line_a[3]//,/ }"
     fi
 done
 
