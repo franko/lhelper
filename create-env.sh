@@ -116,7 +116,7 @@ default_libdir () {
     echo "lib"
 }
 
-IFS=':' read -r -a _libdir_array <<< "$(default_libdir "${INSTALL_PREFIX}")"
+IFS=':' read -r -a _libdir_array <<< "$(default_libdir)"
 
 for _libdir in "${_libdir_array[@]}"; do
     mkdir -p "${INSTALL_PREFIX}/${_libdir}/pkgconfig"
