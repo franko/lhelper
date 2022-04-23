@@ -13,6 +13,8 @@ LHELPER_PREFIX="${LHELPER_BIN_DIRNAME%/bin}"
 export LHELPER_WORKING_DIR="$LHELPER_PREFIX/var/lib/lhelper"
 export LHELPER_DIR="$LHELPER_PREFIX/share/lhelper"
 
+source "$LHELPER_DIR/create-env.sh"
+
 if [ ! -d "${LHELPER_DIR}" ]; then
     echo "error: directory \"${LHELPER_DIR}\" not found."
     echo "Lhelper may be not properly installed."
@@ -743,10 +745,6 @@ start_subshell () {
     source "$LHELPER_WORKING_DIR/environments/$1"
     print_installed_packages
     bash --init-file "$LHELPER_DIR/lhelper-bash-init"
-}
-
-create_env () {
-    bash "$LHELPER_DIR/create-env.sh" "$@"
 }
 
 # Take the environment name and its install prefix as arguments.

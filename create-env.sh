@@ -1,22 +1,3 @@
-# This script is executed from lhelper's main script when a command to create
-# a new environment.
-
-INSTALL_PREFIX="$2"
-_build_type="${3:-Release}"
-arch_target="$4"
-
-IFS=$':' read -a arch_arr <<< "$arch_target"
-export CPU_TYPE="${arch_arr[0]}"
-export CPU_TARGET="${arch_arr[1]}"
-# TODO: we should consider downgrading the CPU_TARGET if the compiler doesn't support it.
-
-if [[ $_build_type != "Release" && $_build_type != "Debug" ]]; then
-    echo "Build type should be either Release or Debug, abort."
-    exit 1
-fi
-
-if [ -z ${CC+x} ]; then CC="gcc"; fi
-if [ -z ${CXX+x} ]; then CXX="g++"; fi
 
 # https://gcc.gnu.org/onlinedocs/gcc/x86-Options.html
 # https://gcc.gnu.org/onlinedocs/gcc/ARM-Options.html#ARM-Options
@@ -77,13 +58,6 @@ known_cpu_spec=(
     "arm64  cortexa73   armv8-a       "
 )
 
-for line in "${known_cpu_spec[@]}"; do
-    read -a line_a <<< "$line"
-    if [[ "${line_a[0]}:${line_a[1]}" == "$CPU_TYPE:$CPU_TARGET" ]]; then
-        CPU_CFLAGS="-march=${line_a[2]} ${line_a[3]//,/ }"
-    fi
-done
-
 # Take a format and a list or aguments. Format each argument with
 # the given format using printf ang join all strings.
 # Omit the first character of the result string.
@@ -116,21 +90,40 @@ default_libdir () {
     echo "lib"
 }
 
-IFS=':' read -r -a _libdir_array <<< "$(default_libdir)"
+env_set_variables () {
+    local arch_arr line line_a
+    IFS=$':' read -a arch_arr <<< "$arch_target"
+    cpu_type="${arch_arr[0]}"
+    cpu_target="${arch_arr[1]}"
+    cc="${CC:-gcc}"
+    cxx="${CXX:-g++}"
+    for line in "${known_cpu_spec[@]}"; do
+        read -a line_a <<< "$line"
+        if [[ "${line_a[0]}:${line_a[1]}" == "$cpu_type:$cpu_target" ]]; then
+            cpu_flags="-march=${line_a[2]} ${line_a[3]//,/ }"
+        fi
+    done
+}
 
-for _libdir in "${_libdir_array[@]}"; do
-    mkdir -p "${INSTALL_PREFIX}/${_libdir}/pkgconfig"
-done
-mkdir -p "${INSTALL_PREFIX}/include"
-mkdir -p "${INSTALL_PREFIX}/bin"
-mkdir -p "${INSTALL_PREFIX}/packages"
-mkdir -p "${INSTALL_PREFIX}/logs"
+env_create_directories () {
+    for libdir in "${libdir_array[@]}"; do
+        mkdir -p "$prefix/$libdir/pkgconfig"
+    done
+    mkdir -p "$prefix/include"
+    mkdir -p "$prefix/bin"
+    mkdir -p "$prefix/packages"
+    mkdir -p "$prefix/logs"
 
-# To avoid deleting the directories when removing packages
-touch "${INSTALL_PREFIX}/logs/.keep"
-touch "${INSTALL_PREFIX}/packages/.keep"
+    touch "$prefix/bin/lhelper-packages"
 
-cat << _EOF_ > "${INSTALL_PREFIX}/bin/lhelper-config"
+    # To avoid deleting the directories when removing packages
+    touch "$prefix/logs/.keep"
+    touch "$prefix/packages/.keep"
+}
+
+env_create_config () {
+    local output_filename="$1"
+    cat << _EOF_ > "$output_filename"
 # Edit here the compiler variables and flags for this
 # specific environment.
 
@@ -138,44 +131,67 @@ cat << _EOF_ > "${INSTALL_PREFIX}/bin/lhelper-config"
 # are automatically added by cmake or meson depending on
 # the BUILD_TYPE variable.
 
-export CC_BARE="$CC"
-export CXX_BARE="$CXX"
-export CC="$CC $CPU_CFLAGS"
-export CXX="$CXX $CPU_CFLAGS"
+export CC_BARE="$cc"
+export CXX_BARE="$cxx"
+export CC="$cc $cpu_flags"
+export CXX="$cxx $cpu_flags"
 export CFLAGS="$CFLAGS"
 export CXXFLAGS="$CXXFLAGS"
 export LDFLAGS="$LDFLAGS"
-export CPU_TYPE="$CPU_TYPE"
-export CPU_TARGET="$CPU_TARGET"
+export CPU_TYPE="$cpu_type"
+export CPU_TARGET="$cpu_target"
 
 # Can be Release or Debug
-export BUILD_TYPE="$_build_type"
+export BUILD_TYPE="$build_type"
 _EOF_
+}
 
-touch "${INSTALL_PREFIX}/bin/lhelper-packages"
+env_create_source_file () {
+    local libdir="${libdir_array[0]}"
+    local datadir="$prefix/share"
+    local pkgconfig_reldir=$(printf_join ":%s/pkgconfig" "${libdir_array[0]}")
+    local pkgconfig_path=$(printf_join ":\$prefix/%s/pkgconfig" "${libdir_array[@]}")
+    local ldpath=$(printf_join ":\$prefix/%s" "${libdir_array[@]}")
 
-_libdir="${_libdir_array[0]}"
-_datadir="${INSTALL_PREFIX}/share"
-_pkgconfig_reldir=$(printf_join ":%s/pkgconfig" "${_libdir_array[0]}")
-_pkgconfig_path=$(printf_join ":\${_prefix}/%s/pkgconfig" "${_libdir_array[@]}")
-_ldpath=$(printf_join ":\${_prefix}/%s" "${_libdir_array[@]}")
+cat << EOF > "$LHELPER_WORKING_DIR/environments/$env_name"
+prefix="$prefix"
+export PATH="\$prefix/bin\${PATH:+:}\$PATH"
 
-cat << EOF > "$LHELPER_WORKING_DIR/environments/$1"
-_prefix="${INSTALL_PREFIX}"
-export PATH="\${_prefix}/bin\${PATH:+:}\${PATH}"
-
-export LD_LIBRARY_PATH="${_ldpath}\${LD_LIBRARY_PATH:+:}\${LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="$ldpath\${LD_LIBRARY_PATH:+:}\$LD_LIBRARY_PATH"
 if [ -z \${PKG_CONFIG_PATH+x} ]; then
-  export PKG_CONFIG_PATH="${_pkgconfig_path}:${_libdir}/pkgconfig:${_datadir}/pkgconfig"
+    export PKG_CONFIG_PATH="$pkgconfig_path:$libdir/pkgconfig:$datadir/pkgconfig"
 else
-  export PKG_CONFIG_PATH="${_pkgconfig_path}\${PKG_CONFIG_PATH:+:}\${PKG_CONFIG_PATH}"
+    export PKG_CONFIG_PATH="$pkgconfig_path\${PKG_CONFIG_PATH:+:}\$PKG_CONFIG_PATH"
 fi
 
-export CMAKE_PREFIX_PATH="\${_prefix}"
-export LHELPER_LIBDIR="${_libdir}"
-export LHELPER_PKGCONFIG_RPATH="${_pkgconfig_reldir}"
-export LHELPER_ENV_PREFIX="\${_prefix}"
-export LHELPER_ENV_NAME="$1"
+export CMAKE_PREFIX_PATH="\$prefix"
+export LHELPER_LIBDIR="$libdir"
+export LHELPER_PKGCONFIG_RPATH="$pkgconfig_reldir"
+export LHELPER_ENV_PREFIX="\$prefix"
+export LHELPER_ENV_NAME="$env_name"
 
-source "\${LHELPER_ENV_PREFIX}/bin/lhelper-config"
+source "\$LHELPER_ENV_PREFIX/bin/lhelper-config"
 EOF
+}
+
+create_env () {
+    local env_name="$1"
+    local prefix="$2"
+    local build_type="${3:-Release}"
+    local arch_target="$4"
+
+    if [[ $build_type != "Release" && $build_type != "Debug" ]]; then
+        echo "Build type should be either Release or Debug, abort."
+        exit 1
+    fi
+
+    local cc cxx cpu_type cpu_target cpu_flags
+    local libdir_array
+    IFS=':' read -r -a libdir_array <<< "$(default_libdir)"
+
+    env_set_variables
+    env_create_directories
+    env_create_config "$prefix/bin/lhelper-config"
+    env_create_source_file
+}
+
