@@ -147,13 +147,14 @@ _EOF_
 }
 
 env_create_source_file () {
+    local target="$1"
     local libdir="${libdir_array[0]}"
     local datadir="$prefix/share"
     local pkgconfig_reldir=$(printf_join ":%s/pkgconfig" "${libdir_array[0]}")
     local pkgconfig_path=$(printf_join ":\$prefix/%s/pkgconfig" "${libdir_array[@]}")
     local ldpath=$(printf_join ":\$prefix/%s" "${libdir_array[@]}")
 
-cat << EOF > "$LHELPER_WORKING_DIR/environments/$env_name"
+cat << EOF > "$target"
 prefix="$prefix"
 export PATH="\$prefix/bin\${PATH:+:}\$PATH"
 
@@ -192,6 +193,6 @@ create_env () {
     env_set_variables
     env_create_directories
     env_create_config "$prefix/bin/lhelper-config"
-    env_create_source_file
+    env_create_source_file "${5:-$LHELPER_WORKING_DIR/environments/$env_name}"
 }
 

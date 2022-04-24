@@ -169,18 +169,18 @@ package_file_query () {
 }
 
 register_package () {
-    local env_dir="$(get_env_directory "$LHELPER_ENV_NAME")"
+    local env_dir="$LHELPER_ENV_PREFIX"
     local provide_line
     package_file_add "$env_dir/bin/lhelper-packages" "$@"
     if [ -f "$LHELPER_ENV_PREFIX/logs/$package-provides" ]; then
         while IFS= read -r provide_line; do
             echo "$provide_line : $*" >> "$env_dir/bin/lhelper-packages"
-        done < "$LHELPER_ENV_PREFIX/logs/$package-provides"
+        done < "$env_dir/logs/$package-provides"
     fi
 }
 
 unregister_package () {
-    local env_dir="$(get_env_directory "$LHELPER_ENV_NAME")"
+    local env_dir="$LHELPER_ENV_PREFIX"
     package_file_remove "$env_dir/bin/lhelper-packages" "$@"
     local un_provided=() un_package
     while IFS= read -r un_package; do
@@ -198,7 +198,7 @@ unregister_package () {
 }
 
 query_package () {
-    local env_dir="$(get_env_directory "$LHELPER_ENV_NAME")"
+    local env_dir="$LHELPER_ENV_PREFIX"
     local use_link=no
     if [[ "$1" == -link ]]; then
         use_link=yes
@@ -549,7 +549,7 @@ build_env_digest () {
 }
 
 
-# The first argument, $run_mode, should be either "dependencies" or "run"
+# The first argument, $run_mode, should be either "dependencies", "run" or "log"
 library_install () {
     local run_mode="$1"
     shift
@@ -630,7 +630,7 @@ library_install () {
     fi
     local recipe_version="${recipe_filename#${package}_}"
 
-    if [ $run_mode == "run" ]; then
+    if [ $run_mode == run ]; then
         if [[ ${#options_a[@]} -eq 0 ]]; then
             echo "Using recipe version ${recipe_version}"
         else
@@ -651,12 +651,15 @@ library_install () {
     export package version
     export _lh_recipe_run=$run_mode
     local log_dirname="${LHELPER_ENV_PREFIX}/logs"
-    if [ $run_mode == "dependencies" ]; then
+    if [ $run_mode == dependencies ]; then
         # Running recipe to get dependencies
         true > "$LHELPER_ENV_PREFIX/logs/$package-dependencies"
         BASH_ENV="$LHELPER_DIR/build-helper.sh" bash -e "${recipe_dir}/${recipe_filename}" "${options_a[@]}" 2> "$log_dirname/deps-$package-stderr.log" 1> "$log_dirname/deps-$package-stdout.log"
         check_dependencies
         unset _lh_recipe_run
+        return 0
+    elif [ $run_mode == log ]; then
+        register_package "$package" "$recipe_version" "${options_a[@]}"
         return 0
     fi
 
@@ -762,6 +765,26 @@ print_error_no_env () {
     echo "To list the packages an environement should be activated"
 }
 
+library_check_and_install () {
+    local mode=$1
+    shift
+    local _missing=()
+    # get dependencies
+    library_install dependencies "$@"
+    if [[ ${#_missing[@]} -ne 0 ]]; then
+        echo "Found missing packages:"; echo
+        for line in "${_missing[@]}"; do
+            echo "- $line"
+        done
+        echo; echo "The package $1 cannot be installed due to missing dependencies."
+        exit 1
+    fi
+    if [ $mode == run ]; then
+        echo "Installing the requested package: $@"
+    fi
+    library_install $mode "$@"
+}
+
 case $1 in
 install)
     if [ $# -lt 2 ]; then
@@ -772,24 +795,12 @@ install)
         print_error_no_env
         exit 1
     fi
-    export _missing=()
-    # get dependencies
-    library_install dependencies "${@:2}"
-    if [[ ${#_missing[@]} -ne 0 ]]; then
-        echo "Found missing packages:"; echo
-        for line in "${_missing[@]}"; do
-            echo "- $line"
-        done
-        echo; echo "The package $2 cannot be installed due to missing dependencies."
-        exit 1
-    fi
-    echo "Installing the requested package: ${@:2}"
-    library_install run "${@:2}"
-    unset _missing
+    library_check_and_install run "${@:2}"
     ;;
 activate)
     if [ $# -lt 2 ]; then
         echo "Usage: $LHELPER_COMMAND_NAME activate <env-name>"
+        echo "    or $LHELPER_COMMAND_NAME activate -f <env-filename>"
         exit 1
     fi
     if [ ! -f "$LHELPER_WORKING_DIR/environments/$2" ]; then
@@ -812,6 +823,9 @@ create)
                 ;;
             -e | --edit)
                 env_edit=yes
+                ;;
+            -f=*)
+                env_filename="${1#-f=}"
                 ;;
             -target=*)
                 arch_target="${1#-target=}"
@@ -839,15 +853,68 @@ create)
         exit 1
     fi
     build_type="${build_type:-Release}"
-    env_prefix="$(get_env_directory "$env_name")"
-    create_env "$env_name" "$env_prefix" "$build_type" "$arch_target" || exit 1
-    if [ ! -z ${env_edit+x} ]; then
-        "${EDITOR-vim}" "${env_prefix}/bin/lhelper-config"
-    fi
-    print_create_env_message "$env_name" "$build_type"
-    if [ -z ${env_activate+x} ]; then
-        echo "Activating the new environment"
-        start_subshell "$env_name"
+    if [ -z ${env_filename+x} ]; then
+        env_prefix="$(get_env_directory "$env_name")"
+        create_env "$env_name" "$env_prefix" "$build_type" "$arch_target" || exit 1
+        if [ ! -z ${env_edit+x} ]; then
+            "${EDITOR-vim}" "${env_prefix}/bin/lhelper-config"
+        fi
+        print_create_env_message "$env_name" "$build_type"
+        if [ -z ${env_activate+x} ]; then
+            echo "Activating the new environment"
+            start_subshell "$env_name"
+        fi
+    else
+        if [ -f "$env_filename" ]; then
+            source "$env_filename"
+        else
+            echo "error: $env_filename does not exist or is not a file."
+            exit 1
+        fi
+        env_realpath="$(realpath "$env_filename")"
+        env_basename="$(basename "$env_filename")"
+        env_workdir="$(dirname "$env_realpath")/.lhelper"
+        env_source="$env_workdir/.env_source"
+        rm -fr "$env_workdir/tmp" "$env_workdir/.env_source"
+        mkdir -p "$env_workdir/tmp" "$env_workdir/env"
+        create_env "${env_basename%.lhelper}" "$env_workdir/tmp" $build_type $arch_target "$env_source"
+        (
+            source "$env_source"
+            for package_name in "${packages[@]}"; do
+                # Important: variable package_name can contain spaces and it must be used
+                # below *without* quotes.
+                library_check_and_install log $package_name
+            done
+        )
+        new_env_no=1
+        shopt -s nullglob
+        for test_env_dir in "$env_workdir/env"/*; do
+            echo "DEBUG testing $test_env_dir"
+            if cmp -s "$env_workdir/tmp/bin/lhelper-config" "$test_env_dir/bin/lhelper-config" &&
+                cmp -s "$env_workdir/tmp/bin/lhelper-packages" "$test_env_dir/bin/lhelper-packages"; then
+                matching_env="$test_env_dir"
+                break
+            fi
+            env_no="$(basename "$test_env_dir")"
+            if [ $env_no -ge "$new_env_no" ]; then
+                new_env_no=$(($env_no + 1))
+            fi
+        done
+        rm -fr "$env_workdir/tmp" "$env_source"
+        if [ -z ${matching_env+x} ]; then
+            env_prefix="$env_workdir/env/$new_env_no"
+            create_env "${env_basename%.lhelper}" "$env_prefix" $build_type $arch_target "$env_prefix/bin/activate"
+            source "$env_prefix/bin/activate"
+            for package_name in "${packages[@]}"; do
+                # Important: variable package_name can contain spaces and it must be used
+                # below *without* quotes.
+                library_check_and_install run $package_name
+            done
+        else
+            source "$matching_env/bin/activate"
+        fi
+        print_installed_packages
+        bash --init-file "$LHELPER_DIR/lhelper-bash-init"
     fi
     ;;
 edit)
