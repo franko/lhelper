@@ -817,6 +817,9 @@ env-source | activate)
     shift 2
     while [ ! -z ${1+x} ]; do
         case "$1" in
+        -e | --edit)
+            edit_file=yes
+            ;;
         -n | --create-only)
             create_only=yes
             ;;
@@ -834,6 +837,46 @@ env-source | activate)
 
     if [[ ! -f "$env_filename" && ! $env_filename =~ \.lhelper$ ]]; then
         env_filename="$env_filename.lhelper"
+    fi
+    if [[ ! -z ${edit_file+x} && ! -f "$env_filename" ]]; then
+        cat << EOF > "$env_filename"
+# This is bash script sourced to get some environment variables to configure the
+# build toolchain.
+
+# Set the variables CC and CXX to point to the C and C++ compilers to use.
+# They may contains options by separating them by spaces and quoting the command.
+CC=gcc
+CXX=g++
+
+# Optional C/C++ and linker flags.
+# Do not include optimization or debug flags as they are automatically added based
+# on the variable BUILD_TYPE.
+# CPU specific flags are automatically added based on CPU_TYPE and CPU_TARGET.
+# CFLAGS=
+# CXXFLAGS=
+# LDFLAGS=
+
+# CPU architecture type and specific CPU to target. These variables are
+# mandatory. In case of doubt for CPU_TARGET you may choose a generic target like
+# x86-64 (generic). You can choose an Intel, AMD or ARM CPU microarchitecture like
+# nehalem, haswell or athlon for example.
+CPU_TYPE=x86-64
+CPU_TARGET=nehalem
+
+# Debug can be used to build the libraries including debug information.
+# It omitted will defaut to a release build.
+BUILD_TYPE=Release
+
+# List of libraries to be installed. Can contain options by quoting the a string with
+# the libray name and its option followed by spaces.
+packages=(
+#   "freetype2"
+#   "sdl2 -opengl"
+)
+EOF
+    fi
+    if [[ ! -z ${edit_file+x} ]]; then
+        "${EDITOR-vim}" "$env_filename"
     fi
     if [ ! -f "$env_filename" ]; then
         echo "error: the file $env_filename does not exist or is not a file"
