@@ -632,14 +632,14 @@ library_install () {
 
     if [ $run_mode == run ]; then
         if [[ ${#options_a[@]} -eq 0 ]]; then
-            echo "Using recipe version ${recipe_version}"
+            $message "Using recipe version ${recipe_version}"
         else
-            echo "Using recipe version ${recipe_version} with options: ${options_a[*]}"
+            $message "Using recipe version ${recipe_version} with options: ${options_a[*]}"
         fi
 
         if package_is_installed "$LHELPER_ENV_PREFIX" "$package"; then
             remove_package "$LHELPER_ENV_PREFIX" "$package"
-            echo "Removed previously installed package \"$package\""
+            $message "Removed previously installed package \"$package\""
         fi
     fi
 
@@ -671,21 +671,21 @@ library_install () {
     done < "$LHELPER_ENV_PREFIX/logs/$package-usage"
     rm "$LHELPER_ENV_PREFIX/logs/$package-usage"
     if [[ ${#pu_list[@]} -gt 0 ]]; then
-        echo "The package dependencies are:"; echo
+        $message "The package dependencies are:"; echo
         for pu_line in "${pu_list[@]}"; do
-            echo "* $pu_line"
+            $message "* $pu_line"
         done
-        echo
+        $message
     else
-        echo "The package has no dependencies."
+        $message "The package has no dependencies."
     fi
 
     local tar_package_filename="${package}${options_tag}_${recipe_version}_${digest}.tar.gz"
     if [[ -z ${rebuild+set} && -z ${local_recipe+set} && "$version" != "git-"* && -f "$LHELPER_WORKING_DIR/packages/${tar_package_filename}" ]]; then
-        echo "Found an existing package"
+        $message "Found an existing package"
     else
         prepare_temp_dir "$LHELPER_WORKING_DIR"
-        echo "Building library..."
+        $message "Building library..."
         # Execute the recipe
         BASH_ENV="$LHELPER_DIR/build-helper.sh" bash -e "${recipe_dir}/${recipe_filename}" "${options_a[@]}" 2> "$log_dirname/$package-stderr.log" 1> "$log_dirname/$package-stdout.log"
         if [ $? -ne 0 ]; then
@@ -699,7 +699,7 @@ library_install () {
             exit 1
         fi
         fix_pkgconfig_install
-        echo "done"
+        $message "done"
 
         library_dir_reloc "$LHELPER_TEMP_ROOT" "$WIN_INSTALL_PREFIX" "__LHELPER_PREFIX__"
 
@@ -712,7 +712,7 @@ library_install () {
     local filename_list="$LHELPER_ENV_PREFIX/packages/${package}.list"
     extract_archive_reloc "${tar_package_filename}" '__LHELPER_PREFIX__' "$WIN_INSTALL_PREFIX" "$INSTALL_PREFIX" "$filename_list"
     register_package "$package" "$recipe_version" "${options_a[@]}"
-    echo "Package \"$package\" successfully installed"
+    $message "Package \"$package\" successfully installed"
 }
 
 library_remove () {
@@ -767,19 +767,27 @@ print_error_no_env () {
 library_check_and_install () {
     local mode=$1
     shift
+
+    local message
+    if [ -z ${package_quiet} ]; then
+        message=echo
+    else
+        message=true
+    fi
+
     local _missing=()
     # get dependencies
     library_install dependencies "$@"
     if [[ ${#_missing[@]} -ne 0 ]]; then
-        echo "Found missing packages:"; echo
+        $message "Found missing packages:"; echo
         for line in "${_missing[@]}"; do
-            echo "- $line"
+            $message "- $line"
         done
-        echo; echo "The package $1 cannot be installed due to missing dependencies."
+        $message; $message "The package $1 cannot be installed due to missing dependencies."
         exit 1
     fi
     if [ $mode == run ]; then
-        echo "Installing the requested package: $@"
+        $message "Installing the requested package: $@"
     fi
     library_install $mode "$@"
 }
@@ -796,17 +804,21 @@ install)
     fi
     library_check_and_install run "${@:2}"
     ;;
-activate)
+env-source | activate)
     if [[ $# -lt 2 || $2 == "-"* ]]; then
         echo "Usage: $LHELPER_COMMAND_NAME activate <spec-filename> [options]"
         exit 1
+    fi
+    if [ $1 == env-source ]; then
+        source_print=yes
+        package_quiet=yes
     fi
     env_filename="$2"
     shift 2
     while [ ! -z ${1+x} ]; do
         case "$1" in
         -n | --create-only)
-            env_activate=no
+            create_only=yes
             ;;
         -*)
             echo "error: unknown option $1"
@@ -896,7 +908,9 @@ activate)
         env_source="$env_workdir/env/$matching_env/bin/activate"
         source "$env_source"
     fi
-    if [ -z ${env_activate+x} ]; then
+    if [ ! -z ${source_print} ]; then
+        echo "$env_source"
+    elif [ -z ${create_only+x} ]; then
         echo "Starting a new shell with the new environment"
         start_subshell
     fi
@@ -908,31 +922,12 @@ edit)
     fi
     "${EDITOR-vim}" "$LHELPER_ENV_PREFIX/bin/lhelper-config"
     ;;
-delete)
-    if [ $# -lt 2 ]; then
-        echo "Usage: $LHELPER_COMMAND_NAME delete <env-name>"
-        exit 1
-    fi
-    _env_name="$2"
-    if [ -f "$LHELPER_WORKING_DIR/environments/$_env_name" ]; then
-        source "$LHELPER_WORKING_DIR/environments/$_env_name"
+cleanup)
+    if [ -d ".lhelper/env" ]; then
+        echo "Cleaning up the environments cached in .lhelper/env"
+        rm -fr ".lhelper/env"
     else
-        echo "Environment $_env_name not found."
-        exit 1
-    fi
-    # TODO: consider printing installed packages.
-    # TODO: consider asking no confirmation if environment is empty.
-    if [ -n "$LHELPER_ENV_PREFIX" ]; then
-        echo -n "Are you sure you want to delete the environment $_env_name (y/n) ? "
-        read _sure_delete
-        if [[ "$_sure_delete" == "y" || "$_sure_delete" == "Y" ]]; then
-            rm -fr "$LHELPER_ENV_PREFIX"
-            rm -f "$LHELPER_WORKING_DIR/environments/$_env_name"
-            echo "Environment $_env_name successfully deleted."
-        else
-            echo "Operation canceled."
-        fi
-        unset _sure_delete
+        echo "No environments found in .lhelper directory, no files deleted"
     fi
     ;;
 remove)
@@ -947,9 +942,7 @@ remove)
     library_remove "${@:2}"
     ;;
 list)
-    if [ "$2" == environments ]; then
-        ls -1 "$LHELPER_WORKING_DIR/environments"
-    elif [ "$2" == recipes ]; then
+    if [ "$2" == recipes ]; then
         ls -1 "$LHELPER_DIR/recipes"
     elif [ "$2" == packages ]; then
         if [ -z ${LHELPER_ENV_NAME+x} ]; then
