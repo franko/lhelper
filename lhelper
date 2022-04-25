@@ -745,7 +745,6 @@ print_installed_packages () {
 }
 
 start_subshell () {
-    source "$LHELPER_WORKING_DIR/environments/$1"
     print_installed_packages
     bash --init-file "$LHELPER_DIR/lhelper-bash-init"
 }
@@ -761,8 +760,8 @@ print_package_files () {
 }
 
 print_error_no_env () {
-    echo "No environement activated"
-    echo "To list the packages an environement should be activated"
+    echo "No environment activated"
+    echo "To list the packages an environment should be activated"
 }
 
 library_check_and_install () {
@@ -798,123 +797,108 @@ install)
     library_check_and_install run "${@:2}"
     ;;
 activate)
-    if [ $# -lt 2 ]; then
-        echo "Usage: $LHELPER_COMMAND_NAME activate <env-name>"
-        echo "    or $LHELPER_COMMAND_NAME activate -f <env-filename>"
-        exit 1
-    fi
-    if [ ! -f "$LHELPER_WORKING_DIR/environments/$2" ]; then
-        echo "The environment \"$2\" does not exist"
-        exit 1
-    fi
-    start_subshell "$2"
-    ;;
-create)
     if [[ $# -lt 2 || $2 == "-"* ]]; then
-        echo "Usage: $LHELPER_COMMAND_NAME create <env-name> [options] [build-type]"
+        echo "Usage: $LHELPER_COMMAND_NAME activate <spec-filename> [options]"
         exit 1
     fi
-    env_name=$2
+    env_filename="$2"
     shift 2
     while [ ! -z ${1+x} ]; do
         case "$1" in
-            -n | --create-only)
-                env_activate=no
-                ;;
-            -e | --edit)
-                env_edit=yes
-                ;;
-            -f=*)
-                env_filename="${1#-f=}"
-                ;;
-            -target=*)
-                arch_target="${1#-target=}"
-                # arch_target should be on the form: "x86:prescott" or "x86-64:prescott"
-                ;;
-            -*)
-                echo "error: unknown option $1"
-                exit 1
-                ;;
-            *)
-                if [ -z ${build_type+x} ]; then
-                    build_type=$1
-                else
-                    echo "error: unexpected argument: \"$1\""
-                    exit 1
-                fi
-                ;;
+        -n | --create-only)
+            env_activate=no
+            ;;
+        -*)
+            echo "error: unknown option $1"
+            exit 1
+            ;;
+        *)
+            echo "error: unexpected argument: \"$1\""
+            exit 1
+            ;;
         esac
         shift
     done
-    if [ -z ${arch_target+x} ]; then
-        echo "error: please provide the -target=* option."
-        echo "The target should be in the form similar to: \"x86:prescott\" or \"x86-64:prescott\""
-        echo "The first part select the instruction set and the second part the CPU micro-architecture"
+
+    if [[ ! -f "$env_filename" && ! $env_filename =~ \.lhelper$ ]]; then
+        env_filename="$env_filename.lhelper"
+    fi
+    if [ ! -f "$env_filename" ]; then
+        echo "error: the file $env_filename does not exist or is not a file"
         exit 1
     fi
-    build_type="${build_type:-Release}"
-    if [ -z ${env_filename+x} ]; then
-        env_prefix="$(get_env_directory "$env_name")"
-        create_env "$env_name" "$env_prefix" "$build_type" "$arch_target" || exit 1
-        if [ ! -z ${env_edit+x} ]; then
-            "${EDITOR-vim}" "${env_prefix}/bin/lhelper-config"
-        fi
-        print_create_env_message "$env_name" "$build_type"
-        if [ -z ${env_activate+x} ]; then
-            echo "Activating the new environment"
-            start_subshell "$env_name"
-        fi
-    else
-        if [ -f "$env_filename" ]; then
-            source "$env_filename"
-        else
-            echo "error: $env_filename does not exist or is not a file."
-            exit 1
-        fi
-        env_realpath="$(realpath "$env_filename")"
-        env_basename="$(basename "$env_filename")"
-        env_workdir="$(dirname "$env_realpath")/.lhelper"
-        env_source="$env_workdir/.env_source"
-        rm -fr "$env_workdir/tmp" "$env_workdir/.env_source"
-        mkdir -p "$env_workdir/tmp" "$env_workdir/env"
-        create_env "${env_basename%.lhelper}" "$env_workdir/tmp" $build_type $arch_target "$env_source"
-        (
-            source "$env_source"
-            for package_name in "${packages[@]}"; do
-                # Important: variable package_name can contain spaces and it must be used
-                # below *without* quotes.
-                library_check_and_install log $package_name
-            done
-        )
-        new_env_no=1
-        shopt -s nullglob
-        for test_env_dir in "$env_workdir/env"/*; do
-            echo "DEBUG testing $test_env_dir"
-            if cmp -s "$env_workdir/tmp/bin/lhelper-config" "$test_env_dir/bin/lhelper-config" &&
-                cmp -s "$env_workdir/tmp/bin/lhelper-packages" "$test_env_dir/bin/lhelper-packages"; then
-                matching_env="$test_env_dir"
-                break
-            fi
-            env_no="$(basename "$test_env_dir")"
-            if [ $env_no -ge "$new_env_no" ]; then
-                new_env_no=$(($env_no + 1))
-            fi
+
+    source "$env_filename"
+    if [ -z ${BUILD_TYPE+x} ]; then
+        BUILD_TYPE=Release
+    elif [[ $BUILD_TYPE != "Release" && $BUILD_TYPE != "Debug" ]]; then
+        echo "Build type should be either Release or Debug, abort."
+        exit 1
+    fi
+    if [[ -z ${CPU_TYPE+x} || -z ${CPU_TARGET+x} ]]; then
+        echo "error: please provide the CPU_TYPE and CPU_TARGET environment variables."
+        echo "The CPU type should be something like \"prescott\" or \"x86-64\"."
+        echo "The CPU target should be something like \"x86\", \"x86-64\" or \"arm64\"."
+        exit 1
+    fi
+
+    env_realpath="$(realpath "$env_filename")"
+    env_basename="$(basename "$env_filename")"
+    env_workdir="$(dirname "$env_realpath")/.lhelper"
+    env_source="$env_workdir/.env_source"
+
+    # Temporary environment creation
+    rm -fr "$env_workdir/tmp" "$env_workdir/.env_source"
+    mkdir -p "$env_workdir/tmp" "$env_workdir/env"
+    create_env "${env_basename%.lhelper}" "$env_workdir/tmp" "$env_source"
+    # run through the packages to log them in the temporary environment
+    (
+        source "$env_source"
+        for package_name in "${packages[@]}"; do
+            # Important: variable package_name can contain spaces and it must be used
+            # below *without* quotes.
+            library_check_and_install log $package_name
         done
-        rm -fr "$env_workdir/tmp" "$env_source"
-        if [ -z ${matching_env+x} ]; then
-            env_prefix="$env_workdir/env/$new_env_no"
-            create_env "${env_basename%.lhelper}" "$env_prefix" $build_type $arch_target "$env_prefix/bin/activate"
-            source "$env_prefix/bin/activate"
-            for package_name in "${packages[@]}"; do
-                # Important: variable package_name can contain spaces and it must be used
-                # below *without* quotes.
-                library_check_and_install run $package_name
-            done
-        else
-            source "$matching_env/bin/activate"
+    )
+
+    # Looking for a matching environment from the existing ones
+    pushd_quiet "$env_workdir/env"
+    new_env_no=1
+    shopt -s nullglob
+    for env_no in *; do
+        if cmp -s "$env_workdir/tmp/bin/lhelper-config" "$env_no/bin/lhelper-config" &&
+            cmp -s "$env_workdir/tmp/bin/lhelper-packages" "$env_no/bin/lhelper-packages"; then
+            matching_env="$env_no"
+            break
         fi
-        print_installed_packages
-        bash --init-file "$LHELPER_DIR/lhelper-bash-init"
+        if [[ $env_no =~ ^-?[0-9]+$ && $env_no -ge "$new_env_no" ]]; then
+            new_env_no=$(($env_no + 1))
+        fi
+    done
+    popd_quiet
+
+    # create the new environment or activate the one found
+    rm -fr "$env_workdir/tmp" "$env_source"
+    if [ -z ${matching_env+x} ]; then
+        # create a new environment
+        env_prefix="$env_workdir/env/$new_env_no"
+        create_env "${env_basename%.lhelper}" "$env_prefix" "$env_prefix/bin/activate"
+        env_source="$env_prefix/bin/activate"
+        # install packages, activate the environment before
+        source "$env_source"
+        for package_name in "${packages[@]}"; do
+            # Important: variable package_name can contain spaces and it must be used
+            # below *without* quotes.
+            library_check_and_install run $package_name
+        done
+    else
+        # points env_source to the activate script of the matching environment
+        env_source="$env_workdir/env/$matching_env/bin/activate"
+        source "$env_source"
+    fi
+    if [ -z ${env_activate+x} ]; then
+        echo "Starting a new shell with the new environment"
+        start_subshell
     fi
     ;;
 edit)

@@ -91,15 +91,11 @@ default_libdir () {
 }
 
 env_set_variables () {
-    local arch_arr line line_a
-    IFS=$':' read -a arch_arr <<< "$arch_target"
-    cpu_type="${arch_arr[0]}"
-    cpu_target="${arch_arr[1]}"
     cc="${CC:-gcc}"
     cxx="${CXX:-g++}"
     for line in "${known_cpu_spec[@]}"; do
         read -a line_a <<< "$line"
-        if [[ "${line_a[0]}:${line_a[1]}" == "$cpu_type:$cpu_target" ]]; then
+        if [[ "${line_a[0]}:${line_a[1]}" == "$CPU_TYPE:$CPU_TARGET" ]]; then
             cpu_flags="-march=${line_a[2]} ${line_a[3]//,/ }"
         fi
     done
@@ -138,11 +134,11 @@ export CXX="$cxx $cpu_flags"
 export CFLAGS="$CFLAGS"
 export CXXFLAGS="$CXXFLAGS"
 export LDFLAGS="$LDFLAGS"
-export CPU_TYPE="$cpu_type"
-export CPU_TARGET="$cpu_target"
+export CPU_TYPE="$CPU_TYPE"
+export CPU_TARGET="$CPU_TARGET"
 
 # Can be Release or Debug
-export BUILD_TYPE="$build_type"
+export BUILD_TYPE="$BUILD_TYPE"
 _EOF_
 }
 
@@ -176,23 +172,14 @@ EOF
 }
 
 create_env () {
-    local env_name="$1"
-    local prefix="$2"
-    local build_type="${3:-Release}"
-    local arch_target="$4"
+    local env_name="$1" prefix="$2" env_source="$3"
 
-    if [[ $build_type != "Release" && $build_type != "Debug" ]]; then
-        echo "Build type should be either Release or Debug, abort."
-        exit 1
-    fi
-
-    local cc cxx cpu_type cpu_target cpu_flags
-    local libdir_array
+    local cc cxx cpu_flags libdir_array
     IFS=':' read -r -a libdir_array <<< "$(default_libdir)"
 
     env_set_variables
     env_create_directories
     env_create_config "$prefix/bin/lhelper-config"
-    env_create_source_file "${5:-$LHELPER_WORKING_DIR/environments/$env_name}"
+    env_create_source_file "$env_source"
 }
 
