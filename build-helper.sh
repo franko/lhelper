@@ -142,8 +142,10 @@ install_pkgconfig_file () {
 
 check_commands () {
     if [[ "${_lh_recipe_run}" == "dependencies" ]]; then return 0; fi
+    # The "command" variable below may contain some arguments so we keep only the
+    # initial word, the command, without arguments.
     for command in "$@"; do
-        type "$command" > /dev/null 2>&1 || { echo >&2 "error: command \"${command}\" is required but it's not available"; exit 1; }
+        type "${command%% *}" > /dev/null 2>&1 || { echo >&2 "error: command \"${command}\" is required but it's not available"; exit 1; }
     done
 }
 
