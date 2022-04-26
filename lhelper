@@ -446,7 +446,7 @@ check_dependencies () {
                 exit 1
                 ;;
             *)
-                echo "Package $cd_package is already installed"
+                $message "Package $cd_package is already installed"
             esac
         elif system_library_version "$cd_package" &> /dev/null; then
             cd_package_found="$name $(system_library_version "$cd_package")"
@@ -454,7 +454,7 @@ check_dependencies () {
                 echo "Error: incompatible version for system library $name."
                 exit 1
             fi
-            echo "Using system library for $cd_package."
+            $message "Using system library for $cd_package."
         else
             _missing+=("$cd_dependency")
         fi
