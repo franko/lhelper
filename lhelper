@@ -650,6 +650,7 @@ library_install () {
     export package version
     export _lh_recipe_run=$run_mode
     local log_dirname="${LHELPER_ENV_PREFIX}/logs"
+    local digest
     if [ $run_mode == dependencies ]; then
         # Running recipe to get dependencies
         true > "$LHELPER_ENV_PREFIX/logs/$package-dependencies"
@@ -658,11 +659,13 @@ library_install () {
         unset _lh_recipe_run
         return 0
     elif [ $run_mode == log ]; then
-        register_package "$package" "$recipe_version" "${options_a[@]}"
+        digest=$(build_env_digest)
+        register_package "$package" "$recipe_version" "${options_a[@]}" "$digest"
         return 0
+    else
+        digest=$(build_env_digest)
     fi
 
-    local digest=$(build_env_digest)
     local pu_line
     local pu_list=()
     while IFS= read -r pu_line; do
@@ -710,7 +713,7 @@ library_install () {
     set_prefix_variables "$LHELPER_ENV_PREFIX"
     local filename_list="$LHELPER_ENV_PREFIX/packages/${package}.list"
     extract_archive_reloc "${tar_package_filename}" '__LHELPER_PREFIX__' "$WIN_INSTALL_PREFIX" "$INSTALL_PREFIX" "$filename_list"
-    register_package "$package" "$recipe_version" "${options_a[@]}"
+    register_package "$package" "$recipe_version" "${options_a[@]}" "$digest"
     $message "Package \"$package\" successfully installed"
 }
 
