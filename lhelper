@@ -521,10 +521,7 @@ OS_VERSION="$(find_os_release)"
 EOF
     echo '# dependencies'
     echo 'cat << END_OF_DEPENDENCIES'
-    local line
-    for line in "${_pack_usage[@]}"; do
-        echo "$line"
-    done
+    cat "$LHELPER_ENV_PREFIX/logs/$package-usage"
     echo 'END_OF_DEPENDENCIES'
 }
 
@@ -533,14 +530,16 @@ build_env_digest () {
     local _pack_usage=()
     compute_package_list
     source "$LHELPER_ENV_PREFIX/bin/lhelper-config"
-    local digest_a=($(cat_digest | md5sum))
-    local digest="${digest_a[0]}"
 
     true > "$LHELPER_ENV_PREFIX/logs/$package-usage"
     local line
     for line in "${_pack_usage[@]}"; do
         echo "$line" >> "$LHELPER_ENV_PREFIX/logs/$package-usage"
     done
+    unset _pack_usage
+
+    local digest_a=($(cat_digest | md5sum))
+    local digest="${digest_a[0]}"
 
     if [ ! -f "$LHELPER_WORKING_DIR/digests/$digest" ]; then
         cat_digest > "$LHELPER_WORKING_DIR/digests/$digest"
