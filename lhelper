@@ -794,6 +794,57 @@ library_check_and_install () {
     library_install $mode "$@"
 }
 
+# print all the arguments but the second and the last one. Ensure no space is added
+# if there are no remaining elements after the first.
+# Needed because a package line is in the form: <package> <version> [options] <digest>
+# and we don't want the version neither the digest.
+package_of_line () {
+    join_by " " "$1" "${@:3:${#@}-3}"
+}
+
+update_installed_packages () {
+    local package_line package_requested package_installed match_found packages_keep=()
+    while IFS= read -r package_line; do
+        if [[ $package_line == *" : "* ]]; then
+            packages_keep+=("$package_line")
+            continue
+        fi
+        package_installed="$(package_of_line $package_line)"
+        match_found=no
+        for package_requested in "${packages[@]}"; do
+            if [[ $package_requested == $package_installed ]]; then
+                match_found=yes
+                break
+            fi
+        done
+        if [ $match_found == no ]; then
+            # Note the second argument is unquoted, we want to keep only the package name
+            # while "package_installed" may contain options.
+            remove_package "$LHELPER_ENV_PREFIX" $package_installed
+        else
+            packages_keep+=("$package_line")
+        fi
+    done < "$LHELPER_ENV_PREFIX/bin/lhelper-packages"
+
+    for package_line in "${packages_keep[@]}"; do echo "$package_line"; done > "$LHELPER_ENV_PREFIX/bin/lhelper-packages"
+
+    for package_requested in "${packages[@]}"; do
+        match_found=no
+        for package_line in "${packages_keep[@]}"; do
+            if [[ $package_line == *" : "* ]]; then continue; fi
+            package_installed="$(package_of_line $package_line)"
+            if [[ $package_installed == $package_requested ]]; then
+                match_found=yes
+                break
+            fi
+        done
+        if [ $match_found == no ]; then
+            # Note the second argument below needs to go unquoted.
+            library_check_and_install run $package_requested
+        fi
+    done
+}
+
 case $1 in
 install)
     if [ $# -lt 2 ]; then
@@ -957,7 +1008,14 @@ EOF
         echo "$env_source"
     elif [ -z ${create_only+x} ]; then
         echo "Starting a new shell with the new environment"
-        start_subshell
+        while true; do
+            start_subshell
+            # We consider an exit status 11 as a requst to restart the environment
+            # after a change in the build file.
+            if [ $? != 11 ]; then break; fi
+            source "$env_filename"
+            update_installed_packages
+        done
     fi
     ;;
 edit)
@@ -965,7 +1023,9 @@ edit)
         print_error_no_env
         exit 1
     fi
-    "${EDITOR-vim}" "$LHELPER_ENV_PREFIX/bin/lhelper-config"
+    "${EDITOR-vim}" "$LHELPER_ENV_PREFIX/../../../$LHELPER_ENV_NAME.lhelper"
+    # We send a SIGUSR1 to the parent process, the activated bash shell
+    kill -SIGUSR1 $(ps --pid $$ -oppid=)
     ;;
 cleanup)
     if [ -d ".lhelper/env" ]; then

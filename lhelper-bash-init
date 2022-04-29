@@ -7,3 +7,6 @@ VIRTUAL_ENV="$LHELPER_ENV_NAME"
 if [ ! -z "${PS1+x}" ]; then
     PS1="($LHELPER_ENV_NAME) $PS1"
 fi
+
+trap "echo Restarting the environment shell>&2; exit 11" SIGUSR1
+
