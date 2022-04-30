@@ -803,13 +803,9 @@ update_installed_packages () {
     local new_env_dir="$1"
     local packages_keep=() env_package_line new_package_line match_found
     while IFS= read -r env_package_line; do
-        if [[ $env_package_line == *" : "* ]]; then
-            packages_keep+=("$env_package_line")
-            continue
-        fi
         match_found=no
         while IFS= read -r new_package_line; do
-            if [[ $new_package_line == $env_package_line ]]; then
+            if [[ $new_package_line == ${env_package_line#* : } ]]; then
                 match_found=yes
                 break
             fi
@@ -817,7 +813,9 @@ update_installed_packages () {
         if [ $match_found == no ]; then
             # Note the second argument is unquoted, we want to keep only the package name
             # while "env_package_line" may contain options.
-            remove_package "$LHELPER_ENV_PREFIX" $env_package_line
+            if [[ $env_package_line != *" : "* ]]; then
+                remove_package "$LHELPER_ENV_PREFIX" $env_package_line
+            fi
         else
             packages_keep+=("$env_package_line")
         fi
@@ -828,9 +826,12 @@ update_installed_packages () {
     done > "$LHELPER_ENV_PREFIX/bin/lhelper-packages"
 
     while IFS= read -r new_package_line; do
+        if [[ $new_package_line == *" : "* ]]; then
+            continue
+        fi
         match_found=no
         for env_package_line in "${packages_keep[@]}"; do
-            if [[ $env_package_line == *" : "* || $env_package_line == $new_package_line ]]; then
+            if [[ $env_package_line == $new_package_line ]]; then
                 match_found=yes
                 break
             fi
@@ -1018,7 +1019,8 @@ EOF
         done
     else
         # points env_source to the activate script of the matching environment
-        env_source="$env_workdir/env/$matching_env/bin/activate"
+        env_prefix="$env_workdir/env/$matching_env"
+        env_source="$env_prefix/bin/activate"
         source "$env_source"
     fi
     if [ ! -z ${source_print} ]; then
