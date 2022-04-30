@@ -1024,8 +1024,9 @@ edit)
         exit 1
     fi
     "${EDITOR-vim}" "$LHELPER_ENV_PREFIX/../../../$LHELPER_ENV_NAME.lhelper"
-    # We send a SIGUSR1 to the parent process, the activated bash shell
-    kill -SIGUSR1 $(ps --pid $$ -oppid=)
+    # We send a SIGUSR1 to the parent process, the activated bash shell.
+    # The variable PPID is a builtin bash variable for the PID of the parent process.
+    kill -s SIGUSR1 $PPID
     ;;
 cleanup)
     if [ -d ".lhelper/env" ]; then
