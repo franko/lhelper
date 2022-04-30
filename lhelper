@@ -845,6 +845,58 @@ update_installed_packages () {
     done
 }
 
+# Create and activate a temporary environment in the given directory
+# and pseudo-installs the packages from local array variable "packages"
+do_temporary_env () {
+    local env_dir="$1"
+    local env_source="$env_dir/.source"
+    rm -fr "$env_dir"
+    mkdir -p "$env_dir"
+    create_env "_tmp" "$env_dir" "$env_source"
+    # run through the packages to log them in the temporary environment
+    (
+        source "$env_source"
+        for package_name in "${packages[@]}"; do
+            # Important: variable package_name can contain spaces and it must be used
+            # below *without* quotes.
+            library_check_and_install log $package_name
+        done
+    )
+}
+
+# Use the variables "matching_env" and "new_env_no" to provides
+# the matching environment found and the new environment number.
+# If no matching environment is found matching_env remains unset.
+find_matching_env () {
+    local env_workdir="$1"
+    local packages=("${@:2}")
+    local env_no
+
+    # Temporary environment creation and activation using local variable
+    # array "packages"
+    do_temporary_env "$env_workdir/tmp"
+
+    # Looking for a matching environment from the existing ones
+    mkdir -p "$env_workdir/env"
+    pushd_quiet "$env_workdir/env"
+    new_env_no=1
+    shopt -s nullglob
+    for env_no in *; do
+        if cmp -s "$env_workdir/tmp/bin/lhelper-config" "$env_no/bin/lhelper-config" &&
+            cmp -s "$env_workdir/tmp/bin/lhelper-packages" "$env_no/bin/lhelper-packages"; then
+            matching_env="$env_no"
+            break
+        fi
+        if [[ $env_no =~ ^-?[0-9]+$ && $env_no -ge "$new_env_no" ]]; then
+            new_env_no=$(($env_no + 1))
+        fi
+    done
+    popd_quiet
+
+    # create the new environment or activate the one found
+    rm -fr "$env_workdir/tmp"
+}
+
 case $1 in
 install)
     if [ $# -lt 2 ]; then
@@ -953,40 +1005,10 @@ EOF
     env_realpath="$(realpath "$env_filename")"
     env_basename="$(basename "$env_filename")"
     env_workdir="$(dirname "$env_realpath")/.lhelper"
-    env_source="$env_workdir/.env_source"
 
-    # Temporary environment creation
-    rm -fr "$env_workdir/tmp" "$env_workdir/.env_source"
-    mkdir -p "$env_workdir/tmp" "$env_workdir/env"
-    create_env "${env_basename%.lhelper}" "$env_workdir/tmp" "$env_source"
-    # run through the packages to log them in the temporary environment
-    (
-        source "$env_source"
-        for package_name in "${packages[@]}"; do
-            # Important: variable package_name can contain spaces and it must be used
-            # below *without* quotes.
-            library_check_and_install log $package_name
-        done
-    )
+    unset new_env_no matching_env
+    find_matching_env "$env_workdir" "${packages[@]}"
 
-    # Looking for a matching environment from the existing ones
-    pushd_quiet "$env_workdir/env"
-    new_env_no=1
-    shopt -s nullglob
-    for env_no in *; do
-        if cmp -s "$env_workdir/tmp/bin/lhelper-config" "$env_no/bin/lhelper-config" &&
-            cmp -s "$env_workdir/tmp/bin/lhelper-packages" "$env_no/bin/lhelper-packages"; then
-            matching_env="$env_no"
-            break
-        fi
-        if [[ $env_no =~ ^-?[0-9]+$ && $env_no -ge "$new_env_no" ]]; then
-            new_env_no=$(($env_no + 1))
-        fi
-    done
-    popd_quiet
-
-    # create the new environment or activate the one found
-    rm -fr "$env_workdir/tmp" "$env_source"
     if [ -z ${matching_env+x} ]; then
         # create a new environment
         env_prefix="$env_workdir/env/$new_env_no"
