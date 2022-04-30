@@ -14,8 +14,11 @@
 #        always true.
 # meaning: "architecture", "CPU target's name", ""gcc/clang arch name", "additional flags"
 known_cpu_spec=(
-    "x86    pentium2    pentium2         -m32,-mfpmath=sse,-msse"
-    "x86    pentium4    pentium4         -m32,-mfpmath=sse,-msse"
+    "x86    i586        i586             -m32"
+    "x86    i686        i686             -m32"
+    "x86    pentium2    pentium2         -m32"
+    "x86    pentium3    pentium3         -m32,-mfpmath=sse,-msse"
+    "x86    pentium4    pentium4         -m32,-mfpmath=sse,-msse2"
     "x86    prescott    prescott         -m32,-mfpmath=sse,-msse2"
     "x86    nehalem     nehalem          -m32,-mfpmath=sse,-msse2"
     "x86    haswell     haswell          -m32,-mfpmath=sse,-msse2"
