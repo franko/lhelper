@@ -830,9 +830,7 @@ update_installed_packages () {
     while IFS= read -r new_package_line; do
         match_found=no
         for env_package_line in "${packages_keep[@]}"; do
-            if [[ $env_package_line == *" : "* ]]; then
-                continue
-            elif [[ $env_package_line == $new_package_line ]]; then
+            if [[ $env_package_line == *" : "* || $env_package_line == $new_package_line ]]; then
                 match_found=yes
                 break
             fi
