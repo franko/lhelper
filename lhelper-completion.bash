@@ -13,10 +13,10 @@ lhcomp_package_list () {
   fi
 }
 
-lhcomp_recipes_list () {
-  lhcomp_recipes=()
-  for line in $(ls -1 "$lhcomp_dir/recipes"); do
-    lhcomp_recipes+=(${line%%_*})
+lhcomp_env_list () {
+  lhcomp_ls=()
+  for name in *.lhelper; do
+    lhcomp_ls+=("${name%.lhelper}")
   done
 }
 
@@ -28,21 +28,19 @@ _lhelper () {
   local lhcomp_workdir="$lhcomp_prefix/var/lib/lhelper"
   local lhcomp_dir="$lhcomp_prefix/share/lhelper"
 
+  local lhcomp_ls=()
   local lhcomp_packages=()
   local lhcomp_recipes=()
 
   case $COMP_CWORD in
   1)
-    COMPREPLY=($(compgen -W "activate create delete dir edit env-source install list remove update" "${COMP_WORDS[1]}"))
+    COMPREPLY=($(compgen -W "activate dir edit env-source list update" "${COMP_WORDS[1]}"))
     ;;
   2)
     case "${COMP_WORDS[1]}" in
-    activate|delete|env-source)
-      COMPREPLY=($(compgen -W "$(ls -1 "$lhcomp_workdir/environments")" "${COMP_WORDS[2]}"))
-      ;;
-    install)
-      lhcomp_recipes_list
-      COMPREPLY=($(compgen -W "${lhcomp_recipes[*]}" "${COMP_WORDS[2]}"))
+    activate | env-source)
+      lhcomp_env_list
+      COMPREPLY=($(compgen -W "${lhcomp_ls[*]}" "${COMP_WORDS[2]}"))
       ;;
     list)
       COMPREPLY=($(compgen -W "environments recipes packages files" "${COMP_WORDS[2]}"))
