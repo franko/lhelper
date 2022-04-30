@@ -734,10 +734,11 @@ print_installed_packages () {
         echo "Installed packages"
         echo
         while IFS= read -r line; do
-            if [[ "$line" == *" : "* ]]; then
-                echo "* ${line% : *} (provided by ${line#* : })"
+            local line_p="${line% *}" digest="${line##* }"
+            if [[ "$line_p" == *" : "* ]]; then
+                echo "* ${line_p% : *} [provided by ${line_p#* : } (${digest::8})]"
             else
-                echo "* $line"
+                echo "* $line_p (${digest::8})"
             fi
         done < $packages_file
         echo
