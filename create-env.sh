@@ -101,6 +101,10 @@ env_set_variables () {
             cpu_flags="-march=${line_a[2]} ${line_a[3]//,/ }"
         fi
     done
+    if [ -z ${cpu_flags+x} ]; then
+        echo "error: Unrecognized CPU type / target combination: $CPU_TYPE:$CPU_TARGET"
+        exit 1
+    fi
 }
 
 env_create_directories () {
