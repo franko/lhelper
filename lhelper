@@ -705,6 +705,14 @@ library_install () {
 
         library_dir_reloc "$LHELPER_TEMP_ROOT" "$WIN_INSTALL_PREFIX" "__LHELPER_PREFIX__"
 
+        # Sometimes on windows we get an error when running tar:
+        # tar: <some-file>: file changed as we read it
+        # so we add an artificial delay to try to avoid the problem.
+        if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* ]]; then
+            if command -v sleep &> /dev/null; then
+                sleep 1
+            fi
+        fi
         tar -C "$LHELPER_TEMP_ROOT" -czf "${tar_package_filename}" .
         mv "${tar_package_filename}" "$LHELPER_WORKING_DIR/packages"
         echo "Saved package for \"$package\""
