@@ -919,7 +919,7 @@ env-source | activate)
         source_print=yes
         package_quiet=yes
     fi
-    env_filename="$2"
+    build_filename="$2"
     shift 2
     while [ ! -z ${1+x} ]; do
         case "$1" in
@@ -941,11 +941,13 @@ env-source | activate)
         shift
     done
 
-    if [[ ! -f "$env_filename" && ! $env_filename =~ \.lhelper$ ]]; then
-        env_filename="$env_filename.lhelper"
+    if [[ ! -f "$build_filename" && ! $build_filename =~ \.lhelper$ ]]; then
+        build_filename="$build_filename.lhelper"
     fi
-    if [[ ! -z ${edit_file+x} && ! -f "$env_filename" ]]; then
-        cat << EOF > "$env_filename"
+    build_basename="$(basename "$build_filename")"
+
+    if [[ ! -z ${edit_file+x} && ! -f "$build_filename" ]]; then
+        cat << EOF > "$build_filename"
 # This is bash script sourced to get some environment variables to configure the
 # build toolchain.
 
@@ -982,14 +984,14 @@ packages=(
 EOF
     fi
     if [[ ! -z ${edit_file+x} ]]; then
-        "${EDITOR-vim}" "$env_filename"
+        "${EDITOR-vim}" "$build_filename"
     fi
-    if [ ! -f "$env_filename" ]; then
-        echo "error: the file $env_filename does not exist or is not a file"
+    if [ ! -f "$build_filename" ]; then
+        echo "error: the file $build_filename does not exist or is not a file"
         exit 1
     fi
 
-    source "$env_filename"
+    source "$build_filename"
     if [ -z ${BUILD_TYPE+x} ]; then
         BUILD_TYPE=Release
     elif [[ $BUILD_TYPE != "Release" && $BUILD_TYPE != "Debug" ]]; then
@@ -1003,8 +1005,6 @@ EOF
         exit 1
     fi
 
-    env_realpath="$(realpath "$env_filename")"
-    env_basename="$(basename "$env_filename")"
     env_workdir="$LHELPER_PREFIX/var/lhenv"
 
     unset new_env_no matching_env
@@ -1013,7 +1013,7 @@ EOF
     if [ -z ${matching_env+x} ]; then
         # create a new environment
         env_prefix="$env_workdir/$new_env_no"
-        create_env "${env_basename%.lhelper}" "$env_prefix" "$env_prefix/bin/activate"
+        create_env "${build_basename%.lhelper}" "$env_prefix" "$env_prefix/bin/activate"
         env_source="$env_prefix/bin/activate"
         # install packages, activate the environment before
         source "$env_source"
@@ -1033,13 +1033,13 @@ EOF
     elif [ -z ${create_only+x} ]; then
         echo "Starting a new shell with the new environment"
         while true; do
-            export LHELPER_BUILD_FILENAME="$env_filename"
+            export LHELPER_BUILD_FILENAME="$build_filename"
             start_subshell
             # We consider an exit status 11 as a requst to restart the environment
             # after a change in the build file.
             if [ $? != 11 ]; then break; fi
             # Source the new build file
-            source "$env_filename"
+            source "$build_filename"
             do_temporary_env "$env_workdir/tmp"
             cp "$env_workdir/tmp/bin/lhelper-config" "$env_prefix/bin/lhelper-config"
             source "$env_source"
