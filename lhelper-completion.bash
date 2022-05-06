@@ -1,8 +1,7 @@
 #!/bin/bash
 
 lhcomp_package_list () {
-  local env_prefix="$lhcomp_prefix/var/lhenv/$LHELPER_ENV_NAME"
-  local packages_file="${env_prefix}/bin/lhelper-packages"
+  local packages_file="$LHELPER_ENV_PREFIX/bin/lhelper-packages"
   lhcomp_packages=()
   if [ -s $packages_file ]; then
     while IFS= read -r line; do

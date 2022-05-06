@@ -115,11 +115,6 @@ latest_package_version () {
 
 join_by () { local IFS="$1"; shift; echo "$*"; }
 
-get_env_directory () {
-    local env_name="$1"
-    echo "$LHELPER_PREFIX/var/lhenv/$env_name"
-}
-
 # Write a package line in the form "<package-name> [options] [version]" into
 # a register file, a line for each package. If the package is already
 # in the "register" file the line is updated otherwise it is added at the
@@ -882,18 +877,19 @@ find_matching_env () {
     do_temporary_env "$env_workdir/tmp"
 
     # Looking for a matching environment from the existing ones
-    mkdir -p "$env_workdir/env"
-    pushd_quiet "$env_workdir/env"
+    pushd_quiet "$env_workdir"
     new_env_no=1
     shopt -s nullglob
     for env_no in *; do
-        if cmp -s "$env_workdir/tmp/bin/lhelper-config" "$env_no/bin/lhelper-config" &&
-            cmp -s "$env_workdir/tmp/bin/lhelper-packages" "$env_no/bin/lhelper-packages"; then
-            matching_env="$env_no"
-            break
-        fi
-        if [[ $env_no =~ ^-?[0-9]+$ && $env_no -ge "$new_env_no" ]]; then
-            new_env_no=$(($env_no + 1))
+        if [[ $env_no =~ ^[0-9]+$ ]]; then
+            if cmp -s "tmp/bin/lhelper-config" "$env_no/bin/lhelper-config" &&
+                cmp -s "tmp/bin/lhelper-packages" "$env_no/bin/lhelper-packages"; then
+                matching_env="$env_no"
+                break
+            fi
+            if [ $env_no -ge "$new_env_no" ]; then
+                new_env_no=$(($env_no + 1))
+            fi
         fi
     done
     popd_quiet
@@ -1009,14 +1005,14 @@ EOF
 
     env_realpath="$(realpath "$env_filename")"
     env_basename="$(basename "$env_filename")"
-    env_workdir="$(dirname "$env_realpath")/.lhelper"
+    env_workdir="$LHELPER_PREFIX/var/lhenv"
 
     unset new_env_no matching_env
     find_matching_env "$env_workdir"
 
     if [ -z ${matching_env+x} ]; then
         # create a new environment
-        env_prefix="$env_workdir/env/$new_env_no"
+        env_prefix="$env_workdir/$new_env_no"
         create_env "${env_basename%.lhelper}" "$env_prefix" "$env_prefix/bin/activate"
         env_source="$env_prefix/bin/activate"
         # install packages, activate the environment before
@@ -1028,7 +1024,7 @@ EOF
         done
     else
         # points env_source to the activate script of the matching environment
-        env_prefix="$env_workdir/env/$matching_env"
+        env_prefix="$env_workdir/$matching_env"
         env_source="$env_prefix/bin/activate"
         source "$env_source"
     fi
@@ -1037,6 +1033,7 @@ EOF
     elif [ -z ${create_only+x} ]; then
         echo "Starting a new shell with the new environment"
         while true; do
+            export LHELPER_BUILD_FILENAME="$env_filename"
             start_subshell
             # We consider an exit status 11 as a requst to restart the environment
             # after a change in the build file.
@@ -1057,19 +1054,15 @@ edit | reload)
         exit 1
     fi
     if [ $1 == edit ]; then
-        "${EDITOR-vim}" "$LHELPER_ENV_PREFIX/../../../$LHELPER_ENV_NAME.lhelper"
+        "${EDITOR-vim}" "$LHELPER_BUILD_FILENAME"
     fi
     # We send a SIGUSR1 to the parent process, the activated bash shell.
     # The variable PPID is a builtin bash variable for the PID of the parent process.
     kill -s SIGUSR1 $PPID
     ;;
 cleanup)
-    if [ -d ".lhelper/env" ]; then
-        echo "Cleaning up the environments cached in .lhelper/env"
-        rm -fr ".lhelper/env"
-    else
-        echo "No environments found in .lhelper directory, no files deleted"
-    fi
+    echo "Cleaning up the environments cached in $LHELPER_PREFIX/var/lhenv"
+    rm -fr "$LHELPER_PREFIX/var/lhenv/*"
     ;;
 remove)
     if [ $# -lt 2 ]; then
