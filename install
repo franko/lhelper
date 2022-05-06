@@ -81,7 +81,6 @@ mkdir -p "$DESTDIR/var/lhenv"
 mkdir -p "$DESTDIR/var/lib/lhelper/builds"
 mkdir -p "$DESTDIR/var/lib/lhelper/archives"
 mkdir -p "$DESTDIR/var/lib/lhelper/packages"
-mkdir -p "$DESTDIR/var/lib/lhelper/environments"
 mkdir -p "$DESTDIR/var/lib/lhelper/digests"
 mkdir -p "$DESTDIR/share/bash-completion/completions"
 
