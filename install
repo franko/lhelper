@@ -83,12 +83,21 @@ mkdir -p "$DESTDIR/var/lib/lhelper/archives"
 mkdir -p "$DESTDIR/var/lib/lhelper/packages"
 mkdir -p "$DESTDIR/var/lib/lhelper/environments"
 mkdir -p "$DESTDIR/var/lib/lhelper/digests"
+mkdir -p "$DESTDIR/share/bash-completion/completions"
 
 cp build-helper.sh "$DESTDIR/share/lhelper"
 cp create-env.sh "$DESTDIR/share/lhelper"
 cp lhelper-bash-init "$DESTDIR/share/lhelper"
 cp patch/*.patch "$DESTDIR/share/lhelper/patch"
 cp lhelper "$DESTDIR/bin"
+
+# warning: if DESTDIR is ~/.local, /usr, /usr/local the completion are going
+# to work but for other prefix they may not work.
+# Bash will use:
+#   $HOME/.local/share/bash-completion/completions
+#   $XDG_DATA_HOME/bash-completion/completions
+#   $BASH_COMPLETION_USER_DIR/completions
+cp lhelper-completion.bash "$DESTDIR/share/bash-completion/completions/lhelper"
 
 if [ -d "$recipes_dir" ]; then
 	echo "Deleting existing recipes dir: $recipes_dir"
