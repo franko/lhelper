@@ -667,6 +667,7 @@ library_install () {
     if [ $run_mode == dependencies ]; then
         # Running recipe to get dependencies
         true > "$LHELPER_ENV_PREFIX/logs/$package-dependencies"
+        true > "$LHELPER_ENV_PREFIX/logs/$package-provides"
         BASH_ENV="$LHELPER_DIR/build-helper.sh" bash -e "${recipe_dir}/${recipe_filename}" "${options_a[@]}" 2> "$log_dirname/deps-$package-stderr.log" 1> "$log_dirname/deps-$package-stdout.log"
         check_dependencies
         unset _lh_recipe_run
