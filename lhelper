@@ -23,6 +23,19 @@ fi
 pushd_quiet () { builtin pushd "$@" > /dev/null; }
 popd_quiet () { builtin popd > /dev/null; }
 
+fs_security_delay () {
+    # Sometimes on windows we get an error when running tar:
+    # tar: <some-file>: file changed as we read it
+    # so we add an artificial delay to try to avoid the problem.
+    if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* ]]; then
+        if command -v sleep &> /dev/null; then
+            sleep 1
+        else
+            ls &> /dev/null
+        fi
+    fi
+}
+
 find_os_release () {
     local uname_out
     uname_out="$(uname -s)"
@@ -406,6 +419,12 @@ test_package_spec () {
     fi
 }
 
+lib_install_msg () {
+    if [ "$lib_install_mode" == verbose ]; then
+        echo "$@"
+    fi
+}
+
 # fill the _missing array variable
 check_dependencies () {
     local cd_package cd_dependency cd_package_found
@@ -440,8 +459,7 @@ check_dependencies () {
                 echo "Error: Invalid package spec: \"$cd_dependency\""
                 exit 1
                 ;;
-            *)
-                $message "Package $cd_package is already installed"
+            # otherwise package is already installed: do nothing
             esac
         elif system_library_version "$cd_package" &> /dev/null; then
             cd_package_found="$name $(system_library_version "$cd_package")"
@@ -449,7 +467,7 @@ check_dependencies () {
                 echo "Error: incompatible version for system library $name."
                 exit 1
             fi
-            $message "Using system library for $cd_package."
+            # Using system library
         else
             _missing+=("$cd_dependency")
         fi
@@ -626,14 +644,14 @@ library_install () {
 
     if [ $run_mode == run ]; then
         if [[ ${#options_a[@]} -eq 0 ]]; then
-            $message "Using recipe version ${recipe_version}"
+            lib_install_msg "Using recipe version ${recipe_version}"
         else
-            $message "Using recipe version ${recipe_version} with options: ${options_a[*]}"
+            lib_install_msg "Using recipe version ${recipe_version} with options: ${options_a[*]}"
         fi
 
         if package_is_installed "$LHELPER_ENV_PREFIX" "$package"; then
             remove_package "$LHELPER_ENV_PREFIX" "$package"
-            $message "Removed previously installed package \"$package\""
+            lib_install_msg "Removed previously installed package \"$package\""
         fi
     fi
 
@@ -667,22 +685,24 @@ library_install () {
         pu_list+=("$pu_line")
     done < "$LHELPER_ENV_PREFIX/logs/$package-usage"
     rm "$LHELPER_ENV_PREFIX/logs/$package-usage"
-    if [[ ${#pu_list[@]} -gt 0 ]]; then
-        $message "The package dependencies are:"; echo
-        for pu_line in "${pu_list[@]}"; do
-            $message "* $pu_line"
-        done
-        $message
-    else
-        $message "The package has no dependencies."
+    if [ ! -z ${show_dependencies+x} ]; then
+        if [[ ${#pu_list[@]} -gt 0 ]]; then
+            lib_install_msg "The package dependencies are:"; echo
+            for pu_line in "${pu_list[@]}"; do
+                lib_install_msg "* $pu_line"
+            done
+            lib_install_msg
+        else
+            lib_install_msg "The package has no dependencies."
+        fi
     fi
 
     local tar_package_filename="${package}${options_tag}_${recipe_version}_${digest}.tar.gz"
     if [[ -z ${rebuild+set} && -z ${local_recipe+set} && "$version" != "git-"* && -f "$LHELPER_WORKING_DIR/packages/${tar_package_filename}" ]]; then
-        $message "Found an existing package"
+        lib_install_msg "Found an existing package"
     else
         prepare_temp_dir "$LHELPER_WORKING_DIR"
-        $message "Building library..."
+        lib_install_msg "Building library..."
         # Execute the recipe
         BASH_ENV="$LHELPER_DIR/build-helper.sh" bash -e "${recipe_dir}/${recipe_filename}" "${options_a[@]}" 2> "$log_dirname/$package-stderr.log" 1> "$log_dirname/$package-stdout.log"
         if [ $? -ne 0 ]; then
@@ -696,18 +716,11 @@ library_install () {
             exit 1
         fi
         fix_pkgconfig_install
-        $message "done"
+        lib_install_msg "done"
 
         library_dir_reloc "$LHELPER_TEMP_ROOT" "$WIN_INSTALL_PREFIX" "__LHELPER_PREFIX__"
 
-        # Sometimes on windows we get an error when running tar:
-        # tar: <some-file>: file changed as we read it
-        # so we add an artificial delay to try to avoid the problem.
-        if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* ]]; then
-            if command -v sleep &> /dev/null; then
-                sleep 1
-            fi
-        fi
+        fs_security_delay
         tar -C "$LHELPER_TEMP_ROOT" -czf "${tar_package_filename}" .
         mv "${tar_package_filename}" "$LHELPER_WORKING_DIR/packages"
         echo "Saved package for \"$package\""
@@ -717,7 +730,7 @@ library_install () {
     local filename_list="$LHELPER_ENV_PREFIX/packages/${package}.list"
     extract_archive_reloc "${tar_package_filename}" '__LHELPER_PREFIX__' "$WIN_INSTALL_PREFIX" "$INSTALL_PREFIX" "$filename_list"
     register_package "$package" "$recipe_version" "${options_a[@]}" "$digest"
-    $message "Package \"$package\" successfully installed"
+    lib_install_msg "Package \"$package\" successfully installed"
 }
 
 library_remove () {
@@ -774,26 +787,19 @@ library_check_and_install () {
     local mode=$1
     shift
 
-    local message
-    if [ -z ${package_quiet} ]; then
-        message=echo
-    else
-        message=true
-    fi
-
     local _missing=()
     # get dependencies
     library_install dependencies "$@"
     if [[ ${#_missing[@]} -ne 0 ]]; then
-        $message "Found missing packages:"; echo
+        lib_install_msg "Found missing packages:"; echo
         for line in "${_missing[@]}"; do
-            $message "- $line"
+            lib_install_msg "- $line"
         done
-        $message; $message "The package $1 cannot be installed due to missing dependencies."
+        lib_install_msg; lib_install_msg "The package $1 cannot be installed due to missing dependencies."
         exit 1
     fi
     if [ $mode == run ]; then
-        $message "Installing the requested package: $@"
+        lib_install_msg "Installing the requested package: $@"
     fi
     library_install $mode "$@"
 }
@@ -805,51 +811,66 @@ package_of_line () {
 
 update_installed_packages () {
     local new_env_dir="$1"
-    local packages_keep=() env_package_line new_package_line match_found
-    while IFS= read -r env_package_line; do
-        match_found=no
-        while IFS= read -r new_package_line; do
-            if [[ $new_package_line == ${env_package_line#* : } ]]; then
-                match_found=yes
-                break
-            fi
-        done < "$new_env_dir/bin/lhelper-packages"
-        if [ $match_found == no ]; then
-            # Note the second argument is unquoted, we want to keep only the package name
-            # while "env_package_line" may contain options.
-            if [[ $env_package_line != *" : "* ]]; then
-                remove_package "$LHELPER_ENV_PREFIX" $env_package_line
-            fi
+
+    # Below old_list is the list of the currently installed packages while new_list
+    # is the list we want to have.
+    # We proceed to remove or install packages so that we match the "new_list" of
+    # installed packages.
+    local old_list=() new_list=() ll
+    while IFS= read -r ll; do old_list+=("$ll"); done < "$LHELPER_ENV_PREFIX/bin/lhelper-packages"
+    while IFS= read -r ll; do new_list+=("$ll"); done < "$new_env_dir/bin/lhelper-packages"
+
+    fs_security_delay
+    # truncate the lhelper-packages file
+    true > "$LHELPER_ENV_PREFIX/bin/lhelper-packages"
+
+    local package_line i=0 j=0 n=${#new_list[@]} m=${#old_list[@]} k found
+    while [[ $i -lt $n ]]; do
+        # in the condition below $j may be out of bounds but that's fine.
+        if [[ ${new_list[$i]} == ${old_list[$j]} ]]; then
+            # lines match: write the line in lhelper-packages and move on
+            echo "${new_list[$i]}" >> "$LHELPER_ENV_PREFIX/bin/lhelper-packages"
+            i=$(( $i + 1 ))
+            j=$(( $j + 1 ))
         else
-            packages_keep+=("$env_package_line")
-        fi
-    done < "$LHELPER_ENV_PREFIX/bin/lhelper-packages"
-
-    for env_package_line in "${packages_keep[@]}"; do
-        echo "$env_package_line"
-    done > "$LHELPER_ENV_PREFIX/bin/lhelper-packages"
-
-    while IFS= read -r new_package_line; do
-        if [[ $new_package_line == *" : "* ]]; then
-            continue
-        fi
-        match_found=no
-        for env_package_line in "${packages_keep[@]}"; do
-            if [[ $env_package_line != *" : "* && $env_package_line == $new_package_line ]]; then
-                match_found=yes
-                break
+            # entries do not match: let's see if the entry in new_list is present
+            # is old_list but later
+            k=$(( $j + 1 ))
+            found=no
+            while [[ $k -lt $m ]]; do
+                if [[ ${new_list[$i]} == ${old_list[$k]} ]]; then
+                    found=yes
+                    break
+                fi
+                k=$(( $k + 1 ))
+            done
+            if [ $found == yes ]; then
+                # the new_list entry is found: remove all the old_list entries up to
+                # the one that match the new_list entry
+                while [[ $j -lt $k ]]; do
+                    if [[ ${old_list[$j]} != *" : "* ]]; then
+                        remove_package "$LHELPER_ENV_PREFIX" ${old_list[$j]}
+                    fi
+                    j=$(( $j + 1 ))
+                done
+            else
+                # The new_list entry is not found: install it in the new environment.
+                # NOTE: it will add one or more new lines in the lhelper-packages file.
+                # It will be more than one if the packages "provides" some virtual packages.
+                if [[ ${new_list[$i]} != *" : "* ]]; then
+                    library_check_and_install run $(package_of_line ${new_list[$i]})
+                fi
+                i=$(( $i + 1 ))
             fi
-        done
-        if [ $match_found == no ]; then
-            # Note the second argument below needs to go unquoted.
-            library_check_and_install run $(package_of_line $new_package_line)
         fi
-    done < "$new_env_dir/bin/lhelper-packages"
+    done
 }
 
 # Create and activate a temporary environment in the given directory
 # and pseudo-installs the packages from the array variable "packages"
 do_temporary_env () {
+    local prev_mode="$lib_install_mode"
+    lib_install_mode=quiet
     local env_dir="$1"
     local env_source="$env_dir/.source"
     rm -fr "$env_dir"
@@ -864,6 +885,7 @@ do_temporary_env () {
             library_check_and_install log $package_name
         done
     )
+    lib_install_mode="$prev_mode"
 }
 
 # Use the variables "matching_env" and "new_env_no" to provides
@@ -898,26 +920,18 @@ find_matching_env () {
     rm -fr "$env_workdir/tmp"
 }
 
-case $1 in
-install)
-    if [ $# -lt 2 ]; then
-        echo "Usage: $LHELPER_COMMAND_NAME install <library-name> [version]"
-        exit 1
-    fi
-    if [ -z ${LHELPER_ENV_NAME+x} ]; then
-        print_error_no_env
-        exit 1
-    fi
-    library_check_and_install run "${@:2}"
-    ;;
-env-source | activate)
+activate_command () {
     if [[ $# -lt 2 || $2 == "-"* ]]; then
         echo "Usage: $LHELPER_COMMAND_NAME activate <spec-filename> [options]"
         exit 1
     fi
+
+    local source_print lib_install_mode build_filename edit_file create_only show_dependencies
     if [ $1 == env-source ]; then
         source_print=yes
-        package_quiet=yes
+        lib_install_mode=quiet
+    else
+        lib_install_mode=verbose
     fi
     build_filename="$2"
     shift 2
@@ -928,6 +942,9 @@ env-source | activate)
             ;;
         -n | --create-only)
             create_only=yes
+            ;;
+        --show-dependencies)
+            show_dependencies=yes
             ;;
         -*)
             echo "error: unknown option $1"
@@ -941,6 +958,7 @@ env-source | activate)
         shift
     done
 
+    local build_basename
     if [[ ! -f "$build_filename" && ! $build_filename =~ \.lhelper$ ]]; then
         build_filename="$build_filename.lhelper"
     fi
@@ -1005,9 +1023,9 @@ EOF
         exit 1
     fi
 
-    env_workdir="$LHELPER_PREFIX/var/lhenv"
+    local env_workdir="$LHELPER_PREFIX/var/lhenv"
 
-    unset new_env_no matching_env
+    local new_env_no matching_env env_prefix env_source
     find_matching_env "$env_workdir"
 
     if [ -z ${matching_env+x} ]; then
@@ -1047,6 +1065,43 @@ EOF
             rm -fr "$env_workdir/tmp"
         done
     fi
+}
+
+update_command () {
+    local branch_name
+    if [ "$2" == recipes ]; then
+        pushd_quiet "${LHELPER_DIR}/recipes"
+        echo "Updating recipes"
+        branch_name="$(git rev-parse --abbrev-ref HEAD)"
+        git fetch origin "$branch_name"
+        git checkout -q -f "$branch_name"
+        git reset --hard "origin/$branch_name"
+        popd_quiet
+    else
+        echo "Usage: $LHELPER_COMMAND_NAME update recipes"
+        exit 1
+    fi
+}
+
+install_command () {
+    if [ $# -lt 2 ]; then
+        echo "Usage: $LHELPER_COMMAND_NAME install <library-name> [version]"
+        exit 1
+    fi
+    if [ -z ${LHELPER_ENV_NAME+x} ]; then
+        print_error_no_env
+        exit 1
+    fi
+    local lib_install_mode=verbose
+    library_check_and_install run "${@:2}"
+}
+
+case $1 in
+install)
+    install_command "$@"
+    ;;
+env-source | activate)
+    activate_command "$@"
     ;;
 edit | reload)
     if [ -z ${LHELPER_ENV_NAME+x} ]; then
@@ -1103,18 +1158,7 @@ dir)
     echo "${LHELPER_ENV_PREFIX}"
     ;;
 update)
-    if [ "$2" == recipes ]; then
-        pushd_quiet "${LHELPER_DIR}/recipes"
-        echo "Updating recipes"
-        _branch_name="$(git rev-parse --abbrev-ref HEAD)"
-        git fetch origin "$_branch_name"
-        git checkout -q -f "$_branch_name"
-        git reset --hard "origin/$_branch_name"
-        popd_quiet
-    else
-        echo "Usage: $LHELPER_COMMAND_NAME update recipes"
-        exit 1
-    fi
+    update_command "$@"
     ;;
 *)
     echo "error: unknown command $1"
