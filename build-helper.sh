@@ -13,8 +13,14 @@ interrupt_clean_archive () {
     if [ -n "${current_download}" ]; then
         echo "Cleaning up directory or file \"$current_download\""
         rm -fr "$current_download"
-        exit 1
+        # script interrupted
+        exit 4
     fi
+}
+
+clean_and_exit_download_error () {
+    if [ -n "$current_download" ]; then rm -fr "$current_download"; fi
+    exit 5
 }
 
 expand_enter_archive_filename () {
@@ -26,9 +32,9 @@ expand_enter_archive_filename () {
     local tmp_expand_dir=".sas"
     rm -fr "$tmp_expand_dir" && mkdir "$tmp_expand_dir" && pushd "$tmp_expand_dir"
     if [[ $filename =~ ".tar."* || $filename =~ ".tgz" ]]; then
-        tar xf "$path_filename"
+        tar xf "$path_filename" || { echo "Got invalid archive: $basename" >&2; exit 5; }
     elif [[ $filename =~ ".zip" ]]; then
-        unzip "$path_filename"
+        unzip "$path_filename" || { echo "Got invalid archive: $basename" >&2; exit 5; }
     else
         echo "error: unknown archive format: \"${filename}\""
         exit 1
@@ -42,12 +48,12 @@ expand_enter_archive_filename () {
         topdir="${xdir%/}"
     done
     if [ -z {topdir+x} ]; then
-        echo "error: empty erchive $filename from $url"
-        exit 1
+        echo "error: empty erchive $filename from $url" >&2
+        exit 5
     fi
     if [ ! -d "${topdir}" ]; then
-        echo "error: no directory found in the archive"
-        exit 1
+        echo "error: no directory found in the archive" >&2
+        exit 5
     fi
     if [ $topdir == "." ]; then
         topdir="${filename%%.*}"
@@ -85,20 +91,22 @@ enter_git_repository () {
         # networks.
         local git_try_count=1
         while [ $git_try_count -lt 3 ]; do
-          git clone --depth 1 --branch "$repo_tag" "$repo_url" "${repo_name_short}-${repo_tag}"
-          if [ $? -eq 0 ]; then
+          git clone --depth 1 --branch "$repo_tag" "$repo_url" "${repo_name_short}-${repo_tag}" && {
             break
-          fi
+          }
           git_try_count=$(($git_try_count + 1))
           sleep 2
         done
-        if [ $? -ne 0 ]; then
-            interrupt_clean_archive
+        if [ $git_try_count -ge 3 ]; then
+            clean_and_exit_download_error
         fi
 
         trap INT
         rm -fr "${repo_name_short}-${repo_tag}/.git"*
-        tar czf "${archive_filename}" "${repo_name_short}-${repo_tag}"
+        tar czf "${archive_filename}" "${repo_name_short}-${repo_tag}" || {
+            echo "Got invalid archive: $basename" >&2
+            exit 5
+        }
         mv "${archive_filename}" "$LHELPER_WORKING_DIR/archives"
         echo "create archive ${archive_filename} in $LHELPER_WORKING_DIR/archives"
         popd
@@ -117,7 +125,8 @@ enter_archive () {
         current_download="$LHELPER_WORKING_DIR/archives/$filename"
         trap interrupt_clean_archive INT
 	    # The option --insecure is used to ignore SSL certificate issues.
-        curl --retry 5 --retry-delay 2 --insecure -L "$url" -o "$LHELPER_WORKING_DIR/archives/$filename" || interrupt_clean_archive
+	    # The option --fail let the command fail if the response is a 404.
+        curl --fail --retry 5 --retry-delay 2 --insecure -L "$url" -o "$LHELPER_WORKING_DIR/archives/$filename" || clean_and_exit_download_error
         trap INT
     fi
     rm -fr "$LHELPER_WORKING_DIR/builds/"*
@@ -145,7 +154,8 @@ check_commands () {
     # The "command" variable below may contain some arguments so we keep only the
     # initial word, the command, without arguments.
     for command in "$@"; do
-        type "${command%% *}" > /dev/null 2>&1 || { echo >&2 "error: command \"${command}\" is required but it's not available"; exit 1; }
+        # Using exit code 3 to signal a missing command
+        type "${command%% *}" > /dev/null 2>&1 || { echo >&2 "error: command \"${command}\" is required but it's not available"; exit 3; }
     done
 }
 
@@ -260,8 +270,14 @@ build_and_install () {
         # quotes. Otherwise it will be passed as a big string without breaking
         # on spaces.
         echo "Using cmake command: " cmake -G "$cmake_gen" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" $processed_options ..
-        cmake -G "$cmake_gen" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" $processed_options ..
-        cmake --build .
+        cmake -G "$cmake_gen" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" $processed_options .. || {
+            echo "error: while running cmake config" >&2
+            exit 6
+        }
+        cmake --build . || {
+            echo "error: while running cmake build" >&2
+            exit 6
+        }
         cmake --build . --target install
         popd_quiet
         ;;
@@ -270,8 +286,14 @@ build_and_install () {
         mkdir build
         pushd_quiet build
         echo "Using meson command: " meson --prefix="$INSTALL_PREFIX" --buildtype="${BUILD_TYPE,,}" $processed_options ..
-        meson --prefix="$INSTALL_PREFIX" --buildtype="${BUILD_TYPE,,}" $processed_options ..
-        meson compile
+        meson --prefix="$INSTALL_PREFIX" --buildtype="${BUILD_TYPE,,}" $processed_options .. || {
+            echo "error: while running meson config" >&2
+            exit 6
+        }
+        meson compile || {
+            echo "error: while running meson build" >&2
+            exit 6
+        }
         meson install
         popd_quiet
         ;;
@@ -279,7 +301,10 @@ build_and_install () {
         processed_options="$(configure_options "${@:2}")"
         add_build_type_compiler_flags "$BUILD_TYPE"
         echo "Using configure command: " configure --prefix="$WIN_INSTALL_PREFIX" $processed_options
-        ./configure --prefix="$WIN_INSTALL_PREFIX" $processed_options
+        ./configure --prefix="$WIN_INSTALL_PREFIX" $processed_options || {
+            echo "error: while running configure script" >&2
+            exit 6
+        }
         local make_options=()
         if command -v nproc; then
             local cpu_cores="$(nproc --all)"
@@ -287,7 +312,10 @@ build_and_install () {
                 make_options+=(-j$cpu_cores)
             fi
         fi
-        make "${make_options[@]}"
+        make "${make_options[@]}" || {
+            echo "error: while running make build" >&2
+            exit 6
+        }
         make install
         ;;
     *)

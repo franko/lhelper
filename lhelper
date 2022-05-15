@@ -706,7 +706,28 @@ library_install () {
         lib_install_msg "Building library..."
         # Execute the recipe
         BASH_ENV="$LHELPER_DIR/build-helper.sh" bash -e "${recipe_dir}/${recipe_filename}" "${options_a[@]}" 2> "$log_dirname/$package-stderr.log" 1> "$log_dirname/$package-stdout.log"
-        if [ $? -ne 0 ]; then
+        case $? in
+        0) ;;
+        3)
+            echo "Some of the required commands for $package is missing:"; echo
+            cat "$log_dirname/$package-stderr.log"
+            exit 1
+            ;;
+        4)
+            echo "error: package install was interruped."
+            exit 1
+            ;;
+        5)
+            echo "Error downloading the source code for $package:"; echo
+            cat "$log_dirname/$package-stderr.log"
+            exit 1
+            ;;
+        6)
+            echo "Error while building the source code for $package:"; echo
+            cat "$log_dirname/$package-stderr.log"
+            exit 1
+            ;;
+        *)
             echo "error: building library \"$package\""
             echo "    You may inspect the log files:"
             echo
@@ -715,7 +736,8 @@ library_install () {
             echo
             echo "    located in the directory $log_dirname"
             exit 1
-        fi
+            ;;
+        esac
         fix_pkgconfig_install
         lib_install_msg "done"
 
