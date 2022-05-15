@@ -805,9 +805,12 @@ library_check_and_install () {
     library_install $mode "$@"
 }
 
-# print all the arguments except the last one
+# Modify a package line so that it can be passed to library_check_and_install
+# to install the same package.
+# Remove the recipe version number after "+" in the 2nd argument and discard
+# the last argument, which is the digest of the package.
 package_of_line () {
-    join_by " " "${@:1:${#@}-1}"
+    join_by " " "$1" "${2%+*}" "${@:3:${#@}-3}"
 }
 
 update_installed_packages () {
