@@ -23,6 +23,12 @@ clean_and_exit_download_error () {
     exit 5
 }
 
+enter_dummy_build_dir () {
+    rm -fr "$1/.tmp"
+    mkdir "$1/.tmp"
+    cd "$1/.tmp"
+}
+
 expand_enter_archive_filename () {
     echo "expand_enter_archive_filename: $1 $2"
     local path_filename="$1"
@@ -72,7 +78,10 @@ expand_enter_archive_filename () {
 # $1 = repository remote URL
 # $2 = branch or tag to use
 enter_git_repository () {
-    if [[ "${_lh_recipe_run}" == "dependencies" ]]; then return 0; fi
+    if [[ "${_lh_recipe_run}" == "dependencies" ]]; then
+        enter_dummy_build_dir "$LHELPER_WORKING_DIR/builds"
+        return 0
+    fi
     local repo_url="$1"
     local repo_tag="$2"
     local repo_name="${repo_url##*/}"
@@ -117,7 +126,10 @@ enter_git_repository () {
 
 # $1 = remote URL
 enter_archive () {
-    if [[ "${_lh_recipe_run}" == "dependencies" ]]; then return 0; fi
+    if [[ "${_lh_recipe_run}" == "dependencies" ]]; then
+        enter_dummy_build_dir "$LHELPER_WORKING_DIR/builds"
+        return 0
+    fi
     local url="$1"
     local filename="${url##*/}"
     # FIXME: possible collisions in the filename, take the url into account
@@ -144,6 +156,7 @@ inside_archive_apply_patch () {
 }
 
 install_pkgconfig_file () {
+    if [[ "${_lh_recipe_run}" == "dependencies" ]]; then return 0; fi
     echo "Installing \"$1\" in \"${INSTALL_PREFIX}/$LHELPER_PKGCONFIG_RPATH\""
     mkdir -p "${INSTALL_PREFIX}/$LHELPER_PKGCONFIG_RPATH"
     cp "$1" "${INSTALL_PREFIX}/$LHELPER_PKGCONFIG_RPATH"
