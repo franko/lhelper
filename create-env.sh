@@ -157,7 +157,7 @@ env_create_source_file () {
     local ldpath=$(printf_join ":\$prefix/%s" "${libdir_array[@]}")
 
 cat << EOF > "$target"
-prefix="$prefix"
+prefix="\$(realpath "$prefix")"
 export PATH="\$prefix/bin\${PATH:+:}\$PATH"
 
 export LD_LIBRARY_PATH="$ldpath\${LD_LIBRARY_PATH:+:}\$LD_LIBRARY_PATH"
@@ -170,6 +170,7 @@ fi
 export CMAKE_PREFIX_PATH="\$prefix"
 export LHELPER_LIBDIR="$libdir"
 export LHELPER_PKGCONFIG_RPATH="$pkgconfig_reldir"
+export LHELPER_ENV_ROOT="\$(realpath .)"
 export LHELPER_ENV_PREFIX="\$prefix"
 export LHELPER_ENV_NAME="$env_name"
 

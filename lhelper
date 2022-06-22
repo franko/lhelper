@@ -918,11 +918,11 @@ do_temporary_env () {
 # the matching environment found and the new environment number.
 # If no matching environment is found matching_env remains unset.
 find_matching_env () {
-    local env_workdir="$1" env_no
+    local env_workdir="$1" tmp_workdir="$2" env_no
 
     # Temporary environment creation and activation using local variable
     # array "packages"
-    do_temporary_env "$env_workdir/tmp"
+    do_temporary_env "$tmp_workdir"
 
     # Looking for a matching environment from the existing ones
     pushd_quiet "$env_workdir"
@@ -930,8 +930,8 @@ find_matching_env () {
     shopt -s nullglob
     for env_no in *; do
         if [[ $env_no =~ ^[0-9]+$ ]]; then
-            if cmp -s "tmp/bin/lhelper-config" "$env_no/bin/lhelper-config" &&
-                cmp -s "tmp/bin/lhelper-packages" "$env_no/bin/lhelper-packages"; then
+            if cmp -s "$tmp_workdir/bin/lhelper-config" "$env_no/bin/lhelper-config" &&
+                cmp -s "$tmp_workdir/bin/lhelper-packages" "$env_no/bin/lhelper-packages"; then
                 matching_env="$env_no"
                 break
             fi
@@ -942,8 +942,7 @@ find_matching_env () {
     done
     popd_quiet
 
-    # create the new environment or activate the one found
-    rm -fr "$env_workdir/tmp"
+    rm -fr "$tmp_workdir"
 }
 
 activate_command () {
@@ -1021,10 +1020,9 @@ BUILD_TYPE=Release
 
 # List of libraries to be installed. Can contain options by quoting the a string with
 # the libray name and its option followed by spaces.
-packages=(
-#   "freetype2"
-#   "sdl2 -opengl"
-)
+# For example:
+# packages=("freetype2"  "sdl2 -opengl")
+packages=()
 EOF
     fi
     if [[ ! -z ${edit_file+x} ]]; then
@@ -1049,14 +1047,29 @@ EOF
         exit 1
     fi
 
-    local env_workdir="$LHELPER_PREFIX/var/lhenv"
+    local build_realpath="$(realpath "$build_filename")"
+    local env_rel_workdir=".lhelper/env" tmp_rel_workdir=".lhelper/tmp"
+    local env_workdir="$(dirname "$build_realpath")/$env_rel_workdir"
+    local tmp_workdir="$(dirname "$build_realpath")/$tmp_rel_workdir"
+    if [ ! -d "$env_workdir" ]; then
+        mkdir -p "$env_workdir" || {
+            echo "error: cannot create local environment directory: $env_workdir"
+            exit 1
+        }
+    fi
 
     local new_env_no matching_env env_prefix env_source
-    find_matching_env "$env_workdir"
+    find_matching_env "$env_workdir" "$tmp_workdir"
 
     if [ -z ${matching_env+x} ]; then
         # create a new environment
-        env_prefix="$env_workdir/$new_env_no"
+        # IMPORTANT: env_prefix below, passed to the function create_env, must be set to the
+        # relative environment workdir, not the absolute one.
+        # The function create_env will create a relocatable config without hard-coding the
+        # full path.
+        # The variables LHELPER_ENV_PREFIX / ROOT are resolved to a full path but only when
+        # the environment is actually activated.
+        env_prefix="$env_rel_workdir/$new_env_no"
         create_env "${build_basename%.lhelper}" "$env_prefix" "$env_prefix/bin/activate"
         env_source="$env_prefix/bin/activate"
         # install packages, activate the environment before
@@ -1068,7 +1081,7 @@ EOF
         done
     else
         # points env_source to the activate script of the matching environment
-        env_prefix="$env_workdir/$matching_env"
+        env_prefix="$env_rel_workdir/$matching_env"
         env_source="$env_prefix/bin/activate"
         source "$env_source"
     fi
@@ -1077,18 +1090,17 @@ EOF
     elif [ -z ${create_only+x} ]; then
         echo "Starting a new shell with the new environment"
         while true; do
-            export LHELPER_BUILD_FILENAME="$build_filename"
             start_subshell
-            # We consider an exit status 11 as a requst to restart the environment
+            # We consider an exit status 11 as a request to restart the environment
             # after a change in the build file.
             if [ $? != 11 ]; then break; fi
             # Source the new build file
             source "$build_filename"
-            do_temporary_env "$env_workdir/tmp"
-            cp "$env_workdir/tmp/bin/lhelper-config" "$env_prefix/bin/lhelper-config"
+            do_temporary_env "$tmp_workdir"
+            cp "$tmp_workdir/bin/lhelper-config" "$env_prefix/bin/lhelper-config"
             source "$env_source"
-            update_installed_packages "$env_workdir/tmp"
-            rm -fr "$env_workdir/tmp"
+            update_installed_packages "$tmp_workdir"
+            rm -fr "$tmp_workdir"
         done
     fi
 }
@@ -1135,15 +1147,15 @@ edit | reload)
         exit 1
     fi
     if [ $1 == edit ]; then
-        "${EDITOR-vim}" "$LHELPER_BUILD_FILENAME"
+        "${EDITOR-vim}" "$LHELPER_ENV_ROOT/$LHELPER_ENV_NAME.lhelper"
     fi
     # We send a SIGUSR1 to the parent process, the activated bash shell.
     # The variable PPID is a builtin bash variable for the PID of the parent process.
     kill -s SIGUSR1 $PPID
     ;;
 cleanup)
-    echo "Cleaning up the environments cached in $LHELPER_PREFIX/var/lhenv"
-    rm -fr "$LHELPER_PREFIX/var/lhenv/*"
+    echo "Cleaning up the environments cached in $LHELPER_ENV_ROOT/env"
+    rm -fr "$LHELPER_ENV_ROOT/env/*"
     ;;
 remove)
     if [ $# -lt 2 ]; then
