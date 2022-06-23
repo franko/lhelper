@@ -61,16 +61,15 @@ recipes_dir="$DESTDIR/share/lhelper/recipes"
 lhcomp="$(find_compiler)"
 
 pushd_quiet src
-echo "compiling lh-path-replace"
-lhcompile lh-path-replace lh-path-replace.c
-echo "compiling lh-sort"
-lhcompile lh-sort lh-sort.c
-if [ $? -ne 0 ]; then
-    echo "error: cannot compile helper tool lh-path-replace"
-    exit 1
-fi
-cp lh-path-replace "$DESTDIR/bin"
-cp lh-sort "$DESTDIR/bin"
+for modname in path-replace sort cmp; do
+    echo "compiling lh-$modname"
+    lhcompile lh-$modname lh-$modname.c
+    if [ $? -ne 0 ]; then
+        echo "error: cannot compile helper tool lh-$modname"
+        exit 1
+    fi
+    cp lh-$modname "$DESTDIR/bin"
+done
 popd_quiet
 
 echo "Installing lhelper with prefix $DESTDIR"

@@ -938,7 +938,7 @@ load_matching_env () {
     do_temporary_env "$tmp_workdir"
 
     if [ -d "$env_workdir/$env_name" ] &&
-        cmp -s "$tmp_workdir/bin/lhelper-config" "$env_workdir/$env_name/bin/lhelper-config"; then
+        lh-cmp "$tmp_workdir/bin/lhelper-config" "$env_workdir/$env_name/bin/lhelper-config"; then
         source "$env_source"
         update_installed_packages "$tmp_workdir"
         rm -fr "$tmp_workdir"
