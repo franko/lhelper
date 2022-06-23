@@ -835,6 +835,8 @@ package_of_line () {
     join_by " " "$1" "${2%+*}" "${@:3:${#@}-3}"
 }
 
+# Update list of packages on the currently activated environment to match the
+# temporary environment whose env dir is given as the first argument.
 update_installed_packages () {
     local new_env_dir="$1"
 
@@ -914,35 +916,30 @@ do_temporary_env () {
     lib_install_mode="$prev_mode"
 }
 
-# Use the variables "matching_env" and "new_env_no" to provides
-# the matching environment found and the new environment number.
-# If no matching environment is found matching_env remains unset.
-find_matching_env () {
-    local env_workdir="$1" tmp_workdir="$2" env_no
+# Load the environment if the given name only if its config matches.
+# It the config matches return 0 or 1 otherwise.
+# In any case set the local varaibles env_prefix and env_source.
+load_matching_env () {
+    local env_name="$1" env_workdir="$2" tmp_workdir="$3"
+
+    # env_prefix and env_source below are local variables defined in the calling function
+    env_prefix="$env_workdir/$env_name"
+    env_source="$env_prefix/bin/activate"
 
     # Temporary environment creation and activation using local variable
     # array "packages"
     do_temporary_env "$tmp_workdir"
 
-    # Looking for a matching environment from the existing ones
-    pushd_quiet "$env_workdir"
-    new_env_no=1
-    shopt -s nullglob
-    for env_no in *; do
-        if [[ $env_no =~ ^[0-9]+$ ]]; then
-            if cmp -s "$tmp_workdir/bin/lhelper-config" "$env_no/bin/lhelper-config" &&
-                cmp -s "$tmp_workdir/bin/lhelper-packages" "$env_no/bin/lhelper-packages"; then
-                matching_env="$env_no"
-                break
-            fi
-            if [ $env_no -ge "$new_env_no" ]; then
-                new_env_no=$(($env_no + 1))
-            fi
-        fi
-    done
-    popd_quiet
-
-    rm -fr "$tmp_workdir"
+    if [ -d "$env_workdir/$env_name" ] &&
+        cmp -s "$tmp_workdir/bin/lhelper-config" "$env_workdir/$env_name/bin/lhelper-config"; then
+        source "$env_source"
+        update_installed_packages "$tmp_workdir"
+        rm -fr "$tmp_workdir"
+        return 0
+    else
+        rm -fr "$tmp_workdir"
+        return 1
+    fi
 }
 
 activate_command () {
@@ -1058,19 +1055,20 @@ EOF
         }
     fi
 
-    local new_env_no matching_env env_prefix env_source
-    find_matching_env "$env_workdir" "$tmp_workdir"
-
-    if [ -z ${matching_env+x} ]; then
-        # create a new environment
+    local env_test_name="${build_basename%.lhelper}"
+    local env_prefix env_source
+    if ! load_matching_env "$env_test_name" "$env_workdir" "$tmp_workdir"; then
+        # Create a new environment.
+        # The variables env_prefix and env_source were set by load_matching_env.
         # IMPORTANT: env_prefix below, passed to the function create_env, must be set to the
         # relative environment workdir, not the absolute one.
         # The function create_env will create a relocatable config without hard-coding the
         # full path.
         # The variables LHELPER_ENV_PREFIX / ROOT are resolved to a full path but only when
         # the environment is actually activated.
-        env_prefix="$env_rel_workdir/$new_env_no"
-        create_env "${build_basename%.lhelper}" "$env_prefix" "$env_prefix/bin/activate"
+        rm -fr "$env_rel_workdir/$env_test_name"
+        env_prefix="$env_rel_workdir/$env_test_name"
+        create_env "$env_test_name" "$env_prefix" "$env_prefix/bin/activate"
         env_source="$env_prefix/bin/activate"
         # install packages, activate the environment before
         source "$env_source"
@@ -1079,11 +1077,6 @@ EOF
             # below *without* quotes.
             library_check_and_install run $package_name
         done
-    else
-        # points env_source to the activate script of the matching environment
-        env_prefix="$env_rel_workdir/$matching_env"
-        env_source="$env_prefix/bin/activate"
-        source "$env_source"
     fi
     if [ ! -z ${source_print} ]; then
         echo "$env_source"
