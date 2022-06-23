@@ -892,6 +892,13 @@ update_installed_packages () {
             fi
         fi
     done
+    # Remove any remaining package not present in the new list
+    while [[ $j -lt $m ]]; do
+        if [[ ${old_list[$j]} != *" : "* ]]; then
+            remove_package "$LHELPER_ENV_PREFIX" ${old_list[$j]}
+        fi
+        j=$(( $j + 1 ))
+    done
 }
 
 # Create and activate a temporary environment in the given directory
