@@ -994,6 +994,105 @@ activate_command () {
     build_basename="$(basename "$build_filename")"
 
     if [[ ! -z ${edit_file+x} && ! -f "$build_filename" ]]; then
+        local mach_cpu="${MACHTYPE%%-*}"
+        local cpu_type_guess cpu_target_guess cpu_help
+        case "$mach_cpu" in
+        x86_64)
+            cpu_type_guess="x86-64"
+            cpu_target_guess="x86-64"
+            read -r -d '' cpu_help << END_X86_64_HELP
+# Possible values for CPU_TARGET are:
+#
+# x86-64 core2 athlon opteron barcelona bobcat jaguar bulldozer piledriver steamroller excavator
+# zen x86-64-v2 nehalem westmere sandybridge x86-64-v3 haswell broadwell skylake cooperlake atom
+# x86-64-v4 skylakex
+#
+# You may use a generic CPU architecture for CPU_TARGET like:
+#
+# x86-64       Support MMX SSE SSE2 FXSR
+# x86-64-v2    Support SSE3 SSE4_1 SSE4_2 SSSE3
+# x86-64-v3    Support AVX AVX2
+# x86-64-v4    Support AVX512
+#
+# For more informations: https://en.wikipedia.org/wiki/X86-64#Microarchitecture_levels
+END_X86_64_HELP
+            ;;
+        i586)
+            cpu_type_guess="x86"
+            cpu_target_guess="i586"
+            read -r -d '' cpu_help << END_I586
+# For ancient i586 this is the only supported CPU_TARGET.
+# It does not support any SIMD extension but has FPU support.
+#
+# For more information:
+#
+# https://en.wikipedia.org/wiki/X86#Chronology
+# https://gcc.gnu.org/onlinedocs/gcc/x86-Options.html
+END_I586
+            ;;
+        i686)
+            cpu_type_guess="x86"
+            cpu_target_guess="i686"
+            read -r -d '' cpu_help << END_I686
+# Possible values for CPU_TARGET are:
+#
+# i686 pentium2 pentium3 pentium4 prescott nehalem haswell
+#
+# You may use a generic CPU architecture for CPU_TARGET like:
+#
+# i686         No SIMD extensions
+# pentium2     Support MMX FXSR
+# pentium3     Support MMX SSE FXSR
+# pentium4     Support MMX SSE SSE2 FXSR
+#
+# For more information:
+#
+# https://en.wikipedia.org/wiki/X86#Chronology
+# https://gcc.gnu.org/onlinedocs/gcc/x86-Options.html
+END_I686
+            ;;
+        arm64* | aarch64)
+            cpu_type_guess="arm64"
+            cpu_target_guess="armv8"
+            read -r -d '' cpu_help << END_ARM64
+# Possible values for CPU_TARGET are:
+#
+# armv8 cortexa53 cortexa57 cortexa72 cortexa73
+#
+# You may use a generic CPU architecture for CPU_TARGET like armv8.
+#
+# For more information:
+#
+# https://gcc.gnu.org/onlinedocs/gcc/ARM-Options.html#ARM-Options
+END_ARM64
+            ;;
+        arm*)
+            cpu_type_guess="arm"
+            cpu_target_guess="armv6"
+            read -r -d '' cpu_help << END_ARM32
+# Possible values for CPU_TARGET are:
+#
+# armv6 armv6+fp armv7 armv7a armv7a+fp cortexa9 cortexa15
+#
+# You may use a generic CPU architecture for CPU_TARGET like:
+#
+# armv6        No FPU support
+# armv6+fp     Include VFPv2 support
+# armv7        No FPU support
+# armv7a       No FPU support
+# armv7a+fp    Include VFPv3 support
+#
+# For more information:
+#
+# https://gcc.gnu.org/onlinedocs/gcc/ARM-Options.html#ARM-Options
+END_ARM32
+            ;;
+        *)
+            cpu_type_guess="unknown"
+            cpu_target_guess="unknown"
+            cpu_help="# The CPU type is unknown. You may contact the lhelper developers."
+            ;;
+        esac
         cat << EOF > "$build_filename"
 # This is bash script sourced to get some environment variables to configure the
 # build toolchain.
@@ -1003,20 +1102,16 @@ activate_command () {
 CC=gcc
 CXX=g++
 
-# Optional C/C++ and linker flags.
-# Do not include optimization or debug flags as they are automatically added based
-# on the variable BUILD_TYPE.
-# CPU specific flags are automatically added based on CPU_TYPE and CPU_TARGET.
+# Optional C/C++ and linker flags. Do not include optimization or debug flags,
+# they are automatically added based on the variables BUILD_TYPE, CPU_TYPE and CPU_TARGET.
 # CFLAGS=
 # CXXFLAGS=
 # LDFLAGS=
 
-# CPU architecture type and specific CPU to target. These variables are
-# mandatory. In case of doubt for CPU_TARGET you may choose a generic target like
-# x86-64 (generic). You can choose an Intel, AMD or ARM CPU microarchitecture like
-# nehalem, haswell or athlon for example.
-CPU_TYPE=x86-64
-CPU_TARGET=nehalem
+# CPU architecture type and specific CPU to target. These variables are mandatory.
+$cpu_help
+CPU_TYPE="$cpu_type_guess"
+CPU_TARGET="$cpu_target_guess"
 
 # Debug can be used to build the libraries including debug information.
 # It omitted will defaut to a release build.
