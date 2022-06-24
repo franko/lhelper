@@ -1101,8 +1101,8 @@ END_ARM32
 
 # Set the variables CC and CXX to point to the C and C++ compilers to use.
 # They may contains options by separating them by spaces and quoting the command.
-CC=$CC
-CXX=$CXX
+CC=${CC:-gcc}
+CXX=${CXX:-g++}
 
 # Optional C/C++ and linker flags. Do not include optimization or debug flags,
 # they are automatically added based on the variables BUILD_TYPE, CPU_TYPE and CPU_TARGET.
