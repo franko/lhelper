@@ -48,34 +48,88 @@ On Linux or Mac OS X you may use the `$HOME/.local` directory as a prefix.
 
 ## Usage
 
-Little Library Helper works by creating a library environment first. The command is:
+Little Library Helper works by creating a build environments based on a spec file, usually a
+file with ".lhelper" extension.
+
+The spec file contains information about the compiler to be used, the CPU to target,
+the kind of build and the list of packages to install.
+The packages are develoment libraries or commands needed by your project and each of
+them can be built and installed using specific options for your project.
+
+The spec file is just a bash script that is sourced before creating the environment and
+should define the following variables: `CC`, `CXX`, `CFLAGS`, `CXXFLAGS` `LDFLAGS`, `BUILD_TYPE`,
+`CPU_TYPE`, `CPU_TARGET` and the array variable `packages`.
+
+The array variable `packages` defines the list of packages you want to install in the enviroment
+with the options for each one.
+
+The command to create an environment from a spec file is:
 
 ```sh
-lhelper create <env-name> [options] [build-type]
+lhelper create <spec-file> [options]
 ```
 
-It will use the environment variables `CC`, `CXX` and `LDFLAGS` to setup the environment configuration.
+If the file doesn't exist yet the option `-e` can be given and lhelper will propose
+for editing a spec file.
+It will use the environment variables `CC`, `CXX`, `CFLAGS`, `CXXFLAGS` `LDFLAGS` to
+propose an initial spec file and will guess the CPU architecture.
+In addition the proposed spec file will contain helpful comments about each variable
+so using the option `-e` with the "create" command is the recommended way to create
+a new spec file.
 
-The options `-e` can be used to edit the build configuration and `-n` to prevent the activation of the new environment.
+The command will also accept the option `--show-dependencies` to show the dependencies of
+each package.
 
-The build-type optional argument can be Debug or Release and by default is set to Release.
-
-On creation the new environment will be activated except if the `-n` option was given.
-To activate an already existing environemnt use the command:
+A minimal spec file could be like the following:
 
 ```sh
-lhelper activate <env-name>
+CC=gcc
+CXX=g++
+CFLAGS=
+CXXFLAGS=
+LDFLAGS=
+CPU_TYPE=x86-64
+CPU_TARGET=nehalem
+BUILD_TYPE=Release
+
+packages=("libfoo -opt1" "libbar -opt1 -opt2")
 ```
 
-When an environment is activated a new shell is started in the new environment.
+The create command has a closely related command called "activate" with the same options.
 
-To activate an environement without starting a new sub-shell the following command can be used:
+```sh
+lhelper activate <spec-file> [options]
+```
+
+The "activate" command will behave like "create" except after the creation of the environment it
+will "activate" it by starting a subshell in the new environment.
+
+To activate an environment without starting a new sub-shell the following command can be used:
 
 ```sh
 source "$(lhelper env-source <env-name>)"
 ```
 
 to define the variables of a given environemnts in the current shell session.
+
+### Edit and reload environemnts
+
+When inside an environement's subshell you can use the related commands:
+
+```sh
+lhelper edit
+lhelper reload
+```
+
+The "edit" command will prompt you to modify the spec file using your editor (as defined
+by the EDITOR variable) and, once modified, will restart the subshell in the modified
+environment.
+
+When restarting the subshell Lhelper will take care or remove, install or re-install each
+package as required to match the new spec file.
+
+The command "reload" will just reload the subshell in case you modified the spec file by
+yourself.
 
 ### Install commands
 
@@ -84,6 +138,15 @@ Once inside an environment any library can be installed using a simple command:
 ```sh
 lhelper install [--local] [--rebuild] <library-name> [library-version] [library-options]
 ```
+
+However the spec file will not be modified so the next time you will restart the
+environment the packages you installed on-the-fly will not be included.
+
+To include permanently a package modify the spec file itself by adding the new package
+in the array variable "packages".
+
+Otherwise the "install" command is useful to quickly experiment in a temporary environment
+without commiting any change.
 
 The option `--local` force lhelper to look for the recipe in the current folder.
 When using `--local` the libray-version is required.
@@ -100,6 +163,9 @@ A library package can be removed from an environment using the command:
 ```sh
 lhelper remove <library-name>
 ```
+
+Like the install command it will not modify the spec file so any modifications will
+be lost when reloading the environemnt.
 
 ### Recipes commands
 
