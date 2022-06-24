@@ -1086,20 +1086,27 @@ END_ARM32
             cpu_help="# The CPU type is unknown. You may contact the lhelper developers."
             ;;
         esac
+        flags_ls=()
+        for var_name in CFLAGS CXXFLAGS LDFLAGS; do
+            if [ -z ${!var_name+x} ]; then
+                flags_ls+=("$var_name=")
+            else
+                flags_ls+=("$var_name=\"${!var_name}\"")
+            fi
+        done
+        printf -v flags_txt "%s\n" "${flags_ls[@]}"
         cat << EOF > "$build_filename"
 # This is bash script sourced to get some environment variables to configure the
 # build toolchain.
 
 # Set the variables CC and CXX to point to the C and C++ compilers to use.
 # They may contains options by separating them by spaces and quoting the command.
-CC=gcc
-CXX=g++
+CC=$CC
+CXX=$CXX
 
 # Optional C/C++ and linker flags. Do not include optimization or debug flags,
 # they are automatically added based on the variables BUILD_TYPE, CPU_TYPE and CPU_TARGET.
-# CFLAGS=
-# CXXFLAGS=
-# LDFLAGS=
+$flags_txt
 
 # CPU architecture type and specific CPU to target. These variables are mandatory.
 $cpu_help
@@ -1108,7 +1115,7 @@ CPU_TARGET="$cpu_target_guess"
 
 # Debug can be used to build the libraries including debug information.
 # It omitted will defaut to a release build.
-BUILD_TYPE=Release
+BUILD_TYPE="${BUILD_TYPE:-Release}"
 
 # List of libraries to be installed. Can contain options by quoting the a string with
 # the libray name and its option followed by spaces.
