@@ -801,9 +801,12 @@ print_package_files () {
     cat "$LHELPER_ENV_PREFIX/packages/${package}.list"
 }
 
-print_error_no_env () {
-    echo "No environment activated"
-    echo "To list the packages an environment should be activated"
+check_env_active_or_exit () {
+    if [ -z ${LHELPER_ENV_NAME+x} ]; then
+        echo "No environment activated"
+        echo "To list the packages an environment should be activated"
+        exit 1
+    fi
 }
 
 library_check_and_install () {
@@ -954,23 +957,13 @@ activate_command () {
         echo "Usage: $LHELPER_COMMAND_NAME activate <spec-filename> [options]"
         exit 1
     fi
-
-    local source_print lib_install_mode build_filename edit_file create_only show_dependencies
-    if [ $1 == env-source ]; then
-        source_print=yes
-        lib_install_mode=quiet
-    else
-        lib_install_mode=verbose
-    fi
-    build_filename="$2"
+    local command="$1" build_filename="$2"
+    local lib_install_mode=verbose edit_file show_dependencies
     shift 2
     while [ ! -z ${1+x} ]; do
         case "$1" in
         -e | --edit)
             edit_file=yes
-            ;;
-        -n | --create-only)
-            create_only=yes
             ;;
         --show-dependencies)
             show_dependencies=yes
@@ -1180,9 +1173,7 @@ EOF
             library_check_and_install run $package_name
         done
     fi
-    if [ ! -z ${source_print} ]; then
-        echo "$env_source"
-    elif [ -z ${create_only+x} ]; then
+    if [ $command == activate ]; then
         echo "Starting a new shell with the new environment"
         while true; do
             start_subshell
@@ -1221,10 +1212,7 @@ install_command () {
         echo "Usage: $LHELPER_COMMAND_NAME install <library-name> [version]"
         exit 1
     fi
-    if [ -z ${LHELPER_ENV_NAME+x} ]; then
-        print_error_no_env
-        exit 1
-    fi
+    check_env_active_or_exit
     local lib_install_mode=verbose
     library_check_and_install run "${@:2}"
 }
@@ -1233,14 +1221,27 @@ case $1 in
 install)
     install_command "$@"
     ;;
-env-source | activate)
+create | activate)
     activate_command "$@"
     ;;
-edit | reload)
-    if [ -z ${LHELPER_ENV_NAME+x} ]; then
-        print_error_no_env
+env-source)
+    if [ $# -ne 2 ]; then
+        echo "Usage: $LHELPER_COMMAND_NAME env-source <spec-filename>"
         exit 1
     fi
+    env_name="${2%.lhelper}"
+    env_dir="$LHELPER_ENV_ROOT${LHELPER_ENV_ROOT+/}.lhelper/env"
+    if [ -f "$env_name.lhelper" ] && [ -d "$env_dir/$env_name/bin" ]; then
+        echo "$env_dir/$env_name/bin/activate"
+    else
+        echo "error: invalid environment name: $2"
+        echo "The spec file \"$env_name.lhelper\" does not exit or the environment"
+        echo "is not yet created. You may need to run the \"create\" command."
+        exit 1
+    fi
+    ;;
+edit | reload)
+    check_env_active_or_exit
     if [ $1 == edit ]; then
         "${EDITOR-vim}" "$LHELPER_ENV_ROOT/$LHELPER_ENV_NAME.lhelper"
     fi
@@ -1249,34 +1250,28 @@ edit | reload)
     kill -s SIGUSR1 $PPID
     ;;
 cleanup)
-    echo "Cleaning up the environments cached in $LHELPER_ENV_ROOT/env"
-    rm -fr "$LHELPER_ENV_ROOT/env/*"
+    clean_env_dir="$LHELPER_ENV_ROOT${LHELPER_ENV_ROOT+/}.lhelper/env"
+    if [ -d "$clean_env_dir" ]; then
+        echo "Cleaning up the environments stored in \"$clean_env_dir\""
+        rm -fr "$clean_env_dir"/*
+    fi
     ;;
 remove)
     if [ $# -lt 2 ]; then
         echo "Usage: $LHELPER_COMMAND_NAME remove <library-name>"
         exit 1
     fi
-    if [ -z ${LHELPER_ENV_NAME+x} ]; then
-        print_error_no_env
-        exit 1
-    fi
+    check_env_active_or_exit
     library_remove "${@:2}"
     ;;
 list)
     if [ "$2" == recipes ]; then
         ls -1 "$LHELPER_DIR/recipes"
     elif [ "$2" == packages ]; then
-        if [ -z ${LHELPER_ENV_NAME+x} ]; then
-            print_error_no_env
-            exit 1
-        fi
+        check_env_active_or_exit
         print_installed_packages
     elif [[ "$2" == files && -n ${3+x} ]]; then
-        if [ -z ${LHELPER_ENV_NAME+x} ]; then
-            print_error_no_env
-            exit 1
-        fi
+        check_env_active_or_exit
         print_package_files "$3"
     else
         echo "Usage: $LHELPER_COMMAND_NAME list (files|environments|recipes) [package]"
@@ -1284,10 +1279,7 @@ list)
     fi
     ;;
 dir)
-    if [ -z ${LHELPER_ENV_NAME+x} ]; then
-        print_error_no_env
-        exit 1
-    fi
+    check_env_active_or_exit
     echo "${LHELPER_ENV_PREFIX}"
     ;;
 update)

@@ -33,11 +33,11 @@ _lhelper () {
 
   case $COMP_CWORD in
   1)
-    COMPREPLY=($(compgen -W "activate dir edit env-source list update" "${COMP_WORDS[1]}"))
+    COMPREPLY=($(compgen -W "activate create dir edit reload env-source list update" "${COMP_WORDS[1]}"))
     ;;
   2)
     case "${COMP_WORDS[1]}" in
-    activate | env-source)
+    activate | create | env-source)
       lhcomp_env_list
       COMPREPLY=($(compgen -W "${lhcomp_ls[*]}" "${COMP_WORDS[2]}"))
       ;;
