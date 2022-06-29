@@ -1026,11 +1026,12 @@ guess_missing_cpu_type_target () {
         else
             # Case CPU_TARGET is given but not CPU_TYPE
             declare -A cpu_type_set
-            local line cpu_type_i
+            local cpu_type_count=1 line cpu_type_i
             for line in "${known_cpu_spec[@]}"; do
                 read -a line_a <<< "$line"
                 if [[ "${line_a[1]}" == "$CPU_TARGET" ]]; then
-                    cpu_type_set[${line_a[0]}]=on
+                    cpu_type_set[${line_a[0]}]=$cpu_type_count
+                    cpu_type_count=$(( $cpu_type_count + 1 ))
                 fi
             done
             for cpu_type_i in "${!cpu_type_set[@]}"; do
@@ -1041,8 +1042,10 @@ guess_missing_cpu_type_target () {
             done
             if [[ -z ${CPU_TYPE+x} ]]; then
                 for cpu_type_i in "${!cpu_type_set[@]}"; do
-                    CPU_TYPE="$cpu_type_i"
-                    break
+                    if [[ ${cpu_type_set[$cpu_type_i]} == 1 ]]; then
+                        CPU_TYPE="$cpu_type_i"
+                        break
+                    fi
                 done
             fi
             if [[ -z ${CPU_TYPE+x} ]]; then
