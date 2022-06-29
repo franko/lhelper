@@ -57,8 +57,10 @@ The packages are develoment libraries or commands needed by your project and eac
 them can be built and installed using specific options for your project.
 
 The spec file is just a bash script that is sourced before creating the environment and
-should define the following variables: `CC`, `CXX`, `CFLAGS`, `CXXFLAGS` `LDFLAGS`, `BUILD_TYPE`,
-`CPU_TYPE`, `CPU_TARGET` and the array variable `packages`.
+should define the following variables: `CC`, `CXX`, `CFLAGS`, `CXXFLAGS` `LDFLAGS`, `BUILD_TYPE`
+and the array variable `packages`.
+The variables `CPU_TYPE`, `CPU_TARGET` are optional and if not set they will be set to
+match your current system using a conservative `CPU_TARGET` value.
 
 The array variable `packages` defines the list of packages you want to install in the enviroment
 with the options for each one.

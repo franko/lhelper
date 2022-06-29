@@ -36,6 +36,68 @@ fs_security_delay () {
     fi
 }
 
+# https://gcc.gnu.org/onlinedocs/gcc/x86-Options.html
+# https://gcc.gnu.org/onlinedocs/gcc/ARM-Options.html#ARM-Options
+
+# https://en.wikipedia.org/wiki/List_of_Intel_CPU_microarchitectures#x86_microarchitectures
+# https://en.wikipedia.org/wiki/X86-64#Microarchitecture_levels
+# https://en.wikipedia.org/wiki/X86#Chronology
+
+# Clang available march: llc -march=x86-64 -mattr=help
+# gcc -march=native -Q --help=target
+
+# We do not cover all the OpenBLAS targets for x86/x86-64
+# IMPORTANT: for each "architecture" the first line should be the more basic
+#            CPU_TARGET supported. It will be chosen as a default if CPU_TARGET is
+#            not given.
+# meaning: "architecture", "CPU target's name", ""gcc/clang arch name", "additional flags"
+known_cpu_spec=(
+    "x86    i586        i586             -m32"
+    "x86    i686        i686             -m32"
+    "x86    pentium2    pentium2         -m32"
+    "x86    pentium3    pentium3         -m32,-mfpmath=sse,-msse"
+    "x86    pentium4    pentium4         -m32,-mfpmath=sse,-msse2"
+    "x86    prescott    prescott         -m32,-mfpmath=sse,-msse2"
+    "x86    nehalem     nehalem          -m32,-mfpmath=sse,-msse2"
+    "x86    haswell     haswell          -m32,-mfpmath=sse,-msse2"
+    "x86-64 x86-64      x86-64        "
+    "x86-64 core2       core2         "
+    "x86-64 athlon      athlon        "
+    "x86-64 opteron     opteron       "
+    "x86-64 barcelona   barcelona     "
+    "x86-64 bobcat      btver1        " # Bobcat, 1st gen
+    "x86-64 jaguar      btver2        " # Bobcat, 2nd gen
+    "x86-64 bulldozer   bdver1        " # Bulldozer, 1st gen
+    "x86-64 piledriver  bdver2        "
+    "x86-64 steamroller bdver3        "
+    "x86-64 excavator   bdver4        "
+    "x86-64 zen         znver1        "
+    "x86-64 x86-64-v2   x86-64-v2     "
+    "x86-64 nehalem     nehalem       "
+    "x86-64 westmere    westmere       "
+    "x86-64 sandybridge sandybridge   "
+    "x86-64 x86-64-v3   x86-64-v3     "
+    "x86-64 haswell     haswell       "
+    "x86-64 broadwell   broadwell     "
+    "x86-64 skylake     skylake       "
+    "x86-64 cooperlake  cooperlake    "
+    "x86-64 atom        bonnell       "
+    "x86-64 x86-64-v4   x86-64-v4     "
+    "x86-64 skylakex    skylake-avx512"
+    "arm    armv6       armv6         "
+    "arm    armv6+fp    armv6+fp      "
+    "arm    armv7       armv7         "
+    "arm    armv7a      armv7-a       "
+    "arm    armv7a+fp   armv7-a+fp    "
+    "arm    cortexa15   armv7-a+fp     -mtune=cortex-a15"
+    "arm    cortexa9    armv7-a+fp     -mtune=cortex-a9"
+    "arm64  armv8       armv8-a       "
+    "arm64  cortexa53   armv8-a        -mtune=cortex-a53"
+    "arm64  cortexa57   armv8-a        -mtune=cortex-a57"
+    "arm64  cortexa72   armv8-a        -mtune=cortex-a72"
+    "arm64  cortexa73   armv8-a       "
+)
+
 find_os_release () {
     local uname_out
     uname_out="$(uname -s)"
@@ -952,6 +1014,57 @@ load_matching_env () {
     fi
 }
 
+# Set CPU_TYPE and CPU_TARGET if any of them is missing.
+# using locals cpu_type_guess and cpu_target_guess
+guess_missing_cpu_type_target () {
+    if [[ -z ${CPU_TYPE+x} ]]; then
+        if [[ -z ${CPU_TARGET+x} ]]; then
+            # Both CPU_TYPE and CPU_TARGET are unset
+            CPU_TYPE="$cpu_type_guess"
+            CPU_TARGET="$cpu_target_guess"
+            echo "Using CPU_TYPE=$CPU_TYPE and CPU_TARGET=$CPU_TARGET"
+        else
+            # Case CPU_TARGET is given but not CPU_TYPE
+            declare -A cpu_type_set
+            local line cpu_type_i
+            for line in "${known_cpu_spec[@]}"; do
+                read -a line_a <<< "$line"
+                if [[ "${line_a[1]}" == "$CPU_TARGET" ]]; then
+                    cpu_type_set[${line_a[0]}]=on
+                fi
+            done
+            for cpu_type_i in "${!cpu_type_set[@]}"; do
+                if [[ "$cpu_type_i" == "$cpu_type_guess" ]]; then
+                    CPU_TYPE="$cpu_type_guess"
+                    break
+                fi
+            done
+            if [[ -z ${CPU_TYPE+x} ]]; then
+                for cpu_type_i in "${!cpu_type_set[@]}"; do
+                    CPU_TYPE="$cpu_type_i"
+                    break
+                done
+            fi
+            if [[ -z ${CPU_TYPE+x} ]]; then
+                echo "error: cannot find CPU_TYPE for $CPU_TARGET"
+                exit 1
+            fi
+            echo "Using CPU_TYPE=$CPU_TYPE"
+        fi
+    elif [[ -z ${CPU_TARGET+x} ]]; then
+        # Case CPU_TYPE is given but not CPU_TARGET
+        # Take the first line of known_cpu_spec matching the CPU_TYPE
+        for line in "${known_cpu_spec[@]}"; do
+            read -a line_a <<< "$line"
+            if [[ "${line_a[0]}" == "$CPU_TYPE" ]]; then
+                CPU_TARGET="${line_a[1]}"
+                echo "Using CPU_TARGET=$CPU_TARGET"
+                break
+            fi
+        done
+    fi
+}
+
 activate_command () {
     if [[ $# -lt 2 || $2 == "-"* ]]; then
         echo "Usage: $LHELPER_COMMAND_NAME activate <spec-filename> [options]"
@@ -986,14 +1099,13 @@ activate_command () {
     fi
     build_basename="$(basename "$build_filename")"
 
-    if [[ ! -z ${edit_file+x} && ! -f "$build_filename" ]]; then
-        local mach_cpu="${MACHTYPE%%-*}"
-        local cpu_type_guess cpu_target_guess cpu_help
-        case "$mach_cpu" in
-        x86_64)
-            cpu_type_guess="x86-64"
-            cpu_target_guess="x86-64"
-            read -r -d '' cpu_help << END_X86_64_HELP
+    local mach_cpu="${MACHTYPE%%-*}"
+    local cpu_type_guess cpu_target_guess cpu_help
+    case "$mach_cpu" in
+    x86_64)
+        cpu_type_guess="x86-64"
+        cpu_target_guess="x86-64"
+        read -r -d '' cpu_help << END_X86_64_HELP
 # Possible values for CPU_TARGET are:
 #
 # x86-64 core2 athlon opteron barcelona bobcat jaguar bulldozer piledriver steamroller excavator
@@ -1009,11 +1121,11 @@ activate_command () {
 #
 # For more informations: https://en.wikipedia.org/wiki/X86-64#Microarchitecture_levels
 END_X86_64_HELP
-            ;;
-        i586)
-            cpu_type_guess="x86"
-            cpu_target_guess="i586"
-            read -r -d '' cpu_help << END_I586
+        ;;
+    i586)
+        cpu_type_guess="x86"
+        cpu_target_guess="i586"
+        read -r -d '' cpu_help << END_I586
 # For ancient i586 this is the only supported CPU_TARGET.
 # It does not support any SIMD extension but has FPU support.
 #
@@ -1022,11 +1134,11 @@ END_X86_64_HELP
 # https://en.wikipedia.org/wiki/X86#Chronology
 # https://gcc.gnu.org/onlinedocs/gcc/x86-Options.html
 END_I586
-            ;;
-        i686)
-            cpu_type_guess="x86"
-            cpu_target_guess="i686"
-            read -r -d '' cpu_help << END_I686
+        ;;
+    i686)
+        cpu_type_guess="x86"
+        cpu_target_guess="i686"
+        read -r -d '' cpu_help << END_I686
 # Possible values for CPU_TARGET are:
 #
 # i686 pentium2 pentium3 pentium4 prescott nehalem haswell
@@ -1043,11 +1155,11 @@ END_I586
 # https://en.wikipedia.org/wiki/X86#Chronology
 # https://gcc.gnu.org/onlinedocs/gcc/x86-Options.html
 END_I686
-            ;;
-        arm64* | aarch64)
-            cpu_type_guess="arm64"
-            cpu_target_guess="armv8"
-            read -r -d '' cpu_help << END_ARM64
+        ;;
+    arm64* | aarch64)
+        cpu_type_guess="arm64"
+        cpu_target_guess="armv8"
+        read -r -d '' cpu_help << END_ARM64
 # Possible values for CPU_TARGET are:
 #
 # armv8 cortexa53 cortexa57 cortexa72 cortexa73
@@ -1058,11 +1170,11 @@ END_I686
 #
 # https://gcc.gnu.org/onlinedocs/gcc/ARM-Options.html#ARM-Options
 END_ARM64
-            ;;
-        arm*)
-            cpu_type_guess="arm"
-            cpu_target_guess="armv6"
-            read -r -d '' cpu_help << END_ARM32
+        ;;
+    arm*)
+        cpu_type_guess="arm"
+        cpu_target_guess="armv6"
+        read -r -d '' cpu_help << END_ARM32
 # Possible values for CPU_TARGET are:
 #
 # armv6 armv6+fp armv7 armv7a armv7a+fp cortexa9 cortexa15
@@ -1079,30 +1191,31 @@ END_ARM64
 #
 # https://gcc.gnu.org/onlinedocs/gcc/ARM-Options.html#ARM-Options
 END_ARM32
-            ;;
-        *)
-            cpu_type_guess="unknown"
-            cpu_target_guess="unknown"
-            cpu_help="# The CPU type is unknown. You may contact the lhelper developers."
-            ;;
-        esac
-        flags_ls=()
-        for var_name in CFLAGS CXXFLAGS LDFLAGS; do
-            if [ -z ${!var_name+x} ]; then
-                flags_ls+=("$var_name=")
-            else
-                flags_ls+=("$var_name=\"${!var_name}\"")
-            fi
-        done
-        printf -v flags_txt "%s\n" "${flags_ls[@]}"
+        ;;
+    *)
+        cpu_type_guess="unknown"
+        cpu_target_guess="unknown"
+        cpu_help="# The CPU type is unknown. You may contact the lhelper developers."
+        ;;
+    esac
+    flags_ls=()
+    for var_name in CFLAGS CXXFLAGS LDFLAGS; do
+        if [ -z ${!var_name+x} ]; then
+            flags_ls+=("$var_name=")
+        else
+            flags_ls+=("$var_name=\"${!var_name}\"")
+        fi
+    done
+    printf -v flags_txt "%s\n" "${flags_ls[@]}"
+    if [[ ! -z ${edit_file+x} && ! -f "$build_filename" ]]; then
         cat << EOF > "$build_filename"
 # This is bash script sourced to get some environment variables to configure the
 # build toolchain.
 
 # Set the variables CC and CXX to point to the C and C++ compilers to use.
 # They may contains options by separating them by spaces and quoting the command.
-CC=${CC:-gcc}
-CXX=${CXX:-g++}
+CC="\${CC:-gcc}"
+CXX="\${CXX:-g++}"
 
 # Optional C/C++ and linker flags. Do not include optimization or debug flags,
 # they are automatically added based on the variables BUILD_TYPE, CPU_TYPE and CPU_TARGET.
@@ -1110,8 +1223,13 @@ $flags_txt
 
 # CPU architecture type and specific CPU to target. These variables are mandatory.
 $cpu_help
-CPU_TYPE="$cpu_type_guess"
-CPU_TARGET="$cpu_target_guess"
+#
+# If CPU_TYPE and CPU_TARGET are not given they will be chosen based on the system
+# currently used. You may give some specific value below to force a build for a specific
+# architecture.
+#
+# CPU_TYPE="$cpu_type_guess"
+# CPU_TARGET="$cpu_target_guess"
 
 # Debug can be used to build the libraries including debug information.
 # It omitted will defaut to a release build.
@@ -1139,12 +1257,8 @@ EOF
         echo "Build type should be either Release or Debug, abort."
         exit 1
     fi
-    if [[ -z ${CPU_TYPE+x} || -z ${CPU_TARGET+x} ]]; then
-        echo "error: please provide the CPU_TYPE and CPU_TARGET environment variables."
-        echo "The CPU type should be something like \"prescott\" or \"x86-64\"."
-        echo "The CPU target should be something like \"x86\", \"x86-64\" or \"arm64\"."
-        exit 1
-    fi
+
+    guess_missing_cpu_type_target
 
     local build_realpath="$(realpath "$build_filename")"
     local env_rel_workdir=".lhelper/env" tmp_rel_workdir=".lhelper/tmp"
