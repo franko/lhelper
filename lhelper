@@ -850,7 +850,7 @@ print_installed_packages () {
 
 start_subshell () {
     print_installed_packages
-    bash --init-file "$LHELPER_DIR/lhelper-bash-init"
+    exec bash --init-file "$LHELPER_DIR/lhelper-bash-init"
 }
 
 # Take the environment name and its install prefix as arguments.
@@ -988,30 +988,35 @@ do_temporary_env () {
     lib_install_mode="$prev_mode"
 }
 
+# should be called using a subshell
+check_env_root_match () {
+    local env_source="$1"
+    source "$env_source"
+    if [ "$LHELPER_ENV_ROOT" == "$PWD" ]; then echo true; else echo false; fi
+}
+
 # Load the environment if the given name only if its config matches.
 # It the config matches return 0 or 1 otherwise.
-# In any case set the local varaibles env_prefix and env_source.
 load_matching_env () {
     local env_name="$1" env_workdir="$2" tmp_workdir="$3"
-
-    # env_prefix and env_source below are local variables defined in the calling function
-    env_prefix="$env_workdir/$env_name"
-    env_source="$env_prefix/bin/activate"
+    local env_prefix="$env_workdir/$env_name"
+    local env_source="$env_prefix/bin/activate"
 
     # Temporary environment creation and activation using local variable
     # array "packages"
     do_temporary_env "$tmp_workdir"
 
+    local load_exit_code=1
     if [ -d "$env_workdir/$env_name" ] &&
         lh-cmp "$tmp_workdir/bin/lhelper-config" "$env_workdir/$env_name/bin/lhelper-config"; then
-        source "$env_source"
-        update_installed_packages "$tmp_workdir"
-        rm -fr "$tmp_workdir"
-        return 0
-    else
-        rm -fr "$tmp_workdir"
-        return 1
+        if [ $(check_env_root_match "$env_source") == true ]; then
+            source "$env_source"
+            update_installed_packages "$tmp_workdir"
+            load_exit_code=0
+        fi
     fi
+    rm -fr "$tmp_workdir"
+    return $load_exit_code
 }
 
 # Set CPU_TYPE and CPU_TARGET if any of them is missing.
@@ -1275,44 +1280,44 @@ EOF
     fi
 
     local env_test_name="${build_basename%.lhelper}"
-    local env_prefix env_source
-    if ! load_matching_env "$env_test_name" "$env_workdir" "$tmp_workdir"; then
-        # Create a new environment.
-        # The variables env_prefix and env_source were set by load_matching_env.
-        # IMPORTANT: env_prefix below, passed to the function create_env, must be set to the
-        # relative environment workdir, not the absolute one.
-        # The function create_env will create a relocatable config without hard-coding the
-        # full path.
-        # The variables LHELPER_ENV_PREFIX / ROOT are resolved to a full path but only when
-        # the environment is actually activated.
-        rm -fr "$env_rel_workdir/$env_test_name"
-        env_prefix="$env_rel_workdir/$env_test_name"
-        create_env "$env_test_name" "$env_prefix" "$env_prefix/bin/activate"
-        env_source="$env_prefix/bin/activate"
-        # install packages, activate the environment before
-        source "$env_source"
-        for package_name in "${packages[@]}"; do
-            # Important: variable package_name can contain spaces and it must be used
-            # below *without* quotes.
-            library_check_and_install run $package_name
-        done
-    fi
-    if [ $command == activate ]; then
-        echo "Starting a new shell with the new environment"
-        while true; do
-            start_subshell
-            # We consider an exit status 11 as a request to restart the environment
-            # after a change in the build file.
-            if [ $? != 11 ]; then break; fi
+    local start_env_shell=true
+    while [ $start_env_shell == true ]; do
+        start_env_shell=false
+        # Below we need to start a subshell so that when we source the environment
+        # "activate" script it doesn't pollute the parent bash process. This is required
+        # so that if we restart the environment we restart it with clean environment variables
+        (
+            if ! load_matching_env "$env_test_name" "$env_workdir" "$tmp_workdir"; then
+                # Create a new environment.
+                # IMPORTANT: env_prefix below, passed to the function create_env, must be set to the
+                # relative environment workdir, not the absolute one.
+                rm -fr "$env_rel_workdir/$env_test_name"
+                env_prefix="$env_rel_workdir/$env_test_name"
+                env_source="$env_prefix/bin/activate"
+                create_env "$env_test_name" "$env_prefix" "$env_source" "$build_filename"
+                # install packages, activate the environment before
+                source "$env_source"
+                for package_name in "${packages[@]}"; do
+                    # Important: variable package_name can contain spaces and it must be used
+                    # below *without* quotes.
+                    library_check_and_install run $package_name
+                done
+            fi
+            if [ $command == activate ]; then
+                echo "Starting a new shell with the new environment"
+                # the function below should exec the new bash so that, when it exits
+                # the subshell here within the enclosing brackets will terminate
+                start_subshell
+            fi
+        )
+        # We consider an exit status 11 as a request to restart the environment
+        # after a change in the build file.
+        if [[ $? == 11 && $command == activate ]]; then
+            start_env_shell=true
             # Source the new build file
             source "$build_filename"
-            do_temporary_env "$tmp_workdir"
-            cp "$tmp_workdir/bin/lhelper-config" "$env_prefix/bin/lhelper-config"
-            source "$env_source"
-            update_installed_packages "$tmp_workdir"
-            rm -fr "$tmp_workdir"
-        done
-    fi
+        fi
+    done
 }
 
 update_command () {
@@ -1367,7 +1372,9 @@ env-source)
 edit | reload)
     check_env_active_or_exit
     if [ $1 == edit ]; then
-        "${EDITOR-vim}" "$LHELPER_ENV_ROOT/$LHELPER_ENV_NAME.lhelper"
+        # LHELPER_BUILD_FILENAME must be defined here. It is empty only for
+        # temporary environment not directly used by users.
+        "${EDITOR-vim}" "$LHELPER_ENV_ROOT/$LHELPER_BUILD_FILENAME"
     fi
     # We send a SIGUSR1 to the parent process, the activated bash shell.
     # The variable PPID is a builtin bash variable for the PID of the parent process.

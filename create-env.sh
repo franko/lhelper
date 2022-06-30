@@ -109,16 +109,17 @@ fi
 export CMAKE_PREFIX_PATH="\$prefix"
 export LHELPER_LIBDIR="$libdir"
 export LHELPER_PKGCONFIG_RPATH="$pkgconfig_reldir"
-export LHELPER_ENV_ROOT="\$(realpath .)"
+export LHELPER_ENV_ROOT="$PWD"
 export LHELPER_ENV_PREFIX="\$prefix"
 export LHELPER_ENV_NAME="$env_name"
+export LHELPER_BUILD_FILENAME="$build_filename"
 
 source "\$LHELPER_ENV_PREFIX/bin/lhelper-config"
 EOF
 }
 
 create_env () {
-    local env_name="$1" prefix="$2" env_source="$3"
+    local env_name="$1" prefix="$2" env_source="$3" build_filename="$4"
 
     local cc cxx cpu_flags libdir_array
     IFS=':' read -r -a libdir_array <<< "$(default_libdir)"
