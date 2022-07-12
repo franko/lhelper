@@ -122,8 +122,8 @@ int find_replace_prefix_path(const char *filename, char *prefix[], int prefix_le
             }
         }
         if (prefix_i >= prefix_len) { // no match
-            add_string(new_content, current, buffer_end - current);
-            current = buffer_end;
+            add_string(new_content, current, 1);
+            current++;
         }
     }
 
@@ -157,10 +157,15 @@ int find_replace_path(const char *filename, const char *pattern, const char *rep
     char *buffer_end = buffer->data + length;
     while (current < buffer_end) {
         char *p = strstr(current, pattern);
-        if (p && !char_is_alphanum_dash(*(p + pattern_len))) {
-            if (add_string(new_content, current, p - current)) goto error_exit;
-            if (add_string(new_content, replacement, replacement_len)) goto error_exit;
-            current = p + pattern_len;
+        if (p) {
+            if (!char_is_alphanum_dash(*(p + pattern_len))) {
+                if (add_string(new_content, current, p - current)) goto error_exit;
+                if (add_string(new_content, replacement, replacement_len)) goto error_exit;
+                current = p + pattern_len;
+            } else {
+                add_string(new_content, current, p - current + 1);
+                current = p + 1;
+            }
         } else {
             add_string(new_content, current, buffer_end - current);
             current = buffer_end;
