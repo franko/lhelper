@@ -13,6 +13,16 @@ LHELPER_PREFIX="${LHELPER_BIN_DIRNAME%/bin}"
 export LHELPER_WORKING_DIR="$LHELPER_PREFIX/var/lib/lhelper"
 export LHELPER_DIR="$LHELPER_PREFIX/share/lhelper"
 
+# The variable below is used by the command lh-path-replace. It is
+# needed because in MSYS sometimes unix-like absolute path are used
+# like /home/user. These kind of path are fed to the native applications
+# transformed into the real windows path like C:/msys64/home/user. Using
+# the variable LH_MSYSROOT lh-path-replace will recognize the msys root
+# windows path, C:/msys64/ and treat it as if it were the unix /.
+if hash cygpath 2> /dev/null; then
+    export LH_MSYSROOT="$(cygpath -m /)"
+fi
+
 source "$LHELPER_DIR/create-env.sh"
 
 if [ ! -d "${LHELPER_DIR}" ]; then
