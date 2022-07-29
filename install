@@ -61,7 +61,7 @@ recipes_dir="$DESTDIR/share/lhelper/recipes"
 lhcomp="$(find_compiler)"
 
 pushd_quiet src
-for modname in path-replace sort cmp; do
+for modname in path-replace sort cmp realpath; do
     echo "compiling lh-$modname"
     lhcompile lh-$modname lh-$modname.c
     if [ $? -ne 0 ]; then

@@ -94,9 +94,9 @@ env_create_source_file () {
     local pkgconfig_reldir=$(printf_join ":%s/pkgconfig" "${libdir_array[0]}")
     local pkgconfig_path=$(printf_join ":\$prefix/%s/pkgconfig" "${libdir_array[@]}")
     local ldpath=$(printf_join ":\$prefix/%s" "${libdir_array[@]}")
-
+    local abs_prefix="$(lh-realpath "$prefix")"
 cat << EOF > "$target"
-prefix="\$(realpath "$prefix")"
+prefix="$abs_prefix"
 export PATH="\$prefix/bin\${PATH:+:}\$PATH"
 
 export LD_LIBRARY_PATH="$ldpath\${LD_LIBRARY_PATH:+:}\$LD_LIBRARY_PATH"

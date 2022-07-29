@@ -1278,7 +1278,7 @@ EOF
 
     guess_missing_cpu_type_target
 
-    local build_realpath="$(realpath "$build_filename")"
+    local build_realpath="$(lh-realpath "$build_filename")"
     local env_rel_workdir=".lhelper/env" tmp_rel_workdir=".lhelper/tmp"
     local env_workdir="$(dirname "$build_realpath")/$env_rel_workdir"
     local tmp_workdir="$(dirname "$build_realpath")/$tmp_rel_workdir"
