@@ -53,25 +53,41 @@ static int dirname_split(char *path, char **dir_path, char **basename) {
     return 0;
 }
 
+static void remove_ending_slash(char *path) {
+    int len = strlen(path);
+#if _WIN32
+    if (len > 1 && (path[len  - 1] == '/' || path[len  - 1] == '\\')) {
+        path[len - 1] = 0;
+    }
+#else
+    if (len > 1 && path[len  - 1] == '/') {
+        path[len - 1] = 0;
+    }
+#endif
+}
+
 int main(int argc, char *argv[]) {
     if (argc != 2) {
         fprintf(stderr, "Usage: %s <filename>\n", argv[0]);
         return 1;
     }
     char *rel_path = argv[1];
-    char *abs_path = realpath_impl(rel_path);
-    if (!abs_path) {
-        char *dir_path, *basename;
-        if (dirname_split(rel_path, &dir_path, &basename) == 0) {
-            char *dir_abs_path = realpath_impl(dir_path);
-            if (dir_abs_path) {
-                fprintf(stdout, "%s/%s\n", dir_abs_path, basename);
-                return 0;
-            }
+    remove_ending_slash(rel_path);
+    char *dir_path, *basename, *dir_abs_path;
+    if (dirname_split(rel_path, &dir_path, &basename) == 0) {
+        if (dir_path[0] != 0) {
+            dir_abs_path = realpath_impl(dir_path);
+        } else {
+            dir_abs_path = dir_path;
         }
-        fprintf(stderr, "%s: %s: No such file or directory.\n", argv[0], rel_path);
-        return 1;
+    } else {
+        dir_abs_path = realpath_impl(".");
+        basename = rel_path;
     }
-    fprintf(stdout, "%s\n", abs_path);
-    return 0;
+    if (dir_abs_path) {
+        fprintf(stdout, "%s/%s\n", dir_abs_path, basename);
+        return 0;
+    }
+    fprintf(stderr, "%s: %s: No such file or directory\n", argv[0], rel_path);
+    return 1;
 }
