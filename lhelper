@@ -1107,6 +1107,7 @@ activate_command () {
     local command="$1" build_filename="$2"
     local lib_install_mode=verbose edit_file show_dependencies
     shift 2
+    local ini_packages=()
     while [ ! -z ${1+x} ]; do
         case "$1" in
         -e | --edit)
@@ -1114,6 +1115,10 @@ activate_command () {
             ;;
         --show-dependencies)
             show_dependencies=yes
+            ;;
+        --packages)
+            ini_packages=("${@:2}")
+            break
             ;;
         -*)
             echo "error: unknown option $1"
@@ -1235,13 +1240,13 @@ END_ARM32
     flags_ls=()
     for var_name in CFLAGS CXXFLAGS LDFLAGS; do
         if [ -z ${!var_name+x} ]; then
-            flags_ls+=("$var_name=")
+            flags_ls+=("# $var_name=")
         else
             flags_ls+=("$var_name=\"${!var_name}\"")
         fi
     done
     printf -v flags_txt "%s\n" "${flags_ls[@]}"
-    if [[ ! -z ${edit_file+x} && ! -f "$build_filename" ]]; then
+    if [[ ( ! -z ${edit_file+x} || $command == create ) && ! -f "$build_filename" ]]; then
         cat << EOF > "$build_filename"
 # This is bash script sourced to get some environment variables to configure the
 # build toolchain.
@@ -1273,13 +1278,13 @@ BUILD_TYPE="${BUILD_TYPE:-Release}"
 # the libray name and its option followed by spaces.
 # For example:
 # packages=("freetype2"  "sdl2 -opengl")
-packages=()
+packages=($(printf '"%s" ' "${ini_packages[@]}"))
 EOF
     fi
     if [[ ! -z ${edit_file+x} ]]; then
         "${EDITOR-vim}" "$build_filename"
     fi
-    if [ ! -f "$build_filename" ]; then
+    if [[ $command == activate && ! -f "$build_filename" ]]; then
         echo "error: the file $build_filename does not exist or is not a file"
         exit 1
     fi
