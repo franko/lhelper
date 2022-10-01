@@ -9,8 +9,7 @@ fi
 pushd_quiet () { builtin pushd "$@" > /dev/null; }
 popd_quiet () { builtin popd > /dev/null; }
 
-echo -n "Please enter the prefix directory to install: "
-read prefix
+prefix="$HOME/.local"
 
 destdir="$prefix"
 if [[ ":$PATH:" == *":$prefix/bin:"* ]]; then
@@ -48,4 +47,3 @@ fi
 popd_quiet
 rm -fr lh-install
 popd_quiet
-
