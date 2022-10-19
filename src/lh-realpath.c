@@ -4,6 +4,8 @@
 #include <string.h>
 
 #if _WIN32
+static char *msysroot = NULL;
+
 static char *path_to_unix(char *path_win) {
     int len = strlen(path_win);
     char *path = malloc(len + 1 + 16);
@@ -27,7 +29,31 @@ static char *path_to_unix(char *path_win) {
 char *realpath_impl(char *rel_path) {
 #if _WIN32
     char *abs_path_win = _fullpath(NULL, rel_path, 0);
-    return path_to_unix(abs_path_win);
+    int len = strlen(abs_path_win);
+    if (len >= 2 && abs_path_win[len - 1] == '\\' && abs_path_win[len - 2] == ':') {
+        /* This is the root of a windows driver, remove the trailing backslash so that
+           the path_to_unix that will follow does not leave a trailing slash. */
+        abs_path_win[len - 1] = 0;
+    }
+    char *abs_path = path_to_unix(abs_path_win);
+    if (msysroot) {
+        char *msysroot_unix = path_to_unix(msysroot);
+        int msu_len = strlen(msysroot_unix);
+        /* Remove trailing slash from msysroot_unix if any */
+        if (msysroot_unix[msu_len - 1] == '/') {
+            msysroot_unix[msu_len - 1] = 0;
+            msu_len--;
+        }
+        /* Check if the abs_path (unix-like) begin with msysroot_unix. If yes remove the
+           beginning to make it msys-like. */
+        if (strncmp(abs_path, msysroot_unix, msu_len) == 0) {
+            if (abs_path[msu_len] == '/') {
+                abs_path += msu_len;
+            } else if (abs_path[msu_len] == 0) {
+                abs_path = "/";
+            }
+        }
+    }
 #else
     char *abs_path = realpath(rel_path, NULL);
 #endif
@@ -66,7 +92,11 @@ static int dirname_split(char *path, char **dir_path, char **basename) {
 
 static void remove_ending_slash(char *path) {
     char *p = path + strlen(path) - 1;
+#if _WIN32
+    while (p > path && is_dir_sep(*p) && *(p - 1) != ':') {
+#else
     while (p > path && is_dir_sep(*p)) {
+#endif
         p--;
     }
     *(p + 1) = 0;
@@ -77,6 +107,9 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Usage: %s <filename>\n", argv[0]);
         return 1;
     }
+#if _WIN32
+    msysroot = getenv("LH_MSYSROOT");
+#endif
     char *rel_path = argv[1];
     remove_ending_slash(rel_path);
     char *dir_abs_path = realpath_impl(rel_path);
