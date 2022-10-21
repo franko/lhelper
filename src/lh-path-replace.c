@@ -197,10 +197,13 @@ int main(int argc, char *argv[]) {
         const int drive_letter = tolower(*pattern);
         char *msysroot = getenv("LH_MSYSROOT");
         /* We use the variable above to recognize the MSYS Windows root directory. */
-        if (msysroot && strncmp(pattern, msysroot, strlen(msysroot)) == 0) {
-            char *prefix = "/";
+        if (msysroot && strlen(msysroot) > 0 && strncmp(pattern, msysroot, strlen(msysroot)) == 0) {
             /* Replace by using a "/" in the pattern instead of LH_MSYSROOT */
-            int ret = find_replace_prefix_path(argv[1], &prefix, 1, pattern + strlen(msysroot), replacement);
+            const char *pattern_msys_skip = pattern + strlen(msysroot);
+            if (*(pattern_msys_skip - 1) == '/') {
+                pattern_msys_skip -= 1;
+            }
+            int ret = find_replace_path(argv[1], pattern_msys_skip, replacement);
             if (ret != 0) return ret;
         }
         char prefix_data[64];
