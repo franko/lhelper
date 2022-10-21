@@ -295,11 +295,21 @@ build_and_install () {
         popd_quiet
         ;;
     meson)
-        processed_options="$(meson_options "${@:2}")"
+        local mopts=("${@:2}")
+        local destdir_opt
+        if [[ " ${mopts[*]} " =~ " --prefix=" ]]; then
+            # If a prefix is specified do not provide our $INSTALL_PREFIX but use
+            # instead a --destdir option with $INSTALL_PREFIX when doing the install.
+            destdir_opt="--destdir=$INSTALL_PREFIX"
+        else
+            mopts+=("--prefix=$INSTALL_PREFIX")
+            destdir_opt=""
+        fi
+        processed_options="$(meson_options "${mopts[@]}")"
         mkdir build
         pushd_quiet build
-        echo "Using meson command: " meson --prefix="$INSTALL_PREFIX" --buildtype="${BUILD_TYPE,,}" $processed_options ..
-        meson --prefix="$INSTALL_PREFIX" --buildtype="${BUILD_TYPE,,}" $processed_options .. || {
+        echo "Using meson command: " meson --buildtype="${BUILD_TYPE,,}" $processed_options ..
+        meson --buildtype="${BUILD_TYPE,,}" $processed_options .. || {
             echo "error: while running meson config" >&2
             exit 6
         }
@@ -307,7 +317,9 @@ build_and_install () {
             echo "error: while running meson build" >&2
             exit 6
         }
-        meson install
+        # $destdir_opt below must *not* be quoted because it can be an empty string
+        # and in this case we don't want to pass an argument.
+        meson install $destdir_opt
         popd_quiet
         ;;
     configure)
