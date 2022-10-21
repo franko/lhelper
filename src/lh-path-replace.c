@@ -111,7 +111,9 @@ int find_replace_prefix_path(const char *filename, char *prefix[], int prefix_le
             if (p) {
                 char *match_start = p;
                 p += strlen(prefix[prefix_i]);
-                if (strncmp(p, pattern, pattern_len) == 0) {
+                if (strncmp(p, pattern, pattern_len) == 0 &&
+                        (match_start == buffer->data || !char_is_alphanum_dash(*(match_start - 1))))
+                {
                     if (!char_is_alphanum_dash(*(p + pattern_len))) {
                         if (add_string(new_content, current, match_start - current)) goto error_exit;
                         if (add_string(new_content, replacement, replacement_len)) goto error_exit;
@@ -158,7 +160,7 @@ int find_replace_path(const char *filename, const char *pattern, const char *rep
     while (current < buffer_end) {
         char *p = strstr(current, pattern);
         if (p) {
-            if (!char_is_alphanum_dash(*(p + pattern_len))) {
+            if (!char_is_alphanum_dash(*(p + pattern_len)) && (p  == buffer->data || !char_is_alphanum_dash(*(p - 1)))) {
                 if (add_string(new_content, current, p - current)) goto error_exit;
                 if (add_string(new_content, replacement, replacement_len)) goto error_exit;
                 current = p + pattern_len;
