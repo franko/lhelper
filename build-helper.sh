@@ -84,6 +84,10 @@ enter_git_repository () {
     fi
     local repo_url="$1"
     local repo_tag="$2"
+    local submodule=
+    if [ "$3" == -submodule ]; then
+        submodule=yes
+    fi
     local repo_name="${repo_url##*/}"
     local repo_name_short="${repo_name%.git}"
     local archive_filename="${repo_name_short}-${repo_tag}.tar.gz"
@@ -110,8 +114,15 @@ enter_git_repository () {
             clean_and_exit_download_error
         fi
 
+        if [ $submodule == yes ]; then
+            git submodule update --init --recursive || {
+                echo "Error whith submodule update"
+                clean_and_exit_download_error
+            }
+        fi
+
         trap INT
-        rm -fr "${repo_name_short}-${repo_tag}/.git"*
+        find "${repo_name_short}-${repo_tag}" -name '.git*' -exec rm -fr '{}' \;
         tar czf "${archive_filename}" "${repo_name_short}-${repo_tag}" || {
             echo "Got invalid archive: $basename" >&2
             exit 5
