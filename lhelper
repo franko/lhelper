@@ -928,6 +928,7 @@ update_installed_packages () {
     true > "$LHELPER_ENV_PREFIX/bin/lhelper-packages"
 
     local newly_installed_packages=()
+    local skip_this newly_installed_package
     local package_line i=0 j=0 n=${#new_list[@]} m=${#old_list[@]} k found
     while [[ $i -lt $n ]]; do
         # in the condition below $j may be out of bounds but that's fine.
@@ -952,7 +953,14 @@ update_installed_packages () {
                 # the new_list entry is found: remove all the old_list entries up to
                 # the one that match the new_list entry
                 while [[ $j -lt $k ]]; do
-                    if [[ ${old_list[$j]} != *" : "* ]]; then
+                    skip_this=no
+                    for newly_installed_package in "${newly_installed_packages[@]}"; do
+                        if [[ ${old_list[$j]%% *} == $newly_installed_package ]]; then
+                            skip_this=yes
+                            break
+                        fi
+                    done
+                    if [[ $skip_this == no && ${old_list[$j]} != *" : "* ]]; then
                         remove_package "$LHELPER_ENV_PREFIX" ${old_list[$j]}
                     fi
                     j=$(( $j + 1 ))
@@ -977,8 +985,7 @@ update_installed_packages () {
         # If this is the case it was previously removed and installed above in this function using
         # library_check_and_install with the new options so we don't want to remove it again here
         # because we would remove the newly installed package.
-        local newly_installed_package
-        local skip_this=no
+        skip_this=no
         for newly_installed_package in "${newly_installed_packages[@]}"; do
             if [[ ${old_list[$j]%% *} == $newly_installed_package ]]; then
                 skip_this=yes
