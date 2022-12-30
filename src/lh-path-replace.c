@@ -54,7 +54,7 @@ int char_is_alphanum_dash(int code) {
         (code == '-' || code == '_');
 }
 
-int string_buffer_init_read_file(const char *filename, struct string_buffer *buf) {
+int string_buffer_init_read_file(const char *filename, struct string_buffer *buf, long max_length) {
 #ifdef _WIN32
     FILE *f = fopen(filename, "rb");
 #else
@@ -64,6 +64,7 @@ int string_buffer_init_read_file(const char *filename, struct string_buffer *buf
     fseek(f, 0, SEEK_END);
     long length = ftell(f);
     fseek(f, 0, SEEK_SET);
+    if (length > max_length) return -1;
     if (string_buffer_init(buf, length + 1)) goto read_error_exit;
     long nread = fread(buf->data, 1, length, f);
     if (nread != length) {
@@ -80,6 +81,15 @@ read_error_exit:
 }
 
 
+int string_buffer_contains_zero(struct string_buffer *buf, long read_length) {
+  for (long i = 0; i < read_length && i < buf->len; i++) {
+    if (buf->data[i] == 0) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
 static int write_file_content(const char *filename, struct string_buffer *buf) {
 #ifdef _WIN32
     FILE *of = fopen(filename, "wb");
@@ -92,11 +102,15 @@ static int write_file_content(const char *filename, struct string_buffer *buf) {
 }
 
 
+#define MAX_FILE_SIZE (50 * 1024 * 1024)
+#define MAX_BYTES_BINARY_CHECK 1024
+
 int find_replace_prefix_path(const char *filename, char *prefix[], int prefix_len, const char *pattern, const char *replacement) {
     const int replacement_len = strlen(replacement);
     const int pattern_len = strlen(pattern);
     struct string_buffer buffer[1];
-    if (string_buffer_init_read_file(filename, buffer)) return -1;
+    if (string_buffer_init_read_file(filename, buffer, MAX_FILE_SIZE)) return -1;
+    if (string_buffer_contains_zero(buffer, MAX_BYTES_BINARY_CHECK)) return -1;
     size_t length = buffer->len;
 
     struct string_buffer new_content[1];
@@ -149,7 +163,8 @@ int find_replace_path(const char *filename, const char *pattern, const char *rep
     const int replacement_len = strlen(replacement);
     const int pattern_len = strlen(pattern);
     struct string_buffer buffer[1];
-    if (string_buffer_init_read_file(filename, buffer)) return -1;
+    if (string_buffer_init_read_file(filename, buffer, MAX_FILE_SIZE)) return -1;
+    if (string_buffer_contains_zero(buffer, MAX_BYTES_BINARY_CHECK)) return -1;
     size_t length = buffer->len;
 
     struct string_buffer new_content[1];

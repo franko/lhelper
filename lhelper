@@ -153,7 +153,7 @@ library_dir_reloc () {
     local archive_dir="$1"
     local old_prefix="$2"
     local new_prefix="$3"
-    find "$archive_dir" '(' -name '*.la' -or -name '*.pc' -or -name '*-config' ')' -exec lh-path-replace '{}' "$old_prefix" "$new_prefix" \;
+    find "$archive_dir" -type f -exec lh-path-replace '{}' "$old_prefix" "$new_prefix" \;
 }
 
 # Extract library archive and relocate prefix path references.
