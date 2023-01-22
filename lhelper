@@ -542,7 +542,7 @@ check_dependencies () {
             # otherwise package is already installed: do nothing
             esac
         elif system_library_version "$cd_package" &> /dev/null; then
-            cd_package_found="$name $(system_library_version "$cd_package")"
+            cd_package_found="$cd_package $(system_library_version "$cd_package")"
             if ! test_package_spec "$cd_dependency" "$cd_package_found" --skip; then
                 echo "Error: incompatible version for system library $name."
                 exit 1
