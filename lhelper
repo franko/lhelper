@@ -46,6 +46,14 @@ fs_security_delay () {
     fi
 }
 
+check_commands () {
+    # The arguments should be a list of commands without any argument or space.
+    for command in "$@"; do
+        # Using exit code 3 to signal a missing command
+        type "$command" > /dev/null 2>&1 || { echo >&2 "error: command \"${command}\" is required but it's not available"; return 1; }
+    done
+}
+
 # https://gcc.gnu.org/onlinedocs/gcc/x86-Options.html
 # https://gcc.gnu.org/onlinedocs/gcc/ARM-Options.html#ARM-Options
 
@@ -1382,6 +1390,22 @@ install_command () {
     check_env_active_or_exit
     local lib_install_mode=verbose
     library_check_and_install run "${@:2}"
+}
+
+# The compiler gcc or clang are checked when installing lhelper.
+# tar, gzip, git and curl are essential to fetch and pack or unpack source code and
+# compiled packages.
+# In theory pkg-config may be required for each package that actually need it but that's
+# not very practical.
+# Note that the following commands may be needed by specific recipes and should be
+# verified from the recipe itself: make, ninja, meson, cmake, grep, cmp, diff.
+# Recipes my possibly needs also other programs like python, perl or other.
+# We don't check for "ar" but we may. Normally if gcc or clang are available "ar" will
+# be available to as well as the linker.
+required_commands=(tar gzip git curl pkg-config)
+check_commands "${required_commands[@]}" || {
+    echo "Make sure the commands: ${required_commands[@]} are available."
+    exit 1
 }
 
 case $1 in
