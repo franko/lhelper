@@ -308,8 +308,8 @@ build_and_install () {
         processed_options="$(meson_options "${mopts[@]}")"
         mkdir build
         pushd_quiet build
-        echo "Using meson command: " meson --buildtype="${BUILD_TYPE,,}" $processed_options setup ..
-        meson --buildtype="${BUILD_TYPE,,}" $processed_options setup .. || {
+        echo "Using meson command: " meson setup --buildtype="${BUILD_TYPE,,}" $processed_options ..
+        meson setup --buildtype="${BUILD_TYPE,,}" $processed_options .. || {
             echo "error: while running meson config" >&2
             exit 6
         }
