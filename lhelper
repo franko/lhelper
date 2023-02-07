@@ -1116,6 +1116,26 @@ guess_missing_cpu_type_target () {
     fi
 }
 
+find_editor () {
+    if [[ -z ${EDITOR+x} ]]; then
+        echo "Information: the EDITOR variable is not set: choosing a terminal editor" 1>&2
+        echo "from those available." 1>&2
+        echo "You may configure the EDITOR variable to define your editor." 1>&2
+
+        # we list the most commonly used editors from the more easy to use
+        # to the most specific one. The fact the vim is near the end is wante
+        # because people not familiar with vim can get easily stuck.
+        for editor_name in nano micro emacs vim nvim; do
+            if command -v "$editor_name" &> /dev/null; then
+                echo "$editor_name"
+                break
+            fi
+        done
+    else
+        echo "$EDITOR"
+    fi
+}
+
 activate_command () {
     if [[ $# -lt 2 || $2 == "-"* ]]; then
         echo "Usage: $LHELPER_COMMAND_NAME activate <spec-filename> [options]"
@@ -1299,7 +1319,7 @@ packages=($(printf '"%s" ' "${ini_packages[@]}"))
 EOF
     fi
     if [[ ! -z ${edit_file+x} ]]; then
-        "${EDITOR-vim}" "$build_filename"
+        "$(find_editor)" "$build_filename"
     fi
     if [[ $command == activate && ! -f "$build_filename" ]]; then
         echo "error: the file $build_filename does not exist or is not a file"
@@ -1438,7 +1458,7 @@ edit | reload)
     if [ $1 == edit ]; then
         # LHELPER_BUILD_FILENAME must be defined here. It is empty only for
         # temporary environment not directly used by users.
-        "${EDITOR-vim}" "$LHELPER_ENV_ROOT/$LHELPER_BUILD_FILENAME"
+        "$(find_editor)" "$LHELPER_ENV_ROOT/$LHELPER_BUILD_FILENAME"
     fi
     # We send a SIGUSR1 to the parent process, the activated bash shell.
     # The variable PPID is a builtin bash variable for the PID of the parent process.
