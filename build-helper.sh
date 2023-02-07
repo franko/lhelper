@@ -172,6 +172,12 @@ check_commands () {
     done
 }
 
+test_commands () {
+    for command in "$@"; do
+        type "$command" > /dev/null 2>&1 || { echo >&2 "error: command \"${command}\" is required but it's not available"; return 1; }
+    done
+}
+
 configure_options () {
     local shared_option="--disable-shared"
     local pic_option
@@ -270,6 +276,7 @@ build_and_install () {
     if [[ "${_lh_recipe_run}" == "dependencies" ]]; then return 0; fi
     case $1 in
     cmake)
+        test_commands cmake || exit 3
         processed_options="$(cmake_options "${@:2}")"
         local cmake_gen
         if command -v ninja &> /dev/null; then
@@ -295,6 +302,7 @@ build_and_install () {
         popd_quiet
         ;;
     meson)
+        test_commands meson ninja || exit 3
         local mopts=("${@:2}")
         local destdir_opt
         if [[ " ${mopts[*]} " =~ " --prefix=" ]]; then
@@ -323,6 +331,7 @@ build_and_install () {
         popd_quiet
         ;;
     configure)
+        test_commands make grep cmp diff || exit 3
         processed_options="$(configure_options "${@:2}")"
         add_build_type_compiler_flags "$BUILD_TYPE"
         echo "Using configure command: " configure --prefix="$WIN_INSTALL_PREFIX" $processed_options
