@@ -340,7 +340,7 @@ build_and_install () {
             exit 6
         }
         local make_options=()
-        if command -v nproc; then
+        if command -v nproc &> /dev/null; then
             local cpu_cores="$(nproc --all)"
             if [[ $? -eq 0 && -n "$cpu_cores" ]]; then
                 make_options+=(-j$cpu_cores)
