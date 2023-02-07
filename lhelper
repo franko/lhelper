@@ -1315,7 +1315,7 @@ BUILD_TYPE="${BUILD_TYPE:-Release}"
 # the libray name and its option followed by spaces.
 # For example:
 # packages=("freetype2"  "sdl2 -opengl")
-packages=($(printf '"%s" ' "${ini_packages[@]}"))
+packages=($(if [[ ${#ini_packages[@]} -gt 0 ]]; then printf '"%s" ' "${ini_packages[@]}"; fi))
 EOF
     fi
     if [[ ! -z ${edit_file+x} ]]; then
