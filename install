@@ -60,6 +60,16 @@ recipes_dir="$DESTDIR/share/lhelper/recipes"
 
 lhcomp="$(find_compiler)"
 
+echo "Installing lhelper with prefix $DESTDIR"
+
+mkdir -p "$DESTDIR/bin"
+mkdir -p "$DESTDIR/share/lhelper/patch"
+mkdir -p "$DESTDIR/var/lib/lhelper/builds"
+mkdir -p "$DESTDIR/var/lib/lhelper/archives"
+mkdir -p "$DESTDIR/var/lib/lhelper/packages"
+mkdir -p "$DESTDIR/var/lib/lhelper/digests"
+mkdir -p "$DESTDIR/share/bash-completion/completions"
+
 pushd_quiet src
 for modname in path-replace sort cmp realpath; do
     echo "compiling lh-$modname"
@@ -71,16 +81,6 @@ for modname in path-replace sort cmp realpath; do
     cp lh-$modname "$DESTDIR/bin"
 done
 popd_quiet
-
-echo "Installing lhelper with prefix $DESTDIR"
-
-mkdir -p "$DESTDIR/bin"
-mkdir -p "$DESTDIR/share/lhelper/patch"
-mkdir -p "$DESTDIR/var/lib/lhelper/builds"
-mkdir -p "$DESTDIR/var/lib/lhelper/archives"
-mkdir -p "$DESTDIR/var/lib/lhelper/packages"
-mkdir -p "$DESTDIR/var/lib/lhelper/digests"
-mkdir -p "$DESTDIR/share/bash-completion/completions"
 
 cp build-helper.sh "$DESTDIR/share/lhelper"
 cp create-env.sh "$DESTDIR/share/lhelper"
