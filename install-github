@@ -1,10 +1,31 @@
 #!/usr/bin/env bash
 
-if [[ "$OSTYPE" == msys || "$OSTYPE" == win32 ]]; then
-  tmpdir="$tmp"
+unset tmpdir
+remove_tmpdir=no
+if [[ -d /tmp ]]; then
+  tmpdir="/tmp"
+elif [[ ! -z ${TEMP+x} ]]; then
+  tmpdir="$TEMP"
 else
-  tmpdir="$TMPDIR"
+  remove_tmpdir=yes
+  tmpdir=".tmp"
+  mkdir -p ".tmp" || {
+    echo "error: cannot create a temporary directory in the current directory."
+    exit 1
+  }
 fi
+
+if [[ ! -d "$tmpdir" ]]; then
+  echo "error: invalid temporary directory from TEMP or TMPDIR variables"
+  exit 1
+fi
+
+exit_cleanup () {
+  if [[ $remove_tmpdir == yes && -d "$tmpdir" ]]; then
+    rm -fr "$tmpdir"
+  fi
+  exit $1
+}
 
 pushd_quiet () { builtin pushd "$@" > /dev/null; }
 popd_quiet () { builtin popd > /dev/null; }
@@ -24,7 +45,7 @@ if [ ! -d "$destdir/bin" ]; then
   if [ $? -ne 0 ]; then
     echo "Fatal error: Cannot create directory: $destdir/bin"
     echo "Aborting install"
-    exit 1
+    exit_cleanup 1
   fi
 fi
 
@@ -47,3 +68,4 @@ fi
 popd_quiet
 rm -fr lh-install
 popd_quiet
+exit_cleanup 0

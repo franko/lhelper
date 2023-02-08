@@ -37,7 +37,7 @@ fs_security_delay () {
     # Sometimes on windows we get an error when running tar:
     # tar: <some-file>: file changed as we read it
     # so we add an artificial delay to try to avoid the problem.
-    if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* ]]; then
+    if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* || "$OSTYPE" == "cygwin"* ]]; then
         if command -v sleep &> /dev/null; then
             sleep 1
         else
@@ -186,7 +186,7 @@ extract_archive_reloc () {
 set_prefix_variables () {
     local prefix_dir="$1"
     INSTALL_PREFIX="$prefix_dir"
-    if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* ]]; then
+    if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* || "$OSTYPE" == "cygwin"* ]]; then
         WIN_INSTALL_PREFIX="${INSTALL_PREFIX/#\/c\//c:\/}"
     else
         WIN_INSTALL_PREFIX="${INSTALL_PREFIX}"
@@ -543,6 +543,8 @@ check_dependencies () {
             esac
         elif system_library_version "$cd_package" &> /dev/null; then
             cd_package_found="$cd_package $(system_library_version "$cd_package")"
+	    echo DEBUG test_package_spec \""$cd_dependency"\" \""$cd_package_found"\" --skip
+	    echo DEBUG MORE "\"$name\"" "\"$cd_package\""
             if ! test_package_spec "$cd_dependency" "$cd_package_found" --skip; then
                 echo "Error: incompatible version for system library $name."
                 exit 1
