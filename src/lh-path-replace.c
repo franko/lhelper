@@ -104,13 +104,15 @@ static int write_file_content(const char *filename, struct string_buffer *buf) {
 
 #define MAX_FILE_SIZE (50 * 1024 * 1024)
 #define MAX_BYTES_BINARY_CHECK 1024
+#define ERR_READING_FILE (-1)
+#define ERR_BINARY_FILE (-13)
 
 int find_replace_prefix_path(const char *filename, char *prefix[], int prefix_len, const char *pattern, const char *replacement) {
     const int replacement_len = strlen(replacement);
     const int pattern_len = strlen(pattern);
     struct string_buffer buffer[1];
-    if (string_buffer_init_read_file(filename, buffer, MAX_FILE_SIZE)) return -1;
-    if (string_buffer_contains_zero(buffer, MAX_BYTES_BINARY_CHECK)) return -1;
+    if (string_buffer_init_read_file(filename, buffer, MAX_FILE_SIZE)) return ERR_READING_FILE;
+    if (string_buffer_contains_zero(buffer, MAX_BYTES_BINARY_CHECK)) return ERR_BINARY_FILE;
     size_t length = buffer->len;
 
     struct string_buffer new_content[1];
@@ -163,8 +165,8 @@ int find_replace_path(const char *filename, const char *pattern, const char *rep
     const int replacement_len = strlen(replacement);
     const int pattern_len = strlen(pattern);
     struct string_buffer buffer[1];
-    if (string_buffer_init_read_file(filename, buffer, MAX_FILE_SIZE)) return -1;
-    if (string_buffer_contains_zero(buffer, MAX_BYTES_BINARY_CHECK)) return -1;
+    if (string_buffer_init_read_file(filename, buffer, MAX_FILE_SIZE)) return ERR_READING_FILE;
+    if (string_buffer_contains_zero(buffer, MAX_BYTES_BINARY_CHECK)) return ERR_BINARY_FILE;
     size_t length = buffer->len;
 
     struct string_buffer new_content[1];
@@ -204,11 +206,70 @@ error_exit:
     return -1;
 }
 
+void *
+this_memmem(const void *haystack, size_t n, const void *needle, size_t m) {
+    if (m > n || !m || !n)
+        return NULL;
+    if (m > 1) {
+        const unsigned char*  y = (const unsigned char*) haystack;
+        const unsigned char*  x = (const unsigned char*) needle;
+        size_t                j = 0;
+        size_t                k = 1, l = 2;
+        if (x[0] == x[1]) {
+            k = 2;
+            l = 1;
+        }
+        while (j <= n-m) {
+            if (x[1] != y[j+1]) {
+                j += k;
+            } else {
+                if (!memcmp(x+2, y+j+2, m-2) && x[0] == y[j])
+                    return (void*) &y[j];
+                j += l;
+            }
+        }
+    } else {
+        /* degenerate case */
+        return memchr(haystack, ((unsigned char*)needle)[0], n);
+    }
+    return NULL;
+}
+
+int find_prefix_file_any(const char *filename, const char *pattern) {
+    const int pattern_len = strlen(pattern);
+    struct string_buffer buffer[1];
+    if (string_buffer_init_read_file(filename, buffer, MAX_FILE_SIZE)) return -1;
+    size_t length = buffer->len;
+
+    char *current = buffer->data;
+    char *buffer_end = buffer->data + length;
+    int prefix_found = 0;
+    while (current < buffer_end) {
+        char *p = this_memmem(current, buffer->len, pattern, pattern_len);
+        if (p) {
+            if (!char_is_alphanum_dash(*(p + pattern_len)) && (p  == buffer->data || !char_is_alphanum_dash(*(p - 1)))) {
+                prefix_found = 1;
+                break;
+            } else {
+                current = p + 1;
+            }
+        } else {
+            current = buffer_end;
+        }
+    }
+
+    free(buffer->data);
+    return prefix_found;
+}
+
 int main(int argc, char *argv[]) {
     if (argc < 4) return 1;
+    int status = 0;
     const char *pattern = argv[2];
     const char *replacement = argv[3];
+    const char *pattern_base = pattern;
     if (char_is_alpha(*pattern) && pattern[1] == ':' && pattern[2] == '/') {
+        pattern_base = pattern + 2;
         const int drive_letter = tolower(*pattern);
         char *msysroot = getenv("LH_MSYSROOT");
         /* We use the variable above to recognize the MSYS Windows root directory. */
@@ -226,10 +287,15 @@ int main(int argc, char *argv[]) {
         sprintf(prefix_array[0], "%c:", drive_letter);
         sprintf(prefix_array[1], "%c:", toupper(drive_letter));
         sprintf(prefix_array[2], "/%c", drive_letter);
-        return find_replace_prefix_path(argv[1], prefix_array, 3, pattern + 2, replacement);
+        status = find_replace_prefix_path(argv[1], prefix_array, 3, pattern_base, replacement);
     } else {
-        return find_replace_path(argv[1], pattern, replacement);
+        status = find_replace_path(argv[1], pattern, replacement);
     }
-    return 0;
+    if (status == ERR_BINARY_FILE) {
+        if (!find_prefix_file_any(argv[1], pattern_base)) {
+            status = 0;
+        }
+    }
+    return status;
 }
 

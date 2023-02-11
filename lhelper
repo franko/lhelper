@@ -161,7 +161,14 @@ library_dir_reloc () {
     local archive_dir="$1"
     local old_prefix="$2"
     local new_prefix="$3"
-    find "$archive_dir" -type f -exec lh-path-replace '{}' "$old_prefix" "$new_prefix" \;
+    reloc_warning_prefix="$old_prefix"
+    reloc_warning_files=()
+    local files_list filename
+    readarray -d '' files_list < <(find "$archive_dir" -type f -print0)
+    for name in "${files_list[@]}"; do
+        lh-path-replace "$name" "$old_prefix" "$new_prefix" || reloc_warning_files+=("$name")
+    done
+    return ${#reloc_warning_files[@]}
 }
 
 # Extract library archive and relocate prefix path references.
@@ -645,6 +652,7 @@ build_env_digest () {
 
 # The first argument, $run_mode, should be either "dependencies", "run" or "log"
 library_install () {
+    local reloc_warning_prefix reloc_warning_files
     local run_mode="$1"
     shift
 
@@ -823,8 +831,15 @@ library_install () {
         fix_pkgconfig_install
         lib_install_msg "done"
 
-        library_dir_reloc "$LHELPER_TEMP_ROOT" "$WIN_INSTALL_PREFIX" "__LHELPER_PREFIX__"
-
+        library_dir_reloc "$LHELPER_TEMP_ROOT" "$WIN_INSTALL_PREFIX" "__LHELPER_PREFIX__" || {
+            local warn_filename
+            echo "warning: prefix directory \"$reloc_warning_prefix\" found in binary files:" >&2; echo >&2
+            for warn_filename in "${reloc_warning_files[@]}"; do
+                echo "$warn_filename" >&2
+            done
+            echo >&2
+            echo "The build recipe for this package may need to be fixed" >&2; echo >&2
+        }
         fs_security_delay
         tar -C "$LHELPER_TEMP_ROOT" -czf "${tar_package_filename}" .
         mv "${tar_package_filename}" "$LHELPER_WORKING_DIR/packages"
