@@ -831,7 +831,6 @@ library_install () {
             echo "error: downloading package ${tar_package_filename} from $LHELPER_DOMAIN"
             exit 1
         }
-        echo DEBUG download successfully
     else
         prepare_temp_dir "$LHELPER_WORKING_DIR"
         lib_install_msg "Building library..."
