@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+LHELPER_PACKAGE_VERSION=1
+
 recipes_branch=master
 if [[ "$1" == "--use="* ]]; then
     recipes_branch="${1#--use=}"
@@ -66,7 +68,7 @@ mkdir -p "$DESTDIR/bin"
 mkdir -p "$DESTDIR/share/lhelper/patch"
 mkdir -p "$DESTDIR/var/lib/lhelper/builds"
 mkdir -p "$DESTDIR/var/lib/lhelper/archives"
-mkdir -p "$DESTDIR/var/lib/lhelper/packages"
+mkdir -p "$DESTDIR/var/lib/lhelper/packages/$LHELPER_PACKAGE_VERSION"
 mkdir -p "$DESTDIR/var/lib/lhelper/digests"
 mkdir -p "$DESTDIR/share/bash-completion/completions"
 

@@ -100,7 +100,7 @@ packages=("libfoo -opt1" "libbar -opt1 -opt2")
 The create command has a closely related command called "activate" with the same options.
 
 ```sh
-lhelper activate <spec-file> [options]
+lhelper activate [options] <spec-file>
 ```
 
 The "activate" command will behave like "create" except after the creation of the environment it

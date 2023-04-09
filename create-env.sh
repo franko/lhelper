@@ -52,14 +52,14 @@ env_create_directories () {
     done
     mkdir -p "$prefix/include"
     mkdir -p "$prefix/bin"
-    mkdir -p "$prefix/packages"
+    mkdir -p "$prefix/packages/$LHELPER_PACKAGE_VERSION"
     mkdir -p "$prefix/logs"
 
     touch "$prefix/bin/lhelper-packages"
 
     # To avoid deleting the directories when removing packages
     touch "$prefix/logs/.keep"
-    touch "$prefix/packages/.keep"
+    touch "$prefix/packages/$LHELPER_PACKAGE_VERSION/.keep"
 }
 
 env_create_config () {

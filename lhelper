@@ -10,6 +10,10 @@ fi
 LHELPER_BIN_DIRNAME="$(dirname "$0")"
 LHELPER_PREFIX="${LHELPER_BIN_DIRNAME%/bin}"
 
+export LHELPER_PACKAGE_VERSION=1
+export LHELPER_PKG_DOWNLOAD=yes
+LHELPER_DOMAIN=lhelper.cc
+
 export LHELPER_WORKING_DIR="$LHELPER_PREFIX/var/lib/lhelper"
 export LHELPER_DIR="$LHELPER_PREFIX/share/lhelper"
 
@@ -32,6 +36,39 @@ fi
 
 pushd_quiet () { builtin pushd "$@" > /dev/null; }
 popd_quiet () { builtin popd > /dev/null; }
+
+upload_package() {
+    package_version="$1"
+    package_filename="$2"
+    package_name=$(basename "$package_filename")
+
+    # Check if the file exists
+    response=$(curl -s -o /dev/null -w '%{http_code}' "http://$LHELPER_DOMAIN/packages/$package_version/$package_name")
+
+    if [ "$response" -ne 200 ]; then
+        # File does not exist, upload using scp
+        scp "$package_filename" "lhelper@$LHELPER_DOMAIN:/lhelper/files/$package_version/$package_name"
+        echo "Package $package_name uploaded successfully to version $package_version."
+    else
+        echo "Package $package_name with version $package_version already exists. No upload needed."
+    fi
+}
+
+function check_remote_package() {
+    local package_version="$1"
+    local package_name="$2"
+    local url="http://$LHELPER_DOMAIN/packages/${package_version}/${package_name}"
+    curl --output /dev/null --silent --head --fail "${url}"
+}
+
+function download_package() {
+    local package_version="$1"
+    local package_name="$2"
+    local destdir="$3"
+    local url="http://$LHELPER_DOMAIN/packages/${package_version}/${package_name}"
+    local output_file="${destdir}/${package_version}/${package_name}"
+    curl -L "${url}" -o "${output_file}" >/dev/null 2>&1
+}
 
 fs_security_delay () {
     # Sometimes on windows we get an error when running tar:
@@ -180,7 +217,7 @@ extract_archive_reloc () {
     local _install_prefix="$4"
     local filename_list="$5"
     local package_temp_dir="$LHELPER_WORKING_DIR/tmp"
-    tar -C "$package_temp_dir" -xf "$LHELPER_WORKING_DIR/packages/${tar_package_filename}"
+    tar -C "$package_temp_dir" -xf "$LHELPER_WORKING_DIR/packages/$LHELPER_PACKAGE_VERSION/${tar_package_filename}"
     library_dir_reloc "$package_temp_dir" "$old_prefix" "$new_prefix"
     # Getting list of package's files
     pushd_quiet "$package_temp_dir"
@@ -317,12 +354,12 @@ query_package () {
 
 package_is_installed () {
     local prefix="$1" package="$2"
-    test -f "$prefix/packages/$package.list"
+    test -f "$prefix/packages/$LHELPER_PACKAGE_VERSION/$package.list"
 }
 
 remove_package () {
     local prefix="$1" package="$2"
-    local filename_list="$prefix/packages/$package.list"
+    local filename_list="$prefix/packages/$LHELPER_PACKAGE_VERSION/$package.list"
     pushd_quiet "$prefix"
     while IFS= read -r line; do
         if [ -f "$line" ]; then
@@ -654,8 +691,7 @@ library_install () {
     local run_mode="$1"
     shift
 
-    local local_recipe
-    local rebuild
+    local rebuild local_recipe
     while [[ "$1" == -* ]]; do
         case "$1" in
         --local)
@@ -787,8 +823,15 @@ library_install () {
     fi
 
     local tar_package_filename="${package}${options_tag}_${recipe_version}_${digest}.tar.gz"
-    if [[ -z ${rebuild+set} && -z ${local_recipe+set} && "$version" != "git-"* && -f "$LHELPER_WORKING_DIR/packages/${tar_package_filename}" ]]; then
+    if [[ -z ${rebuild+set} && -z ${local_recipe+set} && "$version" != "git-"* && -f "$LHELPER_WORKING_DIR/packages/$LHELPER_PACKAGE_VERSION/${tar_package_filename}" ]]; then
         lib_install_msg "Found an existing package"
+    elif [[ -z ${rebuild+set} && -z ${local_recipe+set} && "$version" != "git-"* ]] && check_remote_package "$LHELPER_PACKAGE_VERSION" "${tar_package_filename}"; then
+        lib_install_msg "Found an package in the remote location $LHELPER_DOMAIN"
+        download_package "$LHELPER_PACKAGE_VERSION" "${tar_package_filename}" "$LHELPER_WORKING_DIR/packages" || {
+            echo "error: downloading package ${tar_package_filename} from $LHELPER_DOMAIN"
+            exit 1
+        }
+        echo DEBUG download successfully
     else
         prepare_temp_dir "$LHELPER_WORKING_DIR"
         lib_install_msg "Building library..."
@@ -840,12 +883,15 @@ library_install () {
         }
         fs_security_delay
         tar -C "$LHELPER_TEMP_ROOT" -czf "${tar_package_filename}" .
-        mv "${tar_package_filename}" "$LHELPER_WORKING_DIR/packages"
+        if [[ "$LHELPER_UPLOAD" == yes ]]; then
+            upload_package "$LHELPER_PACKAGE_VERSION" "${tar_package_filename}"
+        fi
+        mv "${tar_package_filename}" "$LHELPER_WORKING_DIR/packages/$LHELPER_PACKAGE_VERSION"
         echo "Saved package for \"$package\""
     fi
     unset _lh_recipe_run
     set_prefix_variables "$LHELPER_ENV_PREFIX"
-    local filename_list="$LHELPER_ENV_PREFIX/packages/${package}.list"
+    local filename_list="$LHELPER_ENV_PREFIX/packages/$LHELPER_PACKAGE_VERSION/${package}.list"
     extract_archive_reloc "${tar_package_filename}" '__LHELPER_PREFIX__' "$WIN_INSTALL_PREFIX" "$INSTALL_PREFIX" "$filename_list"
     register_package "$package" "$recipe_version" "${options_a[@]}" "$digest"
     lib_install_msg "Package \"$package\" successfully installed"
@@ -893,7 +939,7 @@ print_create_env_message () {
 
 print_package_files () {
     local package="$1"
-    cat "$LHELPER_ENV_PREFIX/packages/${package}.list"
+    cat "$LHELPER_ENV_PREFIX/packages/$LHELPER_PACKAGE_VERSION/${package}.list"
 }
 
 check_env_active_or_exit () {
@@ -1150,13 +1196,13 @@ find_editor () {
 }
 
 activate_command () {
-    if [[ $# -lt 2 || $2 == "-"* ]]; then
-        echo "Usage: $LHELPER_COMMAND_NAME activate <spec-filename> [options]"
+    if [[ $# -lt 2 ]]; then
+        echo "Usage: $LHELPER_COMMAND_NAME activate [options] <spec-filename>"
         exit 1
     fi
-    local command="$1" build_filename="$2"
-    local lib_install_mode=verbose edit_file show_dependencies
-    shift 2
+    local command="$1"
+    shift
+    local lib_install_mode=verbose edit_file show_dependencies build_filename
     local ini_packages=()
     while [ ! -z ${1+x} ]; do
         case "$1" in
@@ -1165,6 +1211,9 @@ activate_command () {
             ;;
         --show-dependencies)
             show_dependencies=yes
+            ;;
+        --upload)
+            export LHELPER_UPLOAD=yes
             ;;
         --packages)
             ini_packages=("${@:2}")
@@ -1175,8 +1224,11 @@ activate_command () {
             exit 1
             ;;
         *)
-            echo "error: unexpected argument: \"$1\""
-            exit 1
+            if [ ! -z ${build_filename+x} ]; then
+                echo "error: multiple package names"
+                exit 1
+            fi
+            build_filename="$1"
             ;;
         esac
         shift
