@@ -12,7 +12,9 @@ LHELPER_PREFIX="${LHELPER_BIN_DIRNAME%/bin}"
 
 export LHELPER_PACKAGE_VERSION=1
 export LHELPER_PKG_DOWNLOAD=yes
-LHELPER_DOMAIN=lhelper.cc
+LHELPER_DOMAIN="lhelper.cc"
+LHELPER_WWW_DOMAIN="https://www.lhelper.cc"
+
 
 export LHELPER_WORKING_DIR="$LHELPER_PREFIX/var/lib/lhelper"
 export LHELPER_DIR="$LHELPER_PREFIX/share/lhelper"
@@ -43,7 +45,7 @@ upload_package() {
     package_name=$(basename "$package_filename")
 
     # Check if the file exists
-    response=$(curl -s -o /dev/null -w '%{http_code}' "http://$LHELPER_DOMAIN/packages/$package_version/$package_name")
+    response=$(curl -s -o /dev/null -w '%{http_code}' "$LHELPER_WWW_DOMAIN/packages/$package_version/$package_name")
 
     if [ "$response" -ne 200 ]; then
         # File does not exist, upload using scp
@@ -57,7 +59,7 @@ upload_package() {
 function check_remote_package() {
     local package_version="$1"
     local package_name="$2"
-    local url="http://$LHELPER_DOMAIN/packages/${package_version}/${package_name}"
+    local url="$LHELPER_WWW_DOMAIN/packages/${package_version}/${package_name}"
     curl --output /dev/null --silent --head --fail "${url}"
 }
 
@@ -65,7 +67,7 @@ function download_package() {
     local package_version="$1"
     local package_name="$2"
     local destdir="$3"
-    local url="http://$LHELPER_DOMAIN/packages/${package_version}/${package_name}"
+    local url="$LHELPER_WWW_DOMAIN/packages/${package_version}/${package_name}"
     local output_file="${destdir}/${package_version}/${package_name}"
     curl -L "${url}" -o "${output_file}" >/dev/null 2>&1
 }
@@ -826,9 +828,9 @@ library_install () {
     if [[ -z ${rebuild+set} && -z ${local_recipe+set} && "$version" != "git-"* && -f "$LHELPER_WORKING_DIR/packages/$LHELPER_PACKAGE_VERSION/${tar_package_filename}" ]]; then
         lib_install_msg "Found an existing package"
     elif [[ -z ${rebuild+set} && -z ${local_recipe+set} && "$version" != "git-"* ]] && check_remote_package "$LHELPER_PACKAGE_VERSION" "${tar_package_filename}"; then
-        lib_install_msg "Found an package in the remote location $LHELPER_DOMAIN"
+        lib_install_msg "Found an package in the remote location $LHELPER_WWW_DOMAIN"
         download_package "$LHELPER_PACKAGE_VERSION" "${tar_package_filename}" "$LHELPER_WORKING_DIR/packages" || {
-            echo "error: downloading package ${tar_package_filename} from $LHELPER_DOMAIN"
+            echo "error: downloading package ${tar_package_filename} from $LHELPER_WWW_DOMAIN"
             exit 1
         }
     else
