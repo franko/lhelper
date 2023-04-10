@@ -39,18 +39,38 @@ fi
 pushd_quiet () { builtin pushd "$@" > /dev/null; }
 popd_quiet () { builtin popd > /dev/null; }
 
+urlencode() {
+    local string="$1"
+    local encoded=""
+
+    for (( i=0; i<${#string}; i++ )); do
+        local c="${string:$i:1}"
+        case $c in
+            [a-zA-Z0-9.~_-]) encoded+="$c" ;;
+            *) printf -v c_urlencoded '%%%02X' "'$c"
+               encoded+="$c_urlencoded"
+        esac
+    done
+
+    echo "$encoded"
+}
+
 upload_package() {
     package_version="$1"
     package_filename="$2"
     package_name=$(basename "$package_filename")
+    local package_url="${package_version}/$(urlencode "$package_name")"
 
     # Check if the file exists
-    response=$(curl -s -o /dev/null -w '%{http_code}' "$LHELPER_WWW_DOMAIN/packages/$package_version/$package_name")
+    response=$(curl -s -o /dev/null -w '%{http_code}' "$LHELPER_WWW_DOMAIN/packages/$package_url")
 
     if [ "$response" -ne 200 ]; then
         # File does not exist, upload using scp
-        scp "$package_filename" "lhelper@$LHELPER_DOMAIN:/lhelper/files/$package_version/$package_name"
-        echo "Package $package_name uploaded successfully to version $package_version."
+        if scp "$package_filename" "lhelper@$LHELPER_DOMAIN:/lhelper/files/$package_version/$package_name"; then
+            echo "Package $package_name uploaded successfully with version $package_version"
+        else
+            echo "error uploading ${package_version}/${package_name} into $LHELPER_WWW_DOMAIN"
+        fi
     else
         echo "Package $package_name with version $package_version already exists. No upload needed."
     fi
@@ -67,7 +87,8 @@ function download_package() {
     local package_version="$1"
     local package_name="$2"
     local destdir="$3"
-    local url="$LHELPER_WWW_DOMAIN/packages/${package_version}/${package_name}"
+    local package_url="${package_version}/$(urlencode "$package_name")"
+    local url="$LHELPER_WWW_DOMAIN/packages/${package_url}"
     local output_file="${destdir}/${package_version}/${package_name}"
     curl -L "${url}" -o "${output_file}" >/dev/null 2>&1
 }
