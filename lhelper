@@ -1508,12 +1508,17 @@ install_command () {
 # not very practical.
 # Note that the following commands may be needed by specific recipes and should be
 # verified from the recipe itself: make, ninja, meson, cmake, grep, cmp, diff.
+# As an exception we check here for the make command because it is a very standard
+# command required to compile many projects.
 # Recipes my possibly needs also other programs like python, perl or other.
 # We don't check for "ar" but we may. Normally if gcc or clang are available "ar" will
 # be available to as well as the linker.
-required_commands=(tar gzip git curl pkg-config)
+required_commands=(tar gzip git curl pkg-config make)
+if [ -f /etc/debian_version ]; then
+    required_commands+=(dpkg-architecture)
+fi
 check_commands "${required_commands[@]}" || {
-    echo "Make sure the commands: ${required_commands[@]} are available."
+    echo "Make sure the commands: ${required_commands[@]} are all available."
     exit 1
 }
 
