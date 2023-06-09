@@ -279,6 +279,7 @@ int main(int argc, char *argv[]) {
     const char *pattern = argv[2];
     const char *replacement = argv[3];
     const char *pattern_base = pattern;
+    const char *pattern_msys = NULL;
     if (char_is_alpha(*pattern) && pattern[1] == ':' && pattern[2] == '/') {
         pattern_base = pattern + 2;
         const int drive_letter = tolower(*pattern);
@@ -286,24 +287,25 @@ int main(int argc, char *argv[]) {
         /* We use the variable above to recognize the MSYS Windows root directory. */
         if (msysroot && strlen(msysroot) > 0 && strncmp(pattern, msysroot, strlen(msysroot)) == 0) {
             /* Replace by using a "/" in the pattern instead of LH_MSYSROOT */
-            const char *pattern_msys_skip = pattern + strlen(msysroot);
-            if (*(pattern_msys_skip - 1) == '/') {
-                pattern_msys_skip -= 1;
+            pattern_msys = pattern + strlen(msysroot);
+            if (*(pattern_msys - 1) == '/') {
+                pattern_msys -= 1;
             }
-            int ret = find_replace_path(argv[1], pattern_msys_skip, replacement);
-            if (ret != 0) return ret;
+            status = find_replace_path(argv[1], pattern_msys, replacement);
         }
-        char prefix_data[64];
-        char *prefix_array[3] = {prefix_data, prefix_data + 8, prefix_data + 16};
-        sprintf(prefix_array[0], "%c:", drive_letter);
-        sprintf(prefix_array[1], "%c:", toupper(drive_letter));
-        sprintf(prefix_array[2], "/%c", drive_letter);
-        status = find_replace_prefix_path(argv[1], prefix_array, 3, pattern_base, replacement);
+        if (status == 0) {
+            char prefix_data[64];
+            char *prefix_array[3] = {prefix_data, prefix_data + 8, prefix_data + 16};
+            sprintf(prefix_array[0], "%c:", drive_letter);
+            sprintf(prefix_array[1], "%c:", toupper(drive_letter));
+            sprintf(prefix_array[2], "/%c", drive_letter);
+            status = find_replace_prefix_path(argv[1], prefix_array, 3, pattern_base, replacement);
+        }
     } else {
         status = find_replace_path(argv[1], pattern, replacement);
     }
     if (status == ERR_BINARY_FILE) {
-        if (!find_prefix_file_any(argv[1], pattern_base)) {
+        if (!find_prefix_file_any(argv[1], pattern_base) && (!pattern_msys || !find_prefix_file_any(argv[1], pattern_msys))) {
             status = 0;
         }
     }
