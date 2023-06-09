@@ -107,10 +107,12 @@ static int write_file_content(const char *filename, struct string_buffer *buf) {
 #define ERR_READING_FILE (-1)
 #define ERR_BINARY_FILE (-13)
 
-int find_replace_prefix_path(const char *filename, char *prefix[], int prefix_len, const char *pattern, const char *replacement) {
+int find_replace_prefix_path(const char *filename, char *prefix[], int prefix_number, const char *pattern, const char *replacement) {
     const int replacement_len = strlen(replacement);
     const int pattern_len = strlen(pattern);
     struct string_buffer buffer[1];
+    int prefix_i;
+
     if (string_buffer_init_read_file(filename, buffer, MAX_FILE_SIZE)) return ERR_READING_FILE;
     if (string_buffer_contains_zero(buffer, MAX_BYTES_BINARY_CHECK)) return ERR_BINARY_FILE;
     size_t length = buffer->len;
@@ -118,31 +120,40 @@ int find_replace_prefix_path(const char *filename, char *prefix[], int prefix_le
     struct string_buffer new_content[1];
     if (string_buffer_init(new_content, length + 64)) return -1;
 
+    char **patterns_list = malloc(prefix_number * sizeof(char *));
+    for (prefix_i = 0; prefix_i < prefix_number; prefix_i++) {
+        const int prefix_len = strlen(prefix[prefix_i]);
+        patterns_list[prefix_i] = malloc(prefix_len + pattern_len + 1);
+        memcpy(patterns_list[prefix_i], prefix[prefix_i], prefix_len);
+        memcpy(patterns_list[prefix_i] + prefix_len, pattern, pattern_len + 1);
+    }
+
     char *current = buffer->data;
     char *buffer_end = buffer->data + length;
     while (current < buffer_end) {
-        int prefix_i;
-        for (prefix_i = 0; prefix_i < prefix_len; prefix_i++) {
-            char *p = strstr(current, prefix[prefix_i]);
+        char *current_next = buffer_end;
+        int replacement_done = 0;
+        for (prefix_i = 0; prefix_i < prefix_number; prefix_i++) {
+            const int match_len = strlen(prefix[prefix_i]) + pattern_len;
+            char *p = strstr(current, patterns_list[prefix_i]);
             if (p) {
-                char *match_start = p;
-                p += strlen(prefix[prefix_i]);
-                if (strncmp(p, pattern, pattern_len) == 0 &&
-                        (match_start == buffer->data || !char_is_alphanum_dash(*(match_start - 1))))
-                {
-                    if (!char_is_alphanum_dash(*(p + pattern_len))) {
-                        if (add_string(new_content, current, match_start - current)) goto error_exit;
-                        if (add_string(new_content, replacement, replacement_len)) goto error_exit;
-                        current = p + pattern_len;
-                        break;
+                if (!char_is_alphanum_dash(*(p + match_len)) && (p == buffer->data || !char_is_alphanum_dash(*(p - 1)))) {
+                    if (add_string(new_content, current, p - current)) goto error_exit;
+                    if (add_string(new_content, replacement, replacement_len)) goto error_exit;
+                    current_next = p + match_len;
+                    replacement_done = 1;
+                    break;
+                } else {
+                    if (p + 1 < current_next) {
+                        current_next = p + 1;
                     }
                 }
             }
         }
-        if (prefix_i >= prefix_len) { // no match
-            add_string(new_content, current, 1);
-            current++;
+        if (!replacement_done) {
+            add_string(new_content, current, current_next - current);
         }
+        current = current_next;
     }
 
     if (write_file_content(filename, new_content)) {
