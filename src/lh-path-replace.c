@@ -137,7 +137,7 @@ int find_replace_prefix_path(const char *filename, char *prefix[], int prefix_nu
             const int match_len = strlen(prefix[prefix_i]) + pattern_len;
             char *p = strstr(current, patterns_list[prefix_i]);
             if (p) {
-                if (!char_is_alphanum_dash(*(p + match_len)) && (p == buffer->data || !char_is_alphanum_dash(*(p - 1)))) {
+                if (!char_is_alphanum_dash(*(p + match_len))) {
                     if (add_string(new_content, current, p - current)) goto error_exit;
                     if (add_string(new_content, replacement, replacement_len)) goto error_exit;
                     current_next = p + match_len;
@@ -188,7 +188,7 @@ int find_replace_path(const char *filename, const char *pattern, const char *rep
     while (current < buffer_end) {
         char *p = strstr(current, pattern);
         if (p) {
-            if (!char_is_alphanum_dash(*(p + pattern_len)) && (p  == buffer->data || !char_is_alphanum_dash(*(p - 1)))) {
+            if (!char_is_alphanum_dash(*(p + pattern_len))) {
                 if (add_string(new_content, current, p - current)) goto error_exit;
                 if (add_string(new_content, replacement, replacement_len)) goto error_exit;
                 current = p + pattern_len;
@@ -258,7 +258,7 @@ int find_prefix_file_any(const char *filename, const char *pattern) {
     while (current < buffer_end) {
         char *p = this_memmem(current, buffer->len, pattern, pattern_len);
         if (p) {
-            if (!char_is_alphanum_dash(*(p + pattern_len)) && (p  == buffer->data || !char_is_alphanum_dash(*(p - 1)))) {
+            if (!char_is_alphanum_dash(*(p + pattern_len))) {
                 prefix_found = 1;
                 break;
             } else {
