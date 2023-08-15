@@ -30,10 +30,11 @@ _lhelper () {
   local lhcomp_ls=()
   local lhcomp_packages=()
   local lhcomp_recipes=()
+  local current_word
 
   case $COMP_CWORD in
   1)
-    COMPREPLY=($(compgen -W "activate create dir edit reload env-source list update cleanup" "${COMP_WORDS[1]}"))
+    COMPREPLY=($(compgen -W "activate create dir edit reload env-source list update cleanup register" "${COMP_WORDS[1]}"))
     ;;
   2)
     case "${COMP_WORDS[1]}" in
@@ -46,6 +47,10 @@ _lhelper () {
       ;;
     update)
       COMPREPLY=($(compgen -W "recipes" "${COMP_WORDS[2]}"))
+      ;;
+    register)
+      COMPREPLY=($(compgen -W "key" "${COMP_WORDS[2]}"))
+      ;;
     esac
     ;;
   3)
@@ -57,7 +62,13 @@ _lhelper () {
         else
           return 1
         fi
+        ;;
+      register_key)
+        current_word="${COMP_WORDS[COMP_CWORD]}"
+        COMPREPLY=($(compgen -f -- "${current_word}"))
+        ;;
     esac
+    ;;
   esac
 }
 

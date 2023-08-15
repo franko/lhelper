@@ -15,9 +15,26 @@ export LHELPER_PKG_DOWNLOAD=yes
 LHELPER_DOMAIN="lhelper.cc"
 LHELPER_WWW_DOMAIN="https://www.lhelper.cc"
 
-
 export LHELPER_WORKING_DIR="$LHELPER_PREFIX/var/lib/lhelper"
 export LHELPER_DIR="$LHELPER_PREFIX/share/lhelper"
+
+# config files and directory used by lhelper
+LH_CONFIG_DIR="$HOME/.config/lhelper"
+LH_CONFIG_FILE="$LH_CONFIG_DIR/config"
+
+# this variable defines if we have a ssh key or not. If set it will be the
+# full path of the ssh private key filename.
+unset LH_SSH_KEY_PATH
+
+if [[ -f "$LH_CONFIG_FILE" ]]; then
+    source "$LH_CONFIG_FILE"
+fi
+
+ensure_config_dir_exists() {
+    if [[ ! -d "$LH_CONFIG_DIR" ]]; then
+        mkdir -p "$LH_CONFIG_DIR"
+    fi
+}
 
 # The variable below is used by the command lh-path-replace. It is
 # needed because in MSYS sometimes unix-like absolute path are used
@@ -66,7 +83,7 @@ upload_package() {
 
     if [ "$response" -ne 200 ]; then
         # File does not exist, upload using scp
-        if scp "$package_filename" "lhelper@$LHELPER_DOMAIN:/lhelper/files/$package_version/$package_name"; then
+        if scp -i "$LH_SSH_KEY_PATH" "$package_filename" "lhelper@$LHELPER_DOMAIN:/lhelper/files/$package_version/$package_name"; then
             echo "Package $package_name uploaded successfully with version $package_version"
         else
             echo "error uploading ${package_version}/${package_name} into $LHELPER_WWW_DOMAIN"
@@ -905,7 +922,7 @@ library_install () {
         }
         fs_security_delay
         tar -C "$LHELPER_TEMP_ROOT" -czf "${tar_package_filename}" .
-        if [[ "$LHELPER_UPLOAD" == yes ]]; then
+        if [[ ! -z ${LH_SSH_KEY_PATH+x} ]]; then
             upload_package "$LHELPER_PACKAGE_VERSION" "${tar_package_filename}"
         fi
         mv "${tar_package_filename}" "$LHELPER_WORKING_DIR/packages/$LHELPER_PACKAGE_VERSION"
@@ -1234,9 +1251,6 @@ activate_command () {
         --show-dependencies)
             show_dependencies=yes
             ;;
-        --upload)
-            export LHELPER_UPLOAD=yes
-            ;;
         --packages)
             ini_packages=("${@:2}")
             break
@@ -1561,6 +1575,24 @@ cleanup)
     if [ -d "$clean_env_dir" ]; then
         echo "Cleaning up the environments stored in \"$clean_env_dir\""
         rm -fr "$clean_env_dir"/*
+    fi
+    ;;
+register)
+    if [[ "$2" == key && -n "$3" ]]; then
+        if [[ ! -f "$3" ]]; then
+            echo "The specified SSH key $3 does not exist."
+            exit 1
+        fi
+        ensure_config_dir_exists
+        if [ ! -z ${LH_SSH_KEY_PATH+x} ]; then
+            echo "Warning: the new SSH key will replace the previous one: $LH_SSH_KEY_PATH"
+        fi
+        echo "export LH_SSH_KEY_PATH=\"$3\"" > "$LH_CONFIG_FILE"
+        export LH_SSH_KEY_PATH="$3"
+        echo "SSH key registered successfully."
+    else
+        echo "Usage: $LHELPER_COMMAND_NAME register key <ssh-key-filename>"
+        exit 1
     fi
     ;;
 remove)
