@@ -96,7 +96,15 @@ cp lhelper "$DESTDIR/bin"
 #   $HOME/.local/share/bash-completion/completions
 #   $XDG_DATA_HOME/bash-completion/completions
 #   $BASH_COMPLETION_USER_DIR/completions
-cp lhelper-completion.bash "$DESTDIR/share/bash-completion/completions/lhelper"
+if [[ $OSTYPE == "darwin"* ]]; then
+    if command -v brew >/dev/null 2>&1; then
+        cp lhelper-completion.bash "$(brew --prefix)/etc/bash_completion.d/lhelper"
+    else
+        echo "Warning: bash completion unsupported if Homebrew is not installed"
+    fi
+else
+    cp lhelper-completion.bash "$DESTDIR/share/bash-completion/completions/lhelper"
+fi
 
 if [ -d "$recipes_dir" ]; then
 	echo "Deleting existing recipes dir: $recipes_dir"
