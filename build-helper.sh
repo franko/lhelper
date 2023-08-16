@@ -34,13 +34,15 @@ expand_enter_archive_filename () {
     local path_filename="$1"
     local filename="$(basename "$path_filename")"
     local dir_dest="$2"
+    # arguments starting from $3 are considered additional options for the
+    # extract command, tar or unzip.
     cd "$dir_dest"
     local tmp_expand_dir=".sas"
     rm -fr "$tmp_expand_dir" && mkdir "$tmp_expand_dir" && pushd "$tmp_expand_dir"
     if [[ $filename =~ ".tar."* || $filename =~ ".tgz" ]]; then
-        tar xf "$path_filename" || { echo "Got invalid archive: $basename" >&2; exit 5; }
+        tar xf "$path_filename" "${@:3}" || { echo "Got invalid archive: $basename" >&2; exit 5; }
     elif [[ $filename =~ ".zip" ]]; then
-        unzip "$path_filename" || { echo "Got invalid archive: $basename" >&2; exit 5; }
+        unzip "$path_filename" "${@:3}" || { echo "Got invalid archive: $basename" >&2; exit 5; }
     else
         echo "error: unknown archive format: \"${filename}\""
         exit 1
@@ -131,6 +133,32 @@ enter_archive () {
         return 0
     fi
     local url="$1"
+
+    shift
+    local accu
+    local curl_options=()
+    local extract_options=()
+    while [ ! -z ${1+x} ]; do
+        case $1 in
+        --curl-options)
+            accu=curl
+            ;;
+        --extract-options)
+            accu=extract
+            ;;
+        *)
+            if [[ "$accu" == curl ]]; then
+                curl_options+=("$1")
+            elif [[ "$accu" == extract ]]; then
+                extract_options+=("$1")
+            else
+                echo "error: spurious argument in enter_archive"
+                exit 1
+            fi
+            ;;
+        esac
+    done
+
     local filename="${url##*/}"
     # FIXME: possible collisions in the filename, take the url into account
     if [ ! -f "$LHELPER_WORKING_DIR/archives/$filename" ]; then
@@ -138,11 +166,11 @@ enter_archive () {
         trap interrupt_clean_archive INT
 	    # The option --insecure is used to ignore SSL certificate issues.
 	    # The option --fail let the command fail if the response is a 404.
-        curl --fail --retry 5 --retry-delay 2 --insecure -L "$url" -o "$LHELPER_WORKING_DIR/archives/$filename" || clean_and_exit_download_error
+        curl "${curl_options[@]}" --fail --retry 5 --retry-delay 2 --insecure -L "$url" -o "$LHELPER_WORKING_DIR/archives/$filename" || clean_and_exit_download_error
         trap INT
     fi
     rm -fr "$LHELPER_WORKING_DIR/builds/"*
-    expand_enter_archive_filename "$LHELPER_WORKING_DIR/archives/$filename" "$LHELPER_WORKING_DIR/builds"
+    expand_enter_archive_filename "$LHELPER_WORKING_DIR/archives/$filename" "$LHELPER_WORKING_DIR/builds" "${extract_options[@]}"
 }
 
 inside_git_apply_patch () {
