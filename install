@@ -62,7 +62,36 @@ recipes_dir="$DESTDIR/share/lhelper/recipes"
 
 lhcomp="$(find_compiler)"
 
+# warning: if DESTDIR is ~/.local, /usr, /usr/local the completion are going
+# to work but for other prefix they may not work.
+# Bash will use:
+#   $HOME/.local/share/bash-completion/completions
+#   $XDG_DATA_HOME/bash-completion/completions
+#   $BASH_COMPLETION_USER_DIR/completions
+unset bash_compdir
+if [[ $OSTYPE == "darwin"* ]]; then
+    if command -v brew >/dev/null 2>&1; then
+        bash_compdir="$(brew --prefix)/etc/bash_completion.d"
+    else
+        echo "Warning: bash completion unsupported if Homebrew is not installed"
+    fi
+else
+    BCDIR="share/bash-completion/completions"
+    # We search for a bash completion directory that already exists and the first found
+    for dirpath in "$DESTDIR/$BCDIR" "/usr/$BCDIR" "/etc/bash_completion.d" "/usr/local/$BCDIR" "$HOME/.local/$BCDIR"; do
+        if [ -d "$dirpath" ]; then
+            bash_compdir="$dirpath"
+            break
+        fi
+    done
+fi
+
 echo "Installing lhelper with prefix $DESTDIR"
+if [ ! -z ${bash_compdir+x} ]; then
+    echo "Installing bash completion script in $bash_compdir/lhelper"
+else
+    echo "Warning: no suitable directory found for bash completions, script not installed"
+fi
 
 mkdir -p "$DESTDIR/bin"
 mkdir -p "$DESTDIR/share/lhelper/patch"
@@ -70,7 +99,6 @@ mkdir -p "$DESTDIR/var/lib/lhelper/builds"
 mkdir -p "$DESTDIR/var/lib/lhelper/archives"
 mkdir -p "$DESTDIR/var/lib/lhelper/packages/$LHELPER_PACKAGE_VERSION"
 mkdir -p "$DESTDIR/var/lib/lhelper/digests"
-mkdir -p "$DESTDIR/share/bash-completion/completions"
 
 pushd_quiet src
 for modname in path-replace sort cmp realpath; do
@@ -90,20 +118,9 @@ cp lhelper-bash-init "$DESTDIR/share/lhelper"
 cp patch/*.patch "$DESTDIR/share/lhelper/patch"
 cp lhelper "$DESTDIR/bin"
 
-# warning: if DESTDIR is ~/.local, /usr, /usr/local the completion are going
-# to work but for other prefix they may not work.
-# Bash will use:
-#   $HOME/.local/share/bash-completion/completions
-#   $XDG_DATA_HOME/bash-completion/completions
-#   $BASH_COMPLETION_USER_DIR/completions
-if [[ $OSTYPE == "darwin"* ]]; then
-    if command -v brew >/dev/null 2>&1; then
-        cp lhelper-completion.bash "$(brew --prefix)/etc/bash_completion.d/lhelper"
-    else
-        echo "Warning: bash completion unsupported if Homebrew is not installed"
-    fi
-else
-    cp lhelper-completion.bash "$DESTDIR/share/bash-completion/completions/lhelper"
+if [ ! -z ${bash_compdir+x} ]; then
+    mkdir -p "$bash_compdir"
+    cp lhelper-completion.bash "${bash_compdir}/lhelper"
 fi
 
 if [ -d "$recipes_dir" ]; then
