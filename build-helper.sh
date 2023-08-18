@@ -157,6 +157,7 @@ enter_archive () {
             fi
             ;;
         esac
+        shift
     done
 
     local filename="${url##*/}"
