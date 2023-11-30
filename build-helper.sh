@@ -126,6 +126,55 @@ enter_git_repository () {
     expand_enter_archive_filename "$LHELPER_WORKING_DIR/archives/$archive_filename" "$LHELPER_WORKING_DIR/builds"
 }
 
+# get a name of a variable and transform its content from an URL into
+# a suitable archive filename.
+transform_to_archive_filename () {
+    # the syntax local -n url=... is for bash nameref variables:
+    # https://www.gnu.org/software/bash/manual/html_node/Shell-Parameters.html
+    local -n url="$1"
+    local char final_url
+
+    # Remove protocol (http://, https://, etc)
+    local clean_url="${url#*://}"
+
+    # Split the URL at the last "/"
+    local base_url="${clean_url%/*}"
+    local file_name="${clean_url##*/}"
+
+    # Replace special characters in base_url; '.' also gets replaced by '_'
+    local modified_base_url=""
+    for (( i=0; i<${#base_url}; i++ )); do
+    char="${base_url:$i:1}"
+    if [[ $char =~ [a-zA-Z0-9] ]]; then
+        modified_base_url+="$char"
+    else
+        modified_base_url+="_"
+    fi
+    done
+
+    # Replace special characters in file_name; keep '.'
+    local modified_file_name=""
+    for (( i=0; i<${#file_name}; i++ )); do
+    char="${file_name:$i:1}"
+    if [[ $char =~ [a-zA-Z0-9.] ]]; then
+        modified_file_name+="$char"
+    else
+        modified_file_name+="_"
+    fi
+    done
+
+    # Join the modified parts with an "_"
+    url="${modified_base_url}_${modified_file_name}"
+
+    # Remove uninformative parts from the url-now-a-filename
+    url="${url//www_/}"
+    url="${url//downloads_/}"
+    url="${url//download_/}"
+    url="${url//_archive_refs_tags_/_}"
+    url="${url//_releases_/_}"
+    url="${url//_release_/_}"
+}
+
 # $1 = remote URL
 enter_archive () {
     if [[ "${_lh_recipe_run}" == "dependencies" ]]; then
@@ -160,8 +209,8 @@ enter_archive () {
         shift
     done
 
-    local filename="${url##*/}"
-    # FIXME: possible collisions in the filename, take the url into account
+    local filename="$url"
+    transform_to_archive_filename filename
     if [ ! -f "$LHELPER_WORKING_DIR/archives/$filename" ]; then
         current_download="$LHELPER_WORKING_DIR/archives/$filename"
         trap interrupt_clean_archive INT
