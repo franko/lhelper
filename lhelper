@@ -922,7 +922,7 @@ library_install () {
         }
         fs_security_delay
         tar -C "$LHELPER_TEMP_ROOT" -czf "${tar_package_filename}" .
-        if [[ ! -z ${LH_SSH_KEY_PATH+x} ]]; then
+        if [[ ! -z ${LH_SSH_KEY_PATH+x} && -z ${local_recipe+set} ]]; then
             upload_package "$LHELPER_PACKAGE_VERSION" "${tar_package_filename}"
         fi
         mv "${tar_package_filename}" "$LHELPER_WORKING_DIR/packages/$LHELPER_PACKAGE_VERSION"
