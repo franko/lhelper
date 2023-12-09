@@ -9,6 +9,11 @@ current_download=
 pushd_quiet () { builtin pushd "$@" > /dev/null; }
 popd_quiet () { builtin popd "$@" > /dev/null; }
 
+unset skip_pic_option
+if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* || "$OSTYPE" == "cygwin"* ]]; then
+    skip_pic_option=yes
+fi
+
 interrupt_clean_archive () {
     if [ -n "${current_download}" ]; then
         echo "Cleaning up directory or file \"$current_download\""
@@ -267,7 +272,9 @@ configure_options () {
                 shift
                 ;;
             -pic)
-                pic_option="--with-pic=yes"
+                if [ -z "${skip_pic_option+x}" ]; then
+                    pic_option="--with-pic=yes"
+                fi
                 shift
                 ;;
             *)
@@ -294,7 +301,9 @@ meson_options () {
                 shift
                 ;;
             -pic)
-                pic_option="true"
+                if [ -z "${skip_pic_option+x}" ]; then
+                    pic_option="true"
+                fi
                 shift
                 ;;
             *)
@@ -317,7 +326,9 @@ cmake_options () {
     while [ ! -z ${1+x} ]; do
         case $1 in
             -pic)
-                pic_option="ON"
+                if [ -z "${skip_pic_option+x}" ]; then
+                    pic_option="ON"
+                fi
                 shift
                 ;;
             -shared)

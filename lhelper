@@ -753,12 +753,6 @@ library_install () {
     local options_a=()
     for opt in "${@:1}"; do
         case $opt in
-            -pic)
-                if [[ ! $MACHTYPE =~ (mingw|msys|cygwin) ]]; then
-                    options_a+=("$opt")
-                fi
-                shift
-                ;;
             -*)
                 options_a+=("$opt")
                 shift
@@ -874,6 +868,7 @@ library_install () {
     else
         prepare_temp_dir "$LHELPER_WORKING_DIR"
         lib_install_msg "Building library..."
+
         # Execute the recipe
         BASH_ENV="$LHELPER_DIR/build-helper.sh" bash -e "${recipe_dir}/${recipe_filename}" "${options_a[@]}" 2> "$log_dirname/$package-stderr.log" 1> "$log_dirname/$package-stdout.log"
         case $? in
