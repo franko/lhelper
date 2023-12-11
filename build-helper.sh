@@ -373,8 +373,8 @@ build_and_install () {
         else
             cmake_gen="Unix Makefiles"
         fi
-        mkdir build
-        pushd_quiet build
+        mkdir .build
+        pushd_quiet .build
         # It is very important below to pass $processed_options without
         # quotes. Otherwise it will be passed as a big string without breaking
         # on spaces.
@@ -403,8 +403,8 @@ build_and_install () {
             destdir_opt=""
         fi
         processed_options="$(meson_options "${mopts[@]}")"
-        mkdir build
-        pushd_quiet build
+        mkdir .build
+        pushd_quiet .build
         echo "Using meson command: " meson setup --buildtype="${BUILD_TYPE,,}" $processed_options ..
         meson setup --buildtype="${BUILD_TYPE,,}" $processed_options .. || {
             echo "error: while running meson config" >&2
