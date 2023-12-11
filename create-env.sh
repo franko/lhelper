@@ -95,11 +95,17 @@ env_create_source_file () {
     local pkgconfig_path=$(printf_join ":\$prefix/%s/pkgconfig" "${libdir_array[@]}")
     local ldpath=$(printf_join ":\$prefix/%s" "${libdir_array[@]}")
     local abs_prefix="$(lh-realpath "$prefix")"
+    local ldlibpath_var_name
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        ldlibpath_var_name=DYLD_LIBRARY_PATH
+    else
+        ldlibpath_var_name=LD_LIBRARY_PATH
+    fi
 cat << EOF > "$target"
 prefix="$abs_prefix"
 export PATH="\$prefix/bin\${PATH:+:}\$PATH"
 
-export LD_LIBRARY_PATH="$ldpath\${LD_LIBRARY_PATH:+:}\$LD_LIBRARY_PATH"
+export $ldlibpath_var_name="$ldpath\${$ldlibpath_var_name:+:}\$$ldlibpath_var_name"
 if [ -z \${PKG_CONFIG_PATH+x} ]; then
     export PKG_CONFIG_PATH="$pkgconfig_path:$libdir/pkgconfig:$datadir/pkgconfig"
 else
