@@ -11,6 +11,13 @@ LHELPER_BIN_DIRNAME="$(dirname "$0")"
 LHELPER_PREFIX="${LHELPER_BIN_DIRNAME%/bin}"
 
 export LHELPER_PACKAGE_VERSION=1
+if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* || "$OSTYPE" == "cygwin"* ]]; then
+    LHELPER_SYSTEM_PREFIX="C:/"
+else
+    LHELPER_SYSTEM_PREFIX="/usr"
+fi
+export LHELPER_SYSTEM_PREFIX
+
 export LHELPER_PKG_DOWNLOAD=yes
 LHELPER_DOMAIN="lhelper.cc"
 LHELPER_WWW_DOMAIN="https://www.lhelper.cc"
@@ -751,10 +758,15 @@ library_install () {
 
     local version
     local options_a=()
+    local package_prefix="$LHELPER_SYSTEM_PREFIX"
     for opt in "${@:1}"; do
         case $opt in
             -*)
                 options_a+=("$opt")
+                if [[ "$opt" == "-prefix="* ]]; then
+                    package_prefix="${opt#-prefix=}"
+                    if [ -z "$package_prefix" ]; then exit 1; fi
+                fi
                 shift
                 ;;
             *)
@@ -815,6 +827,7 @@ library_install () {
 
     LHELPER_TEMP_ROOT="$LHELPER_WORKING_DIR/tmp"
     set_prefix_variables "$LHELPER_TEMP_ROOT"
+    export CONFIG_PREFIX="$package_prefix"
 
     source "$LHELPER_ENV_PREFIX/bin/lhelper-config"
 
@@ -906,7 +919,7 @@ library_install () {
         fix_pkgconfig_install
         lib_install_msg "done"
 
-        library_dir_reloc "$LHELPER_TEMP_ROOT" "$WIN_INSTALL_PREFIX" "__LHELPER_PREFIX__" || {
+        library_dir_reloc "$LHELPER_TEMP_ROOT" "$package_prefix" "__LHELPER_PREFIX__" || {
             local warn_filename
             echo "warning: prefix directory \"$reloc_warning_prefix\" found in binary files:" >&2; echo >&2
             for warn_filename in "${reloc_warning_files[@]}"; do
@@ -916,7 +929,19 @@ library_install () {
             echo "The build recipe for this package may need to be fixed" >&2; echo >&2
         }
         fs_security_delay
-        tar -C "$LHELPER_TEMP_ROOT" -czf "${tar_package_filename}" .
+	# remove the leading drive letter, for Windows, if present
+	local prefix_rel="${package_prefix#[A-Za-z]:}"
+	# Remove a possible trailing / at the end. It could be because the
+	# $package_prefix is the root directory itself, "/".
+	prefix_rel="${prefix_rel%/}"
+        if [ -d "$LHELPER_TEMP_ROOT$prefix_rel" ]; then
+            tar -C "$LHELPER_TEMP_ROOT${prefix_rel}" -czf "${tar_package_filename}" .
+        else
+            # This is there in case the recipe fails to install in $package_prefix
+	    # but if all recipes behaves correctly it should not be necessary.
+	    # It may happen for recipes with non standard build process.
+            tar -C "$LHELPER_TEMP_ROOT" -czf "${tar_package_filename}" .
+        fi
         if [[ ! -z ${LH_SSH_KEY_PATH+x} && -z ${local_recipe+set} ]]; then
             upload_package "$LHELPER_PACKAGE_VERSION" "${tar_package_filename}"
         fi

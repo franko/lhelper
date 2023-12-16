@@ -266,8 +266,12 @@ configure_options () {
     shift
     local shared_option="--disable-shared"
     local pic_option
+    local prefix_val="$LHELPER_SYSTEM_PREFIX"
     while [ ! -z ${1+x} ]; do
         case $1 in
+            -prefix=*)
+                prefix_val="${1#-prefix=}"
+                ;;
             -shared)
                 shared_option="--enable-shared"
                 shift
@@ -284,7 +288,7 @@ configure_options () {
                 ;;
         esac
     done
-    options_new+=($shared_option)
+    options_new+=(--prefix="${prefix_val}" $shared_option)
     if [ -n "$pic_option" ]; then
         options_new+=($pic_option)
     fi
@@ -295,8 +299,12 @@ meson_options () {
     shift
     local shared_option="static"
     local pic_option
+    local prefix_val="$LHELPER_SYSTEM_PREFIX"
     while [ ! -z ${1+x} ]; do
         case $1 in
+            -prefix=*)
+                prefix_val="${1#-prefix=}"
+                ;;
             -shared)
                 shared_option="shared"
                 shift
@@ -313,7 +321,7 @@ meson_options () {
                 ;;
         esac
     done
-    options_new+=("-Ddefault_library=$shared_option")
+    options_new+=("--prefix=${prefix_val}" "-Ddefault_library=$shared_option")
     if [[ $shared_option == "static" && -n "$pic_option" ]]; then
         options_new+=("-Db_staticpic=$pic_option")
     fi
@@ -324,8 +332,12 @@ cmake_options () {
     shift
     local pic_option
     local shared_lib="OFF"
+    local prefix_val="$LHELPER_SYSTEM_PREFIX"
     while [ ! -z ${1+x} ]; do
         case $1 in
+            -prefix=*)
+                prefix_val="${1#-prefix=}"
+                ;;
             -pic)
                 if [ -z "${skip_pic_option+x}" ]; then
                     pic_option="ON"
@@ -342,9 +354,9 @@ cmake_options () {
                 ;;
         esac
     done
-    options_new+=("-DBUILD_SHARED_LIBS=${shared_lib}")
+    options_new+=(-DCMAKE_INSTALL_PREFIX="$prefix_val" -DBUILD_SHARED_LIBS="${shared_lib}")
     if [ -n "$pic_option" ]; then
-        options_new+=("-DCMAKE_POSITION_INDEPENDENT_CODE=$pic_option")
+        options_new+=(-DCMAKE_POSITION_INDEPENDENT_CODE="$pic_option")
     fi
 }
 
@@ -370,15 +382,10 @@ build_and_install () {
         test_commands cmake || exit 3
         cmake_options processed_options "${@:2}"
         local cmake_gen
-        if command -v ninja &> /dev/null; then
-            cmake_gen=Ninja
-        else
-            cmake_gen="Unix Makefiles"
-        fi
         mkdir .build
         pushd_quiet .build
-        echo "Using cmake command: " cmake -G "$cmake_gen" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" "${processed_options[@]}" ..
-        cmake -G "$cmake_gen" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" "${processed_options[@]}" .. || {
+        echo "Using cmake command: " cmake -G Ninja -DCMAKE_BUILD_TYPE="$BUILD_TYPE" "${processed_options[@]}" ..
+        cmake -G Ninja -DCMAKE_BUILD_TYPE="$BUILD_TYPE" "${processed_options[@]}" .. || {
             echo "error: while running cmake config" >&2
             exit 6
         }
@@ -386,22 +393,12 @@ build_and_install () {
             echo "error: while running cmake build" >&2
             exit 6
         }
-        cmake --build . --target install
+        DESTDIR="$destdir" cmake --build . --target install
         popd_quiet
         ;;
     meson)
         test_commands meson ninja || exit 3
-        local mopts=("${@:2}")
-        local destdir_opt
-        if [[ " ${mopts[*]} " =~ " --prefix=" ]]; then
-            # If a prefix is specified do not provide our $INSTALL_PREFIX but use
-            # instead a --destdir option with $INSTALL_PREFIX when doing the install.
-            destdir_opt="--destdir=$INSTALL_PREFIX"
-        else
-            mopts+=("--prefix=$INSTALL_PREFIX")
-            destdir_opt=""
-        fi
-        meson_options processed_options "${mopts[@]}"
+        meson_options processed_options "${@:2}"
         mkdir .build
         pushd_quiet .build
         echo "Using meson command: " meson setup --buildtype="${BUILD_TYPE,,}" "${processed_options[@]}"
@@ -413,6 +410,7 @@ build_and_install () {
             echo "error: while running meson build" >&2
             exit 6
         }
+        echo "Using meson install command: " meson install --destdir="$destdir"
         meson install --destdir="$destdir"
         popd_quiet
         ;;
@@ -420,8 +418,8 @@ build_and_install () {
         test_commands make grep cmp diff || exit 3
         configure_options processed_options "${@:2}"
         add_build_type_compiler_flags "$BUILD_TYPE"
-        echo "Using configure command: " configure --prefix="$WIN_INSTALL_PREFIX" "${processed_options[@]}"
-        ./configure --prefix="$WIN_INSTALL_PREFIX" "${processed_options[@]}" || {
+        echo "Using configure command: " configure "${processed_options[@]}"
+        ./configure "${processed_options[@]}" || {
             echo "error: while running configure script" >&2
             exit 6
         }
@@ -436,7 +434,7 @@ build_and_install () {
             echo "error: while running make build" >&2
             exit 6
         }
-        make install
+        DESTDIR="$destdir" make install
         ;;
     *)
         echo "error: unknown build type \"$1\""
