@@ -10,7 +10,6 @@ fi
 LHELPER_BIN_DIRNAME="$(dirname "$0")"
 LHELPER_PREFIX="${LHELPER_BIN_DIRNAME%/bin}"
 
-export LHELPER_PACKAGE_VERSION=1
 if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* || "$OSTYPE" == "cygwin"* ]]; then
     LHELPER_SYSTEM_PREFIX="C:/"
 else
@@ -18,6 +17,7 @@ else
 fi
 export LHELPER_SYSTEM_PREFIX
 
+export LHELPER_PACKAGE_VERSION="${LHELPER_PACKAGE_VERSION:-1}"
 export LHELPER_PKG_DOWNLOAD=yes
 LHELPER_DOMAIN="lhelper.cc"
 LHELPER_WWW_DOMAIN="https://www.lhelper.cc"
@@ -35,6 +35,14 @@ unset LH_SSH_KEY_PATH
 
 if [[ -f "$LH_CONFIG_FILE" ]]; then
     source "$LH_CONFIG_FILE"
+fi
+
+lh_package_dir="$LHELPER_WORKING_DIR/packages/$LHELPER_PACKAGE_VERSION"
+if [ ! -d "$lh_package_dir" ]; then
+    mkdir -p "$lh_package_dir" || {
+        echo "error: cannot create package directory $lh_package_dir" >&2
+        exit 1
+    }
 fi
 
 ensure_config_dir_exists() {
@@ -264,7 +272,7 @@ extract_archive_reloc () {
     local _install_prefix="$4"
     local filename_list="$5"
     local package_temp_dir="$LHELPER_WORKING_DIR/tmp"
-    tar -C "$package_temp_dir" -xf "$LHELPER_WORKING_DIR/packages/$LHELPER_PACKAGE_VERSION/${tar_package_filename}"
+    tar -C "$package_temp_dir" -xf "${lh_package_dir}/${tar_package_filename}"
     library_dir_reloc "$package_temp_dir" "$old_prefix" "$new_prefix"
     # Getting list of package's files
     pushd_quiet "$package_temp_dir"
@@ -870,7 +878,7 @@ library_install () {
     fi
 
     local tar_package_filename="${package}${options_tag}_${recipe_version}_${digest}.tar.gz"
-    if [[ -z ${rebuild+set} && -z ${local_recipe+set} && "$version" != "git-"* && -f "$LHELPER_WORKING_DIR/packages/$LHELPER_PACKAGE_VERSION/${tar_package_filename}" ]]; then
+    if [[ -z ${rebuild+set} && -z ${local_recipe+set} && "$version" != "git-"* && -f "${lh_package_dir}/${tar_package_filename}" ]]; then
         lib_install_msg "Found an existing package"
     elif [[ -z ${rebuild+set} && -z ${local_recipe+set} && "$version" != "git-"* ]] && check_remote_package "$LHELPER_PACKAGE_VERSION" "${tar_package_filename}"; then
         lib_install_msg "Found an package in the remote location $LHELPER_WWW_DOMAIN"
@@ -945,7 +953,7 @@ library_install () {
         if [[ ! -z ${LH_SSH_KEY_PATH+x} && -z ${local_recipe+set} ]]; then
             upload_package "$LHELPER_PACKAGE_VERSION" "${tar_package_filename}"
         fi
-        mv "${tar_package_filename}" "$LHELPER_WORKING_DIR/packages/$LHELPER_PACKAGE_VERSION"
+        mv "${tar_package_filename}" "${lh_package_dir}"
         echo "Saved package for \"$package\""
     fi
     unset _lh_recipe_run
