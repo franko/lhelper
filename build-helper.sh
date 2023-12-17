@@ -262,9 +262,10 @@ test_commands () {
 }
 
 configure_options () {
+    local -n options_new=$1
+    shift
     local shared_option="--disable-shared"
     local pic_option
-    local options_new=()
     while [ ! -z ${1+x} ]; do
         case $1 in
             -shared)
@@ -287,13 +288,13 @@ configure_options () {
     if [ -n "$pic_option" ]; then
         options_new+=($pic_option)
     fi
-    echo "${options_new[*]}"
 }
 
 meson_options () {
+    local -n options_new=$1
+    shift
     local shared_option="static"
     local pic_option
-    local options_new=()
     while [ ! -z ${1+x} ]; do
         case $1 in
             -shared)
@@ -316,13 +317,13 @@ meson_options () {
     if [[ $shared_option == "static" && -n "$pic_option" ]]; then
         options_new+=("-Db_staticpic=$pic_option")
     fi
-    echo "${options_new[*]}"
 }
 
 cmake_options () {
+    local -n options_new=$1
+    shift
     local pic_option
     local shared_lib="OFF"
-    local options_new=()
     while [ ! -z ${1+x} ]; do
         case $1 in
             -pic)
@@ -345,7 +346,6 @@ cmake_options () {
     if [ -n "$pic_option" ]; then
         options_new+=("-DCMAKE_POSITION_INDEPENDENT_CODE=$pic_option")
     fi
-    echo "${options_new[*]}"
 }
 
 # Do not use with cmake and meson based build.
@@ -362,11 +362,12 @@ add_build_type_compiler_flags () {
 }
 
 build_and_install () {
+    local processed_options=()
     if [[ "${_lh_recipe_run}" == "dependencies" ]]; then return 0; fi
     case $1 in
     cmake)
         test_commands cmake || exit 3
-        processed_options="$(cmake_options "${@:2}")"
+        cmake_options processed_options "${@:2}"
         local cmake_gen
         if command -v ninja &> /dev/null; then
             cmake_gen=Ninja
@@ -375,11 +376,8 @@ build_and_install () {
         fi
         mkdir .build
         pushd_quiet .build
-        # It is very important below to pass $processed_options without
-        # quotes. Otherwise it will be passed as a big string without breaking
-        # on spaces.
-        echo "Using cmake command: " cmake -G "$cmake_gen" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" $processed_options ..
-        cmake -G "$cmake_gen" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" $processed_options .. || {
+        echo "Using cmake command: " cmake -G "$cmake_gen" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" "${processed_options[@]}" ..
+        cmake -G "$cmake_gen" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" "${processed_options[@]}" .. || {
             echo "error: while running cmake config" >&2
             exit 6
         }
@@ -402,11 +400,11 @@ build_and_install () {
             mopts+=("--prefix=$INSTALL_PREFIX")
             destdir_opt=""
         fi
-        processed_options="$(meson_options "${mopts[@]}")"
+        meson_options processed_options "${mopts[@]}"
         mkdir .build
         pushd_quiet .build
-        echo "Using meson command: " meson setup --buildtype="${BUILD_TYPE,,}" $processed_options ..
-        meson setup --buildtype="${BUILD_TYPE,,}" $processed_options .. || {
+        echo "Using meson command: " meson setup --buildtype="${BUILD_TYPE,,}" "${processed_options[@]}"
+        meson setup --buildtype="${BUILD_TYPE,,}" "${processed_options[@]}" .. || {
             echo "error: while running meson config" >&2
             exit 6
         }
@@ -421,10 +419,10 @@ build_and_install () {
         ;;
     configure)
         test_commands make grep cmp diff || exit 3
-        processed_options="$(configure_options "${@:2}")"
+        configure_options processed_options "${@:2}"
         add_build_type_compiler_flags "$BUILD_TYPE"
-        echo "Using configure command: " configure --prefix="$WIN_INSTALL_PREFIX" $processed_options
-        ./configure --prefix="$WIN_INSTALL_PREFIX" $processed_options || {
+        echo "Using configure command: " configure --prefix="$WIN_INSTALL_PREFIX" "${processed_options[@]}"
+        ./configure --prefix="$WIN_INSTALL_PREFIX" "${processed_options[@]}" || {
             echo "error: while running configure script" >&2
             exit 6
         }
