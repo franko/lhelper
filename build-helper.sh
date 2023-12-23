@@ -263,26 +263,28 @@ test_commands () {
 
 configure_options () {
     local -n options_new=$1
-    shift
+    local -n buildtype=$2
+    shift 2
     local shared_option="--disable-shared"
     local pic_option
     while [ ! -z ${1+x} ]; do
         case $1 in
             -shared)
                 shared_option="--enable-shared"
-                shift
                 ;;
             -pic)
                 if [ -z "${skip_pic_option+x}" ]; then
                     pic_option="--with-pic=yes"
                 fi
-                shift
+                ;;
+            --buildtype=*)
+                buildtype="${1#*=}"
                 ;;
             *)
                 options_new+=($1)
-                shift
                 ;;
         esac
+        shift
     done
     options_new+=($shared_option)
     if [ -n "$pic_option" ]; then
@@ -295,25 +297,30 @@ meson_options () {
     shift
     local shared_option="static"
     local pic_option
+    local build_flag
     while [ ! -z ${1+x} ]; do
         case $1 in
             -shared)
                 shared_option="shared"
-                shift
                 ;;
             -pic)
                 if [ -z "${skip_pic_option+x}" ]; then
                     pic_option="true"
                 fi
-                shift
+                ;;
+            --buildtype=*)
+                build_flag="$1"
                 ;;
             *)
                 options_new+=($1)
-                shift
                 ;;
         esac
+        shift
     done
-    options_new+=("-Ddefault_library=$shared_option")
+    if [ -z ${build_flag+x} ]; then
+        build_flag="--buildtype=${BUILD_TYPE,,}"
+    fi
+    options_new+=("$build_flag" "-Ddefault_library=$shared_option")
     if [[ $shared_option == "static" && -n "$pic_option" ]]; then
         options_new+=("-Db_staticpic=$pic_option")
     fi
@@ -324,24 +331,31 @@ cmake_options () {
     shift
     local pic_option
     local shared_lib="OFF"
+    local build_flag
     while [ ! -z ${1+x} ]; do
         case $1 in
             -pic)
                 if [ -z "${skip_pic_option+x}" ]; then
                     pic_option="ON"
                 fi
-                shift
                 ;;
             -shared)
                 shared_lib="ON"
-                shift
+                ;;
+            --buildtype=*)
+                build_flag="${1#*=}"
                 ;;
             *)
                 options_new+=($1)
-                shift
                 ;;
         esac
+        shift
     done
+    if [ -z ${build_flag+x} ]; then
+        options_new+=("-DCMAKE_BUILD_TYPE=$BUILD_TYPE")
+    elif [[ "$build_flag" != plain ]]; then
+        options_new+=("-DCMAKE_BUILD_TYPE=${build_flag^}")
+    fi
     options_new+=("-DBUILD_SHARED_LIBS=${shared_lib}")
     if [ -n "$pic_option" ]; then
         options_new+=("-DCMAKE_POSITION_INDEPENDENT_CODE=$pic_option")
@@ -376,8 +390,8 @@ build_and_install () {
         fi
         mkdir .build
         pushd_quiet .build
-        echo "Using cmake command: " cmake -G "$cmake_gen" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" "${processed_options[@]}" ..
-        cmake -G "$cmake_gen" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" "${processed_options[@]}" .. || {
+        echo "Using cmake command: " cmake -G "$cmake_gen" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" "${processed_options[@]}" ..
+        cmake -G "$cmake_gen" -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" "${processed_options[@]}" .. || {
             echo "error: while running cmake config" >&2
             exit 6
         }
@@ -403,8 +417,8 @@ build_and_install () {
         meson_options processed_options "${mopts[@]}"
         mkdir .build
         pushd_quiet .build
-        echo "Using meson command: " meson setup --buildtype="${BUILD_TYPE,,}" "${processed_options[@]}"
-        meson setup --buildtype="${BUILD_TYPE,,}" "${processed_options[@]}" .. || {
+        echo "Using meson command: " meson setup "${processed_options[@]}"
+        meson setup "${processed_options[@]}" .. || {
             echo "error: while running meson config" >&2
             exit 6
         }
@@ -419,7 +433,7 @@ build_and_install () {
         ;;
     configure)
         test_commands make grep cmp diff || exit 3
-        configure_options processed_options "${@:2}"
+        configure_options processed_options BUILD_TYPE "${@:2}"
         add_build_type_compiler_flags "$BUILD_TYPE"
         echo "Using configure command: " configure --prefix="$WIN_INSTALL_PREFIX" "${processed_options[@]}"
         ./configure --prefix="$WIN_INSTALL_PREFIX" "${processed_options[@]}" || {
