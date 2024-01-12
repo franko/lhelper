@@ -265,12 +265,12 @@ configure_options () {
     local -n options_new=$1
     local -n buildtype=$2
     shift 2
-    local shared_option="--disable-shared"
+    local use_shared=no
     local pic_option
     while [ ! -z ${1+x} ]; do
         case $1 in
             -shared)
-                shared_option="--enable-shared"
+                use_shared=yes
                 ;;
             -pic)
                 if [ -z "${skip_pic_option+x}" ]; then
@@ -286,7 +286,11 @@ configure_options () {
         esac
         shift
     done
-    options_new+=($shared_option)
+    if [ $use_shared == yes ]; then
+        options_new+=(--enable-shared --disable-static)
+    else
+        options_new+=(--enable-static --disable-shared)
+    fi
     if [ -n "$pic_option" ]; then
         options_new+=($pic_option)
     fi
