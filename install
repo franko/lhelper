@@ -95,7 +95,6 @@ fi
 
 mkdir -p "$DESTDIR/bin"
 mkdir -p "$DESTDIR/share/lhelper/patch"
-mkdir -p "$DESTDIR/var/lhelper/builds"
 mkdir -p "$DESTDIR/var/lhelper/archives"
 mkdir -p "$DESTDIR/var/lhelper/packages/$LHELPER_PACKAGE_VERSION"
 mkdir -p "$DESTDIR/var/lhelper/digests"

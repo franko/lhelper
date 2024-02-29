@@ -12,8 +12,10 @@ LHELPER_PREFIX="${LHELPER_BIN_DIRNAME%/bin}"
 
 if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* || "$OSTYPE" == "cygwin"* ]]; then
     LHELPER_SYSTEM_PREFIX="C:/"
+    LHELPER_TMPDIR="C:/Windows/Temp"
 else
     LHELPER_SYSTEM_PREFIX="/usr"
+    LHELPER_TMPDIR="${TMPDIR:-/tmp}"
 fi
 export LHELPER_SYSTEM_PREFIX
 
@@ -24,6 +26,7 @@ LHELPER_WWW_DOMAIN="https://www.lhelper.cc"
 
 export LHELPER_WORKING_DIR="$LHELPER_PREFIX/var/lhelper"
 export LHELPER_DIR="$LHELPER_PREFIX/share/lhelper"
+export LHELPER_TMPDIR
 
 # config files and directory used by lhelper
 LH_CONFIG_DIR="$HOME/.config/lhelper"
