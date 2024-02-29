@@ -263,32 +263,41 @@ test_commands () {
 
 configure_options () {
     local -n options_new=$1
-    shift
-    local shared_option="--disable-shared"
+    local -n buildtype=$2
+    shift 2
+    local use_shared=no
     local pic_option
-    local prefix_val="$LHELPER_SYSTEM_PREFIX"
+
     while [ ! -z ${1+x} ]; do
         case $1 in
             -prefix=*)
                 prefix_val="${1#-prefix=}"
                 ;;
             -shared)
-                shared_option="--enable-shared"
-                shift
+                use_shared=yes
                 ;;
             -pic)
                 if [ -z "${skip_pic_option+x}" ]; then
                     pic_option="--with-pic=yes"
                 fi
-                shift
+                ;;
+            --buildtype=*)
+                buildtype="${1#*=}"
                 ;;
             *)
                 options_new+=($1)
-                shift
                 ;;
         esac
+        shift
     done
-    options_new+=(--prefix="${prefix_val}" $shared_option)
+
+    options_new+=(--prefix="${prefix_val}")
+    if [ $use_shared == yes ]; then
+        options_new+=(--enable-shared --disable-static)
+    else
+        options_new+=(--enable-static --disable-shared)
+    fi
+
     if [ -n "$pic_option" ]; then
         options_new+=($pic_option)
     fi
@@ -300,6 +309,7 @@ meson_options () {
     local shared_option="static"
     local pic_option
     local prefix_val="$LHELPER_SYSTEM_PREFIX"
+    local build_flag
     while [ ! -z ${1+x} ]; do
         case $1 in
             -prefix=*)
@@ -307,21 +317,27 @@ meson_options () {
                 ;;
             -shared)
                 shared_option="shared"
-                shift
                 ;;
             -pic)
                 if [ -z "${skip_pic_option+x}" ]; then
                     pic_option="true"
                 fi
-                shift
+                ;;
+            --buildtype=*)
+                build_flag="$1"
                 ;;
             *)
                 options_new+=($1)
-                shift
                 ;;
         esac
+        shift
     done
-    options_new+=("--prefix=${prefix_val}" "-Ddefault_library=$shared_option")
+
+    if [ -z ${build_flag+x} ]; then
+        build_flag="--buildtype=${BUILD_TYPE,,}"
+    fi
+    options_new+=("--prefix=${prefix_val}" "$build_flag" "-Ddefault_library=$shared_option")
+
     if [[ $shared_option == "static" && -n "$pic_option" ]]; then
         options_new+=("-Db_staticpic=$pic_option")
     fi
@@ -333,6 +349,7 @@ cmake_options () {
     local pic_option
     local shared_lib="OFF"
     local prefix_val="$LHELPER_SYSTEM_PREFIX"
+    local build_flag
     while [ ! -z ${1+x} ]; do
         case $1 in
             -prefix=*)
@@ -342,18 +359,25 @@ cmake_options () {
                 if [ -z "${skip_pic_option+x}" ]; then
                     pic_option="ON"
                 fi
-                shift
                 ;;
             -shared)
                 shared_lib="ON"
-                shift
+                ;;
+            --buildtype=*)
+                build_flag="${1#*=}"
                 ;;
             *)
                 options_new+=($1)
-                shift
                 ;;
         esac
+        shift
     done
+
+    if [ -z ${build_flag+x} ]; then
+        options_new+=("-DCMAKE_BUILD_TYPE=$BUILD_TYPE")
+    elif [[ "$build_flag" != plain ]]; then
+        options_new+=("-DCMAKE_BUILD_TYPE=${build_flag^}")
+    fi
     options_new+=(-DCMAKE_INSTALL_PREFIX="$prefix_val" -DBUILD_SHARED_LIBS="${shared_lib}")
     if [ -n "$pic_option" ]; then
         options_new+=(-DCMAKE_POSITION_INDEPENDENT_CODE="$pic_option")
@@ -381,11 +405,11 @@ build_and_install () {
     cmake)
         test_commands cmake || exit 3
         cmake_options processed_options "${@:2}"
-        local cmake_gen
         mkdir .build
         pushd_quiet .build
-        echo "Using cmake command: " cmake -G Ninja -DCMAKE_BUILD_TYPE="$BUILD_TYPE" "${processed_options[@]}" ..
-        cmake -G Ninja -DCMAKE_BUILD_TYPE="$BUILD_TYPE" "${processed_options[@]}" .. || {
+
+        echo "Using cmake command: " cmake -G Ninja -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" "${processed_options[@]}" ..
+        cmake -G Ninja -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" "${processed_options[@]}" .. || {
             echo "error: while running cmake config" >&2
             exit 6
         }
@@ -398,10 +422,11 @@ build_and_install () {
         ;;
     meson)
         test_commands meson ninja || exit 3
+
         meson_options processed_options "${@:2}"
         mkdir .build
         pushd_quiet .build
-        echo "Using meson command: " meson setup --buildtype="${BUILD_TYPE,,}" "${processed_options[@]}"
+        echo "Using meson command: " meson setup --buildtype="${BUILD_TYPE,,}" "${processed_options[@]}" ..
         meson setup --buildtype="${BUILD_TYPE,,}" "${processed_options[@]}" .. || {
             echo "error: while running meson config" >&2
             exit 6
@@ -416,7 +441,7 @@ build_and_install () {
         ;;
     configure)
         test_commands make grep cmp diff || exit 3
-        configure_options processed_options "${@:2}"
+        configure_options processed_options BUILD_TYPE "${@:2}"
         add_build_type_compiler_flags "$BUILD_TYPE"
         echo "Using configure command: " configure "${processed_options[@]}"
         ./configure "${processed_options[@]}" || {
