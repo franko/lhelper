@@ -265,6 +265,7 @@ configure_options () {
     local -n options_new=$1
     local -n buildtype=$2
     shift 2
+    local prefix_val="$LHELPER_SYSTEM_PREFIX"
     local use_shared=no
     local pic_option
 
