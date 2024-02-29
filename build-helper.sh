@@ -452,7 +452,7 @@ normalize_destdir_install () {
     to_real_prefix setup_prefix
     get_prefix_rel prefix_rel "$setup_prefix"
     if [[ ! -z "$prefix_rel" ]]; then
-        content_dir="$(dirname "$prefix_rel")"
+        content_dir="${prefix_rel%%/*}"
         for name in "$prefix_rel"/*; do
             # FIXME: $name may conflict with the dirname of $prefix_rel
             mv "$name" .

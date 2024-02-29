@@ -940,19 +940,7 @@ library_install () {
             echo "The build recipe for this package may need to be fixed" >&2; echo >&2
         }
         fs_security_delay
-        # remove the leading drive letter, for Windows, if present
-        local prefix_rel="${package_prefix#[A-Za-z]:}"
-        # Remove a possible trailing / at the end. It could be because the
-        # $package_prefix is the root directory itself, "/".
-        prefix_rel="${prefix_rel%/}"
-        if [ -d "$LHELPER_TEMP_ROOT$prefix_rel" ]; then
-            tar -C "$LHELPER_TEMP_ROOT${prefix_rel}" -czf "${tar_package_filename}" .
-        else
-            # This is there in case the recipe fails to install in $package_prefix
-	    # but if all recipes behaves correctly it should not be necessary.
-	    # It may happen for recipes with non standard build process.
-            tar -C "$LHELPER_TEMP_ROOT" -czf "${tar_package_filename}" .
-        fi
+        tar -C "$LHELPER_TEMP_ROOT" -czf "${tar_package_filename}" .
         if [[ ! -z ${LH_SSH_KEY_PATH+x} && -z ${local_recipe+set} ]]; then
             upload_package "$LHELPER_PACKAGE_VERSION" "${tar_package_filename}"
         fi
