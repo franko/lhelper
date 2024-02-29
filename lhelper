@@ -22,7 +22,7 @@ export LHELPER_PKG_DOWNLOAD=yes
 LHELPER_DOMAIN="lhelper.cc"
 LHELPER_WWW_DOMAIN="https://www.lhelper.cc"
 
-export LHELPER_WORKING_DIR="$LHELPER_PREFIX/var/lib/lhelper"
+export LHELPER_WORKING_DIR="$LHELPER_PREFIX/var/lhelper"
 export LHELPER_DIR="$LHELPER_PREFIX/share/lhelper"
 
 # config files and directory used by lhelper

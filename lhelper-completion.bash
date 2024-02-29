@@ -24,7 +24,7 @@ _lhelper () {
 
   local lh_bindir="$(dirname $(which lhelper))"
   local lhcomp_prefix="${lh_bindir%/bin}"
-  local lhcomp_workdir="$lhcomp_prefix/var/lib/lhelper"
+  local lhcomp_workdir="$lhcomp_prefix/var/lhelper"
   local lhcomp_dir="$lhcomp_prefix/share/lhelper"
 
   local lhcomp_ls=()

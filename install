@@ -95,10 +95,10 @@ fi
 
 mkdir -p "$DESTDIR/bin"
 mkdir -p "$DESTDIR/share/lhelper/patch"
-mkdir -p "$DESTDIR/var/lib/lhelper/builds"
-mkdir -p "$DESTDIR/var/lib/lhelper/archives"
-mkdir -p "$DESTDIR/var/lib/lhelper/packages/$LHELPER_PACKAGE_VERSION"
-mkdir -p "$DESTDIR/var/lib/lhelper/digests"
+mkdir -p "$DESTDIR/var/lhelper/builds"
+mkdir -p "$DESTDIR/var/lhelper/archives"
+mkdir -p "$DESTDIR/var/lhelper/packages/$LHELPER_PACKAGE_VERSION"
+mkdir -p "$DESTDIR/var/lhelper/digests"
 
 pushd_quiet src
 for modname in path-replace sort cmp realpath; do

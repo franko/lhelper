@@ -42,7 +42,7 @@ cd lhelper
 bash install <install-prefix-directory>
 ```
 
-The `<install-prefix-directory>` can be any directory but it should contains a `bin` folder and it should be part of you PATH. The helper will install its files in the `<prefix>/share/lhelper` directory and it will use the directory `<prefix>/var/lib/lhelper` to store downloaded archives and build the libraries.
+The `<install-prefix-directory>` can be any directory but it should contains a `bin` folder and it should be part of you PATH. The helper will install its files in the `<prefix>/share/lhelper` directory and it will use the directory `<prefix>/var/lhelper` to store downloaded archives and build the libraries.
 
 On Linux or Mac OS X you may use the `$HOME/.local` directory as a prefix.
 
