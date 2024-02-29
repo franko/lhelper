@@ -11,13 +11,11 @@ LHELPER_BIN_DIRNAME="$(dirname "$0")"
 LHELPER_PREFIX="${LHELPER_BIN_DIRNAME%/bin}"
 
 if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* || "$OSTYPE" == "cygwin"* ]]; then
-    LHELPER_SYSTEM_PREFIX="C:/"
     LHELPER_TMPDIR="C:/Windows/Temp"
 else
-    LHELPER_SYSTEM_PREFIX="/usr"
     LHELPER_TMPDIR="${TMPDIR:-/tmp}"
 fi
-export LHELPER_SYSTEM_PREFIX
+export LHELPER_SYSTEM_PREFIX="/usr"
 
 export LHELPER_PACKAGE_VERSION="${LHELPER_PACKAGE_VERSION:-1}"
 export LHELPER_PKG_DOWNLOAD=yes
@@ -261,7 +259,9 @@ library_dir_reloc () {
     local files_list filename
     readarray -d '' files_list < <(find "$archive_dir" -type f -print0)
     for name in "${files_list[@]}"; do
-        lh-path-replace "$name" "$old_prefix" "$new_prefix" || reloc_warning_files+=("$name")
+        if [[ $name == *".pc" || $name == *"-config" || $name == *".la" ]]; then
+            lh-path-replace "$name" "$old_prefix" "$new_prefix" || reloc_warning_files+=("$name")
+        fi
     done
     return ${#reloc_warning_files[@]}
 }
@@ -940,11 +940,11 @@ library_install () {
             echo "The build recipe for this package may need to be fixed" >&2; echo >&2
         }
         fs_security_delay
-	# remove the leading drive letter, for Windows, if present
-	local prefix_rel="${package_prefix#[A-Za-z]:}"
-	# Remove a possible trailing / at the end. It could be because the
-	# $package_prefix is the root directory itself, "/".
-	prefix_rel="${prefix_rel%/}"
+        # remove the leading drive letter, for Windows, if present
+        local prefix_rel="${package_prefix#[A-Za-z]:}"
+        # Remove a possible trailing / at the end. It could be because the
+        # $package_prefix is the root directory itself, "/".
+        prefix_rel="${prefix_rel%/}"
         if [ -d "$LHELPER_TEMP_ROOT$prefix_rel" ]; then
             tar -C "$LHELPER_TEMP_ROOT${prefix_rel}" -czf "${tar_package_filename}" .
         else
@@ -1469,7 +1469,7 @@ EOF
     guess_missing_cpu_type_target
 
     local build_realpath="$(lh-realpath "$build_filename")"
-    local env_rel_workdir=".lhelper/env" tmp_rel_workdir=".lhelper/tmp"
+    local env_rel_workdir=".lhelper" tmp_rel_workdir=".lhelper/.tmp"
     local env_workdir="$(dirname "$build_realpath")/$env_rel_workdir"
     local tmp_workdir="$(dirname "$build_realpath")/$tmp_rel_workdir"
     if [ ! -d "$env_workdir" ]; then
@@ -1580,7 +1580,7 @@ env-source)
         exit 1
     fi
     env_name="${2%.lhelper}"
-    env_dir="$LHELPER_ENV_ROOT${LHELPER_ENV_ROOT+/}.lhelper/env"
+    env_dir="$LHELPER_ENV_ROOT${LHELPER_ENV_ROOT+/}.lhelper"
     if [ -f "$env_name.lhelper" ] && [ -d "$env_dir/$env_name/bin" ]; then
         echo "$env_dir/$env_name/bin/activate"
     else
@@ -1602,7 +1602,7 @@ edit | reload)
     kill -s SIGUSR1 $PPID
     ;;
 cleanup)
-    clean_env_dir="$LHELPER_ENV_ROOT${LHELPER_ENV_ROOT+/}.lhelper/env"
+    clean_env_dir="$LHELPER_ENV_ROOT${LHELPER_ENV_ROOT+/}.lhelper"
     if [ -d "$clean_env_dir" ]; then
         echo "Cleaning up the environments stored in \"$clean_env_dir\""
         rm -fr "$clean_env_dir"/*

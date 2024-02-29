@@ -401,9 +401,72 @@ add_build_type_compiler_flags () {
     fi
 }
 
+prefix_from_options () {
+    local option_name=$1
+    local -n prefix_value="$2"
+    local -n options="$3"
+    local option
+    for option in "${options[@]}"; do
+        if [[ $option == "$option_name"=* ]]; then
+            prefix_value="${option#*=}"
+            break
+        fi
+    done
+}
+
+get_prefix_rel () {
+    local -n _prefix_rel="$1"
+    local prefix_value="$2"
+    # remove the leading drive letter, for Windows, if present
+    _prefix_rel="${prefix_value#[A-Za-z]:}"
+    _prefix_rel="${_prefix_rel#/}"
+    # Remove a possible trailing / at the end. It could be because the
+    # $package_prefix is the root directory itself, "/".
+    _prefix_rel="${_prefix_rel%/}"
+}
+
+to_real_prefix () {
+    local -n prefix_grp="$1"
+    if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* || "$OSTYPE" == "cygwin"* ]]; then
+        if [[ "$prefix_grp" == /* ]]; then
+            prefix_grp="$LH_MSYSROOT${prefix_grp#/}"
+        fi
+    fi
+}
+
+# Inside $destdir move the files from from $destdir/$prefix into the $destdir root.
+# Explanation: when using Meson and Cmake with DESTDIR it will install the file
+# in destdir + the prefix. For example if prefix is /usr/local and DESTDIR=/tmp/dest
+# the files will be located in /tmp/dest/usr/local.
+# On Windows, in addition, with Meson and cmake,
+# /usr will be translated to C:/msys64/usr and Meson or cmake will
+# use msys64/usr as a prefix to install in DESTDIR.
+# We want to get rid of the prefix directory inside destdir to package the file.
+normalize_destdir_install () {
+    local destdir="$1"
+    local setup_prefix="$2"
+    local prefix_rel
+    local content_dir
+    # go into destdir and move files into actual root directory
+    pushd_quiet "$destdir"
+    to_real_prefix setup_prefix
+    get_prefix_rel prefix_rel "$setup_prefix"
+    if [[ ! -z "$prefix_rel" ]]; then
+        content_dir="$(dirname "$prefix_rel")"
+        for name in "$prefix_rel"/*; do
+            # FIXME: $name may conflict with the dirname of $prefix_rel
+            mv "$name" .
+        done
+        rm -fr "$content_dir"
+    fi
+    popd_quiet
+}
+
 build_and_install () {
     local processed_options=()
     local destdir="$INSTALL_PREFIX"
+    local setup_prefix
+    local prefix_rel
     if [[ "${_lh_recipe_run}" == "dependencies" ]]; then return 0; fi
     case $1 in
     cmake)
@@ -412,8 +475,11 @@ build_and_install () {
         mkdir .build
         pushd_quiet .build
 
-        echo "Using cmake command: " cmake -G Ninja -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" "${processed_options[@]}" ..
-        cmake -G Ninja -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" "${processed_options[@]}" .. || {
+        # get the --prefix actually given to the setup command
+        prefix_from_options -DCMAKE_INSTALL_PREFIX setup_prefix processed_options
+
+        echo "Using cmake command: " cmake -G Ninja "${processed_options[@]}" ..
+        cmake -G Ninja "${processed_options[@]}" .. || {
             echo "error: while running cmake config" >&2
             exit 6
         }
@@ -422,16 +488,20 @@ build_and_install () {
             exit 6
         }
         DESTDIR="$destdir" cmake --build . --target install
+        normalize_destdir_install "$destdir" "$setup_prefix"
         popd_quiet
         ;;
     meson)
         test_commands meson ninja || exit 3
-
         meson_options processed_options "${@:2}"
         mkdir .build
         pushd_quiet .build
-        echo "Using meson command: " meson setup --buildtype="${BUILD_TYPE,,}" "${processed_options[@]}" ..
-        meson setup --buildtype="${BUILD_TYPE,,}" "${processed_options[@]}" .. || {
+
+        # get the --prefix actually given to the setup command
+        prefix_from_options --prefix setup_prefix processed_options
+
+        echo "Using meson command: " meson setup "${processed_options[@]}" ..
+        meson setup "${processed_options[@]}" .. || {
             echo "error: while running meson config" >&2
             exit 6
         }
@@ -441,6 +511,7 @@ build_and_install () {
         }
         echo "Using meson install command: " meson install --destdir="$destdir"
         meson install --destdir="$destdir"
+        normalize_destdir_install "$destdir" "$setup_prefix"
         popd_quiet
         ;;
     configure)
@@ -463,6 +534,7 @@ build_and_install () {
             echo "error: while running make build" >&2
             exit 6
         }
+        echo "Using install command: " 'DESTDIR='"$destdir" make install
         DESTDIR="$destdir" make install
         ;;
     *)

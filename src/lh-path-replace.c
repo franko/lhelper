@@ -284,22 +284,22 @@ int main(int argc, char *argv[]) {
         pattern_base = pattern + 2;
         const int drive_letter = tolower(*pattern);
         char *msysroot = getenv("LH_MSYSROOT");
+
+        char prefix_data[64];
+        char *prefix_array[3] = {prefix_data, prefix_data + 8, prefix_data + 16};
+        sprintf(prefix_array[0], "%c:", drive_letter);
+        sprintf(prefix_array[1], "%c:", toupper(drive_letter));
+        sprintf(prefix_array[2], "/%c", drive_letter);
+        status = find_replace_prefix_path(argv[1], prefix_array, 3, pattern_base, replacement);
+
         /* We use the variable above to recognize the MSYS Windows root directory. */
-        if (msysroot && strlen(msysroot) > 0 && strncmp(pattern, msysroot, strlen(msysroot)) == 0) {
+        if (status == 0 && msysroot && strlen(msysroot) > 0 && strncmp(pattern, msysroot, strlen(msysroot)) == 0) {
             /* Replace by using a "/" in the pattern instead of LH_MSYSROOT */
             pattern_msys = pattern + strlen(msysroot);
             if (*(pattern_msys - 1) == '/') {
                 pattern_msys -= 1;
             }
             status = find_replace_path(argv[1], pattern_msys, replacement);
-        }
-        if (status == 0) {
-            char prefix_data[64];
-            char *prefix_array[3] = {prefix_data, prefix_data + 8, prefix_data + 16};
-            sprintf(prefix_array[0], "%c:", drive_letter);
-            sprintf(prefix_array[1], "%c:", toupper(drive_letter));
-            sprintf(prefix_array[2], "/%c", drive_letter);
-            status = find_replace_prefix_path(argv[1], prefix_array, 3, pattern_base, replacement);
         }
     } else {
         status = find_replace_path(argv[1], pattern, replacement);
