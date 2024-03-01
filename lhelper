@@ -836,6 +836,9 @@ library_install () {
         fi
     fi
 
+    # Ensure that the temporary directory exists
+    mkdir -p "$LHELPER_TMPDIR/build"
+
     LHELPER_TEMP_ROOT="$LHELPER_WORKING_DIR/tmp"
     set_prefix_variables "$LHELPER_TEMP_ROOT"
     export CONFIG_PREFIX="$package_prefix"
