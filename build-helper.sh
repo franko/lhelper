@@ -425,6 +425,9 @@ get_prefix_rel () {
     _prefix_rel="${_prefix_rel%/}"
 }
 
+# Translate /usr to C:/msys64/usr, for example, but only on windows.
+# On other systems it does nothing.
+# The first argument is a reference to the variable to be translated.
 to_real_prefix () {
     local -n prefix_grp="$1"
     if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* || "$OSTYPE" == "cygwin"* ]]; then
@@ -435,6 +438,8 @@ to_real_prefix () {
 }
 
 # Inside $destdir move the files from from $destdir/$prefix into the $destdir root.
+# The first argument can be -msys, in which case the prefix will be
+# translated to the real prefix, for example /usr to C:/msys64/usr.
 # Explanation: when using Meson and Cmake with DESTDIR it will install the file
 # in destdir + the prefix. For example if prefix is /usr/local and DESTDIR=/tmp/dest
 # the files will be located in /tmp/dest/usr/local.
@@ -443,13 +448,20 @@ to_real_prefix () {
 # use msys64/usr as a prefix to install in DESTDIR.
 # We want to get rid of the prefix directory inside destdir to package the file.
 normalize_destdir_install () {
-    local destdir="$1"
-    local setup_prefix="$2"
+    local destdir
+    local setup_prefix
+    if [[ $1 == -msys ]]; then
+        destdir="$2"
+        setup_prefix="$3"
+        to_real_prefix setup_prefix
+    else
+        destdir="$1"
+        setup_prefix="$2"
+    fi
     local prefix_rel
     local content_dir
     # go into destdir and move files into actual root directory
     pushd_quiet "$destdir"
-    to_real_prefix setup_prefix
     get_prefix_rel prefix_rel "$setup_prefix"
     if [[ ! -z "$prefix_rel" ]]; then
         content_dir="${prefix_rel%%/*}"
@@ -488,7 +500,7 @@ build_and_install () {
             exit 6
         }
         DESTDIR="$destdir" cmake --build . --target install
-        normalize_destdir_install "$destdir" "$setup_prefix"
+        normalize_destdir_install -msys "$destdir" "$setup_prefix"
         popd_quiet
         ;;
     meson)
@@ -511,13 +523,17 @@ build_and_install () {
         }
         echo "Using meson install command: " meson install --destdir="$destdir"
         meson install --destdir="$destdir"
-        normalize_destdir_install "$destdir" "$setup_prefix"
+        normalize_destdir_install -msys "$destdir" "$setup_prefix"
         popd_quiet
         ;;
     configure)
         test_commands make grep cmp diff || exit 3
         configure_options processed_options BUILD_TYPE "${@:2}"
         add_build_type_compiler_flags "$BUILD_TYPE"
+
+        # get the --prefix actually given to the setup command
+        prefix_from_options --prefix setup_prefix processed_options
+
         echo "Using configure command: " configure "${processed_options[@]}"
         ./configure "${processed_options[@]}" || {
             echo "error: while running configure script" >&2
@@ -536,6 +552,7 @@ build_and_install () {
         }
         echo "Using install command: " 'DESTDIR='"$destdir" make install
         DESTDIR="$destdir" make install
+        normalize_destdir_install "$destdir" "$setup_prefix"
         ;;
     *)
         echo "error: unknown build type \"$1\""
