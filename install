@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-LHELPER_PACKAGE_VERSION=1
+LHELPER_PACKAGE_VERSION=2
 
 recipes_branch=master
 if [[ "$1" == "--use="* ]]; then
