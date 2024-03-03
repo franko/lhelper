@@ -86,7 +86,7 @@ expand_enter_archive_filename () {
 # $2 = branch or tag to use
 enter_git_repository () {
     if [[ "${_lh_recipe_run}" == "dependencies" ]]; then
-        enter_dummy_build_dir "$LHELPER_TMPDIR/build"
+        enter_dummy_build_dir "$LHELPER_TMPDIR"
         return 0
     fi
     local repo_url="$1"
@@ -127,11 +127,11 @@ enter_git_repository () {
         echo "create archive ${archive_filename} in $LHELPER_WORKING_DIR/archives"
         popd
     fi
-    if [ ! -d "$LHELPER_TMPDIR/build" ]; then
-        mkdir -p "$LHELPER_TMPDIR/build"
+    if [ ! -d "$LHELPER_TMPDIR" ]; then
+        mkdir -p "$LHELPER_TMPDIR"
     fi
-    rm -fr "$LHELPER_TMPDIR/build/"*
-    expand_enter_archive_filename "$LHELPER_WORKING_DIR/archives/$archive_filename" "$LHELPER_TMPDIR/build"
+    rm -fr "$LHELPER_TMPDIR"
+    expand_enter_archive_filename "$LHELPER_WORKING_DIR/archives/$archive_filename" "$LHELPER_TMPDIR"
 }
 
 # get a name of a variable and transform its content from an URL into
@@ -186,7 +186,7 @@ transform_to_archive_filename () {
 # $1 = remote URL
 enter_archive () {
     if [[ "${_lh_recipe_run}" == "dependencies" ]]; then
-        enter_dummy_build_dir "$LHELPER_TMPDIR/build"
+        enter_dummy_build_dir "$LHELPER_TMPDIR"
         return 0
     fi
     local url="$1"
@@ -227,8 +227,8 @@ enter_archive () {
         curl "${curl_options[@]}" --fail --retry 5 --retry-delay 2 --insecure -L "$url" -o "$LHELPER_WORKING_DIR/archives/$filename" || clean_and_exit_download_error
         trap INT
     fi
-    rm -fr "$LHELPER_TMPDIR/build/"*
-    expand_enter_archive_filename "$LHELPER_WORKING_DIR/archives/$filename" "$LHELPER_TMPDIR/build" "${extract_options[@]}"
+    rm -fr "$LHELPER_TMPDIR"
+    expand_enter_archive_filename "$LHELPER_WORKING_DIR/archives/$filename" "$LHELPER_TMPDIR" "${extract_options[@]}"
 }
 
 inside_git_apply_patch () {

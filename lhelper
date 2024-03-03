@@ -7,6 +7,21 @@ if [ "$#" -lt 1 ]; then
     exit 1
 fi
 
+uuid_with_epoch() {
+    local -n uuid=$1
+    local length=${2:-6}
+    local chars=(a b c d e f g h i j k l m n o p q r s t u v w x y z 0 1 2 3 4 5 6 7 8 9)
+
+    uuid=""
+    for ((i = 0; i < length; i++)); do
+        local rand=$((RANDOM % 36))
+        uuid+=${chars[rand]}
+    done
+
+    # remove first for characters
+    uuid+="${EPOCHSECONDS:4}"
+}
+
 LHELPER_BIN_DIRNAME="$(dirname "$0")"
 LHELPER_PREFIX="${LHELPER_BIN_DIRNAME%/bin}"
 
@@ -15,6 +30,12 @@ if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* || "$OSTYPE" == "cygwin"* ]]
 else
     LHELPER_TMPDIR="${TMPDIR:-/tmp}"
 fi
+
+LHELPER_SESSION_UUID=
+uuid_with_epoch LHELPER_SESSION_UUID
+LHELPER_TMPDIR="$LHELPER_TMPDIR/$LHELPER_SESSION_UUID"
+export LHELPER_TMPDIR
+
 export LHELPER_SYSTEM_PREFIX="/usr"
 
 export LHELPER_PACKAGE_VERSION="${LHELPER_PACKAGE_VERSION:-2}"
@@ -23,7 +44,6 @@ LHELPER_WWW_DOMAIN="https://www.lhelper.cc"
 
 export LHELPER_WORKING_DIR="$LHELPER_PREFIX/var/lhelper"
 export LHELPER_DIR="$LHELPER_PREFIX/share/lhelper"
-export LHELPER_TMPDIR
 
 # config files and directory used by lhelper
 LH_CONFIG_DIR="$HOME/.config/lhelper"
@@ -741,7 +761,6 @@ build_env_digest () {
     echo "$digest"
 }
 
-
 # The first argument, $run_mode, should be either "dependencies", "run" or "log"
 library_install () {
     local reloc_warning_prefix reloc_warning_files
@@ -798,6 +817,10 @@ library_install () {
         options_tag="${options_tag/#-/_}"
     fi
 
+    # Ensure that the temporary directory exists
+    echo "DEBUG: LHELPER_TMPDIR: $LHELPER_TMPDIR"
+    mkdir -p "$LHELPER_TMPDIR"
+
     if [[ "$local_recipe" == "true" && -z ${version+set} ]]; then
         echo "error: version is required for local recipes"
         exit 1
@@ -835,10 +858,7 @@ library_install () {
         fi
     fi
 
-    # Ensure that the temporary directory exists
-    mkdir -p "$LHELPER_TMPDIR/build"
-
-    LHELPER_TEMP_ROOT="$LHELPER_WORKING_DIR/tmp"
+    LHELPER_TEMP_ROOT="$LHELPER_WORKING_DIR/tmp/$LHELPER_SESSION_UUID"
     set_prefix_variables "$LHELPER_TEMP_ROOT"
     export CONFIG_PREFIX="$package_prefix"
 
