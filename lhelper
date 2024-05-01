@@ -32,6 +32,7 @@ LH_CONFIG_FILE="$LH_CONFIG_DIR/config"
 # this variable defines if we have a ssh key or not. If set it will be the
 # full path of the ssh private key filename.
 unset LH_SSH_KEY_PATH
+unset LH_SSH_KEY_PORT
 
 if [[ -f "$LH_CONFIG_FILE" ]]; then
     source "$LH_CONFIG_FILE"
@@ -98,7 +99,7 @@ upload_package() {
 
     if [ "$response" -ne 200 ]; then
         # File does not exist, upload using scp
-        if scp -i "$LH_SSH_KEY_PATH" "$package_filename" "lhelper@$LHELPER_DOMAIN:/lhelper/files/$package_version/$package_name"; then
+        if scp -i "$LH_SSH_KEY_PATH" -P "$LHELPER_SSH_KEY_PORT" "$package_filename" "lhelper@$LHELPER_DOMAIN:/lhelper/files/$package_version/$package_name"; then
             echo "Package $package_name uploaded successfully with version $package_version"
         else
             echo "error uploading ${package_version}/${package_name} into $LHELPER_WWW_DOMAIN"
@@ -943,7 +944,7 @@ library_install () {
         }
         fs_security_delay
         tar -C "$LHELPER_TEMP_ROOT" -czf "${tar_package_filename}" .
-        if [[ ! -z ${LH_SSH_KEY_PATH+x} && -z ${local_recipe+set} ]]; then
+        if [[ ! -z ${LH_SSH_KEY_PATH+x} && ! -z ${LH_SSH_KEY_PORT+x} && -z ${local_recipe+set} ]]; then
             upload_package "$LHELPER_PACKAGE_VERSION" "${tar_package_filename}"
         fi
         mv "${tar_package_filename}" "${lh_package_dir}"
@@ -1599,7 +1600,7 @@ cleanup)
     fi
     ;;
 register)
-    if [[ "$2" == key && -n "$3" ]]; then
+    if [[ "$2" == key && -n "$3" && -n "$4" ]]; then
         if [[ ! -f "$3" ]]; then
             echo "The specified SSH key $3 does not exist."
             exit 1
@@ -1609,10 +1610,12 @@ register)
             echo "Warning: the new SSH key will replace the previous one: $LH_SSH_KEY_PATH"
         fi
         echo "export LH_SSH_KEY_PATH=\"$3\"" > "$LH_CONFIG_FILE"
+        echo "export LH_SSH_KEY_PORT=$4" >> "$LH_CONFIG_FILE"
         export LH_SSH_KEY_PATH="$3"
+        export LH_SSH_KEY_PORT="$4"
         echo "SSH key registered successfully."
     else
-        echo "Usage: $LHELPER_COMMAND_NAME register key <ssh-key-filename>"
+        echo "Usage: $LHELPER_COMMAND_NAME register key <ssh-key-filename> <port-number>"
         exit 1
     fi
     ;;
