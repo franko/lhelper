@@ -265,12 +265,17 @@ test_commands () {
 }
 
 configure_options () {
+    local wxconfigure=
     local -n options_new=$1
     local -n buildtype=$2
     shift 2
+    if [[ $1 == --wxwidgets ]]; then
+        wxconfigure=yes
+        shift
+    fi
     local prefix_val="$LHELPER_SYSTEM_PREFIX"
     local use_shared=no
-    local pic_option
+    local want_pic=no
 
     while [ ! -z ${1+x} ]; do
         case $1 in
@@ -281,9 +286,7 @@ configure_options () {
                 use_shared=yes
                 ;;
             -pic)
-                if [ -z "${skip_pic_option+x}" ]; then
-                    pic_option="--with-pic=yes"
-                fi
+                want_pic=yes
                 ;;
             --buildtype=*)
                 buildtype="${1#*=}"
@@ -296,14 +299,26 @@ configure_options () {
     done
 
     options_new+=(--prefix="${prefix_val}")
-    if [ $use_shared == yes ]; then
-        options_new+=(--enable-shared --disable-static)
+    if [ -z "$wxconfigure" ]; then
+        if [ $use_shared == yes ]; then
+            options_new+=(--enable-shared --disable-static)
+        else
+            options_new+=(--disable-shared --enable-static)
+        fi
+        if [[ $want_pic == yes && -z "${skip_pic_option+x}" ]]; then
+            options_new+=("--with-pic=yes")
+        fi
     else
-        options_new+=(--enable-static --disable-shared)
-    fi
-
-    if [ -n "$pic_option" ]; then
-        options_new+=($pic_option)
+        if [ $use_shared == yes ]; then
+            options_new+=(--enable-shared)
+        else
+            options_new+=(--disable-shared)
+        fi
+        if [[ ($want_pic == yes || $use_shared == yes) && -z "${skip_pic_option+x}" ]]; then
+            options_new+=("--enable-pic")
+        else
+            options_new+=("--disable-pic")
+        fi
     fi
 }
 
