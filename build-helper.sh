@@ -566,7 +566,7 @@ build_and_install () {
             exit 6
         }
         echo "Using install command: " 'DESTDIR='"$destdir" make install
-        DESTDIR="$destdir" make install
+        make DESTDIR="$destdir" install
         normalize_destdir_install "$destdir" "$setup_prefix"
         ;;
     *)
