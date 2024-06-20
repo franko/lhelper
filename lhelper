@@ -99,7 +99,7 @@ upload_package() {
 
     if [ "$response" -ne 200 ]; then
         # File does not exist, upload using scp
-        if scp -i "$LH_SSH_KEY_PATH" -p "$LH_SSH_KEY_PORT" "$package_filename" "lhelper@$LHELPER_DOMAIN:/lhelper/files/$package_version/$package_name"; then
+        if scp -i "$LH_SSH_KEY_PATH" -P "$LH_SSH_KEY_PORT" "$package_filename" "lhelper@$LHELPER_DOMAIN:/lhelper/files/$package_version/$package_name"; then
             echo "Package $package_name uploaded successfully with version $package_version"
         else
             echo "error uploading ${package_version}/${package_name} into $LHELPER_WWW_DOMAIN"
