@@ -259,7 +259,9 @@ library_dir_reloc () {
     local files_list filename
     readarray -d '' files_list < <(find "$archive_dir" -type f -print0)
     for name in "${files_list[@]}"; do
-        if [[ $name == *".pc" || $name == *"-config" || $name == *".la" ]]; then
+        # wxwidgets install config files in the directory lib/wx/config so we use the pattern
+        # *"/config/"* to match these files
+        if [[ $name == *".pc" || $name == *"-config" || $name == *"/config/"* || $name == *".la" ]]; then
             lh-path-replace "$name" "$old_prefix" "$new_prefix" || reloc_warning_files+=("$name")
         fi
     done
