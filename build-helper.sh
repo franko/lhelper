@@ -4,10 +4,9 @@
 # The functions defined below are explicitly exported from the lhelpers's
 # main script.
 
-current_download=
+source "$LHELPER_DIR/common-lhelper.sh"
 
-pushd_quiet () { builtin pushd "$@" > /dev/null; }
-popd_quiet () { builtin popd "$@" > /dev/null; }
+current_download=
 
 unset skip_pic_option
 if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* || "$OSTYPE" == "cygwin"* ]]; then
@@ -487,23 +486,6 @@ normalize_destdir_install () {
         rm -fr "$content_dir"
     fi
     popd_quiet
-}
-
-# FIXME: duplicate function from create-env.sh
-default_libdir () {
-    local -n libs="$1"
-    if [ -f /etc/debian_version ]; then
-        local archpath=$(dpkg-architecture -qDEB_HOST_MULTIARCH)
-        if [ $? == 0 -a ${archpath:-none} != "none" ]; then
-            libs=("lib/$archpath" "lib")
-            return
-        fi
-    fi
-    if [ -d /usr/lib64 -a ! -L /usr/lib64 ]; then
-        libs=("lib64")
-        return
-    fi
-    libs=("lib")
 }
 
 # Libraries based on the configure script sometimes check for a library
