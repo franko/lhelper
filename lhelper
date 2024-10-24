@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# set -x
+
 LHELPER_COMMAND_NAME="$(basename "$0")"
 
 if [ "$#" -lt 1 ]; then
@@ -213,6 +215,9 @@ container_start() {
     # Run container with proper error handling
     echo "Starting container '$container_name' from image '$image'"
     if ! docker run --rm -it \
+        --gpus all \
+        -e NVIDIA_DRIVER_CAPABILITIES=all \
+        -e NVIDIA_VISIBLE_DEVICES=all \
         -e DISPLAY="$DISPLAY" \
         --name "$container_name" \
         -v /tmp/.X11-unix:/tmp/.X11-unix \
