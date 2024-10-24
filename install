@@ -95,6 +95,7 @@ fi
 
 mkdir -p "$DESTDIR/bin"
 mkdir -p "$DESTDIR/share/lhelper/patch"
+# mkdir -p "$DESTDIR/share/lhelper/containers"
 mkdir -p "$DESTDIR/var/lhelper/archives"
 mkdir -p "$DESTDIR/var/lhelper/packages/$LHELPER_PACKAGE_VERSION"
 mkdir -p "$DESTDIR/var/lhelper/digests"
@@ -116,6 +117,8 @@ for filename in common-lhelper.sh cpu-lhelper.sh build-helper.sh create-env.sh l
 done
 cp patch/*.patch "$DESTDIR/share/lhelper/patch"
 cp lhelper "$DESTDIR/bin"
+rm -fr "$DESTDIR/share/lhelper/containers"
+cp -r containers "$DESTDIR/share/lhelper"
 
 if [ ! -z ${bash_compdir+x} ]; then
     mkdir -p "$bash_compdir"

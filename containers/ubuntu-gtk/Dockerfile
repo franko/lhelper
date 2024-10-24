@@ -1,0 +1,46 @@
+# $LHELPER_DIR/containers/ubuntu-gtk-dev/Dockerfile
+FROM ubuntu:focal
+
+# Accept build arguments for user/group IDs and names
+ARG USER_ID
+ARG GROUP_ID
+ARG USERNAME
+ARG GROUPNAME
+
+# Avoid warnings by switching to noninteractive
+ENV DEBIAN_FRONTEND=noninteractive
+
+# System packages installation
+RUN apt-get update && apt-get install -y \
+    sudo x11-apps xorg-dev build-essential pkg-config ninja-build \
+    git python3-pip ca-certificates curl vim openssh-client \
+    bison libxcb-xkb-dev libegl1-mesa-dev \
+    libgtk-3-dev libgtk-3-0 glade \
+    --no-install-recommends \
+    && pip3 install meson \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create the same group as host
+RUN groupadd -g $GROUP_ID $GROUPNAME
+
+# Create the same user as host
+RUN useradd -m -u $USER_ID -g $GROUP_ID -s /bin/bash $USERNAME \
+    && echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Switch to the user
+USER $USERNAME
+
+# Set the working directory to user's home
+WORKDIR /home/$USERNAME
+
+# Setup user environment
+RUN echo 'export PATH="$HOME/.local/bin:$PATH"' >> .bashrc \
+    && mkdir -p .local/bin
+
+RUN git clone https://github.com/franko/lhelper && cd lhelper && \
+  bash install $HOME/.local
+
+WORKDIR /workspace
+
+CMD ["/bin/bash"]

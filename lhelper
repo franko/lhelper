@@ -8,6 +8,8 @@ if [ "$#" -lt 1 ]; then
 fi
 
 LHELPER_BIN_DIRNAME="$(dirname "$0")"
+
+# The followig gives the prefix directory where lhelper is installed
 LHELPER_PREFIX="${LHELPER_BIN_DIRNAME%/bin}"
 
 if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* || "$OSTYPE" == "cygwin"* ]]; then
@@ -70,6 +72,164 @@ if [ ! -d "${LHELPER_DIR}" ]; then
     echo "error: directory \"${LHELPER_DIR}\" not found."
     echo "Lhelper may be not properly installed."
 fi
+
+# Function to check if docker is available
+check_docker_command () {
+    if ! command -v docker >/dev/null 2>&1; then
+        echo "Error: Docker is not installed or not in PATH"
+        exit 1
+    fi
+}
+
+# Function to check if an image needs to be built
+needs_build() {
+    local container_type="$1"
+    local dockerfile_path="$2"
+    local image_name="lhelper/$container_type:latest"
+
+    # Check if image exists
+    if ! docker image inspect "$image_name" >/dev/null 2>&1; then
+        return 0  # Image doesn't exist, needs build
+    fi
+
+    # Get image creation timestamp using consistent format
+    local image_timestamp
+    image_timestamp=$(docker image inspect "$image_name" --format='{{.Created}}' | date -f - +%s)
+
+    # Use find with NUL terminator and read with -z for safe filename handling
+    local newest_file_time=0
+    local dir_path
+    dir_path=$(dirname "$dockerfile_path")
+
+    while IFS= read -r -d '' file; do
+        local file_time
+        file_time=$(stat -c %Y "$file")
+        if (( file_time > newest_file_time )); then
+            newest_file_time=$file_time
+        fi
+    done < <(find "$dir_path" -type f -print0)
+
+    (( newest_file_time > image_timestamp ))
+}
+
+container_list() {
+    local system_path="$LHELPER_DIR/containers"
+    local user_path="$LH_CONFIG_DIR/containers"
+    local found_containers=0
+
+    # Function to list containers from a directory
+    list_from_dir() {
+        local dir="$1"
+        if [ -d "$dir" ]; then
+            while IFS= read -r -d '' dockerfile; do
+                local container_type
+                container_type=$(basename "$(dirname "$dockerfile")")
+                echo "$container_type"
+                found_containers=1
+            done < <(find "$dir" -mindepth 2 -maxdepth 2 -name "Dockerfile" -print0 2>/dev/null)
+        fi
+    }
+
+    # List both system and user containers
+    list_from_dir "$system_path"
+    list_from_dir "$user_path"
+
+    if [ "$found_containers" -eq 0 ]; then
+        echo "No containers available"
+        exit 1
+    fi
+}
+
+find_dockerfile() {
+    local container_type="$1"
+    local user_container_config_dir="$LH_CONFIG_DIR/containers"
+    local container_config_dir="$LHELPER_DIR/containers"
+
+    # Check user config first, then system config
+    if [ -f "$user_container_config_dir/$container_type/Dockerfile" ]; then
+        echo "$user_container_config_dir/$container_type/Dockerfile"
+    elif [ -f "$container_config_dir/$container_type/Dockerfile" ]; then
+        echo "$container_config_dir/$container_type/Dockerfile"
+    else
+        echo ""
+    fi
+}
+
+container_build() {
+    local container_type="$1"
+    local dockerfile_path="$2"
+    local build_context
+    build_context=$(dirname "$dockerfile_path")
+
+    # Get current user/group information for build arguments
+    local user_id group_id username groupname
+    user_id=$(id -u)
+    group_id=$(id -g)
+    username=$(id -un)
+    groupname=$(id -gn)
+
+    echo "Building container image for $container_type..."
+    if ! docker build \
+        --build-arg USER_ID="$user_id" \
+        --build-arg GROUP_ID="$group_id" \
+        --build-arg USERNAME="$username" \
+        --build-arg GROUPNAME="$groupname" \
+        -t "lhelper/$container_type:latest" \
+        -f "$dockerfile_path" \
+        "$build_context"; then
+        return 1
+    fi
+    return 0
+}
+
+# Function to safely start a container
+container_start() {
+    local container_type="$1"
+
+    # Find Dockerfile
+    local dockerfile_path
+    dockerfile_path=$(find_dockerfile "$container_type")
+    if [ -z "$dockerfile_path" ]; then
+        echo "Error: No Dockerfile found for container type '$container_type'"
+        container_list
+        exit 1
+    fi
+
+    # Build if needed
+    if needs_build "$container_type" "$dockerfile_path"; then
+        echo "Container image needs to be built or updated..."
+        if ! container_build "$container_type" "$dockerfile_path"; then
+            echo "Error: Container build failed"
+            exit 1
+        fi
+    fi
+
+    # Prepare run arguments
+    local image="lhelper/$container_type:latest"
+
+    # Create unique container name
+    local container_name="${container_type}-$(date +%s)"
+
+    # Run container with proper error handling
+    echo "Starting container '$container_name' from image '$image'"
+    if ! docker run --rm -it \
+        -e DISPLAY="$DISPLAY" \
+        --name "$container_name" \
+        -v /tmp/.X11-unix:/tmp/.X11-unix \
+        -v ~/.ssh:/home/${USER}/.ssh:ro \
+        -v "$PWD":/workspace \
+        -v ~/.config/lhelper:/home/${USER}/.config/lhelper:ro \
+        --network host \
+        "$image" \
+        /bin/bash
+    then
+        echo "Error: Failed to start container"
+        exit 1
+    fi
+}
+
+pushd_quiet () { builtin pushd "$@" > /dev/null; }
+popd_quiet () { builtin popd > /dev/null; }
 
 urlencode() {
     local string="$1"
@@ -1586,6 +1746,28 @@ dir)
     ;;
 update)
     update_command "$@"
+    ;;
+container)
+    case "$2" in
+        "start")
+            if [ -z "${3:-}" ]; then
+                echo "Usage: $LHELPER_COMMAND_NAME container start <container-type>"
+                exit 1
+            fi
+            check_docker_command
+            container_start "$3"
+            ;;
+        "list")
+            container_list
+            ;;
+        *)
+            echo "Usage: $LHELPER_COMMAND_NAME container <subcommand> [args]"
+            echo "Available subcommands:"
+            echo "  start <container-type>   Start a new container"
+            echo "  list                     List available container types"
+            exit 1
+            ;;
+    esac
     ;;
 *)
     echo "error: unknown command $1"
