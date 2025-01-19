@@ -921,6 +921,11 @@ library_install () {
             cat "$log_dirname/$package-stderr.log"
             exit 1
             ;;
+        7)
+            echo "Error in the configuration for $package:"; echo
+            cat "$log_dirname/$package-stderr.log"
+            exit 1
+            ;;
         *)
             echo "error: building library \"$package\""
             echo "    You may inspect the log files:"
