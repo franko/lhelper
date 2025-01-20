@@ -1,3 +1,5 @@
+# This module use the function "default_libdir" that should be defined
+# in the parent script including this module.
 
 # Take a format and a list or aguments. Format each argument with
 # the given format using printf ang join all strings.
@@ -7,28 +9,6 @@ function printf_join {
     shift
     local _result=$(printf "$_fmt" "$@")
     echo "${_result:1}"
-}
-
-# Figure out the default library directory.
-# Adapted from https://github.com/mesonbuild/meson/blob/master/mesonbuild/mesonlib.py
-# Returns one or more paths separated by a colon. It can return multiple values
-# because on debian with multiarch there is the lib directory and its multiarch
-# subdirectory.
-# The first directory will be used by lhelper to install new pkg-config files if
-# the build system doesn't do it natively.
-default_libdir () {
-    if [ -f /etc/debian_version ]; then
-        local archpath=$(dpkg-architecture -qDEB_HOST_MULTIARCH)
-        if [ $? == 0 -a ${archpath:-none} != "none" ]; then
-            echo "lib/$archpath:lib"
-            return
-        fi
-    fi
-    if [ -d /usr/lib64 -a ! -L /usr/lib64 ]; then
-        echo "lib64"
-        return
-    fi
-    echo "lib"
 }
 
 env_set_variables () {
@@ -127,8 +107,10 @@ EOF
 create_env () {
     local env_name="$1" prefix="$2" env_source="$3" build_filename="$4"
 
-    local cc cxx cpu_flags libdir_array
-    IFS=':' read -r -a libdir_array <<< "$(default_libdir)"
+    local cc cxx cpu_flags
+
+    local libdir_array=()
+    default_libdir libdir_array
 
     env_set_variables
     env_create_directories

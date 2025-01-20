@@ -4,10 +4,9 @@
 # The functions defined below are explicitly exported from the lhelpers's
 # main script.
 
-current_download=
+source "$LHELPER_DIR/common-lhelper.sh"
 
-pushd_quiet () { builtin pushd "$@" > /dev/null; }
-popd_quiet () { builtin popd "$@" > /dev/null; }
+current_download=
 
 unset skip_pic_option
 if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* || "$OSTYPE" == "cygwin"* ]]; then
@@ -489,6 +488,31 @@ normalize_destdir_install () {
     popd_quiet
 }
 
+# Libraries based on the configure script sometimes check for a library
+# using the system paths without using the pkg-config corresponding to
+# the dependency they are checking. To avoid the problem we add the
+# standard include and library directories from the environment in the
+# CC, CXX et LDFLAGS.
+add_lhelper_env_directory () {
+    local env_prefix
+    if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* || "$OSTYPE" == "cygwin"* ]]; then
+        env_prefix="${LHELPER_ENV_PREFIX/#\/c\//C:\/}"
+    else
+        env_prefix="$LHELPER_ENV_PREFIX"
+    fi
+    CC="$CC -I$env_prefix/include"
+    CXX="$CXX -I$env_prefix/include"
+    local libdir_a=()
+    default_libdir libdir_a
+    for libdir in "${libdir_a[@]}"; do
+        LDFLAGS="${LDFLAGS}${LDFLAGS:+ }-L$env_prefix/$libdir"
+    done
+    echo "Setting the variables:"
+    echo "  CC=$CC"
+    echo "  CXX=$CXX"
+    echo "  LDFLAGS=$LDFLAGS"
+}
+
 build_and_install () {
     local processed_options=()
     local destdir="$INSTALL_PREFIX"
@@ -563,6 +587,7 @@ build_and_install () {
         test_commands make grep cmp diff || exit 3
         configure_options processed_options BUILD_TYPE "${@:2}"
         add_build_type_compiler_flags "$BUILD_TYPE"
+        add_lhelper_env_directory
 
         # get the --prefix actually given to the setup command
         prefix_from_options --prefix setup_prefix processed_options
