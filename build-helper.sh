@@ -519,24 +519,6 @@ build_and_install () {
     local setup_prefix
     local prefix_rel
     if [[ "${_lh_recipe_run}" == "dependencies" ]]; then return 0; fi
-
-    # The following is a method to ensure that the compiler can always found
-    # the header files in ${LHELPER_ENV_PREFIX}/include.
-    # The reason is that some build system search for some standard libraries without
-    # querying the pkg-config file. With this fix we make sure the lhelper's
-    # installed headers can be found.
-    # Using -isystem is somewhat unorthodox, probably it should be more correct to
-    # use -I instead.
-    # In theory we may have used CPPFLAGS to add the directories but sometimes
-    # build systems may forget to add $CPPFLAGS so using $CC/$CXX is more safe.
-    CC="$CC -isystem ${LHELPER_ENV_PREFIX}/include"
-    CXX="$CXX -isystem ${LHELPER_ENV_PREFIX}/include"
-
-    # The same than above but for the libraries. For example some projects
-    # check for -lz without querying any pkg-config file. With this fix we
-    # make sure the z library installed by lhelper can be found.
-    LDFLAGS="${LDFLAGS:+$LDFLAGS }-L${LHELPER_ENV_PREFIX}/lib"
-
     case $1 in
     cmake)
         test_commands cmake || exit 3
