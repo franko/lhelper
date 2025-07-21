@@ -35,6 +35,9 @@ known_cpu_spec=(
     "x86-64 steamroller bdver3        "
     "x86-64 excavator   bdver4        "
     "x86-64 zen         znver1        "
+    "x86-64 zen2         znver2        "         # Zen 2 (2019)
+    "x86-64 zen3         znver3        "         # Zen 3 (2020)
+    "x86-64 zen4         znver4        "         # Zen 4 (2022)
     "x86-64 x86-64-v2   x86-64-v2     "
     "x86-64 nehalem     nehalem       "
     "x86-64 westmere    westmere       "
@@ -47,6 +50,10 @@ known_cpu_spec=(
     "x86-64 atom        bonnell       "
     "x86-64 x86-64-v4   x86-64-v4     "
     "x86-64 skylakex    skylake-avx512"
+    "x86-64 icelake      icelake       "         # Ice Lake (2019)
+    "x86-64 tigerlake    tigerlake     "         # Tiger Lake (2020)
+    "x86-64 alderlake    alderlake     "         # Alder Lake (2021)
+    "x86-64 sapphirerapids sapphirerapids "      # Sapphire Rapids (2023)
     "arm    armv6       armv6         "
     "arm    armv6+fp    armv6+fp      "
     "arm    armv7       armv7         "
@@ -59,5 +66,15 @@ known_cpu_spec=(
     "arm64  cortexa57   armv8-a        -mtune=cortex-a57"
     "arm64  cortexa72   armv8-a        -mtune=cortex-a72"
     "arm64  cortexa73   armv8-a       "
+    "arm64  armv8.2      armv8.2-a     "         # ARMv8.2
+    "arm64  armv8.3      armv8.3-a     "         # ARMv8.3
+    "arm64  armv8.4      armv8.4-a     "         # ARMv8.4
+    "arm64  armv9        armv9-a       "         # ARMv9
+    "arm64  cortexa76    armv8.2-a     -mtune=cortex-a76"
+    "arm64  cortexa78    armv8.2-a     -mtune=cortex-a78"
+    "arm64  cortexX1     armv8.2-a     -mtune=cortex-x1"
+    "arm64  neoversen1   armv8.2-a     -mtune=neoverse-n1"
+    "arm64  neoversen2   armv8.5-a     -mtune=neoverse-n2"
+    "arm64  neoversev1   armv8.4-a     -mtune=neoverse-v1"
 )
 
