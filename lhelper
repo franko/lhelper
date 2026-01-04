@@ -7,6 +7,28 @@ if [ "$#" -lt 1 ]; then
     exit 1
 fi
 
+if command -v sed >/dev/null 2>&1 && sed --version >/dev/null 2>&1; then
+  # GNU sed already (Linux, or someone did the work for us)
+  :
+elif command -v gsed >/dev/null 2>&1; then
+  # Likely macOS with Homebrew
+  if command -v brew >/dev/null 2>&1; then
+    export PATH="$(brew --prefix gnu-sed)/libexec/gnubin:$PATH"
+  fi
+fi
+
+# Final sanity check
+if ! sed --version >/dev/null 2>&1; then
+  echo "Error: GNU sed is required but not available"
+  exit 1
+fi
+
+if [[ ${BASH_VERSINFO[0]} -lt 5 ]]; then
+  echo "Error: Bash >= 5.0 required."
+  echo "On macOS: brew install bash"
+  exit 1
+fi
+
 LHELPER_BIN_DIRNAME="$(dirname "$0")"
 LHELPER_PREFIX="${LHELPER_BIN_DIRNAME%/bin}"
 
