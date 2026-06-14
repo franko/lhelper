@@ -91,7 +91,7 @@ fi
 source "$LHELPER_DIR/common-lhelper.sh"
 source "$LHELPER_DIR/cpu-lhelper.sh"
 source "$LHELPER_DIR/create-env.sh"
-source "$LHELPER_BIN_DIRNAME/lhelper-lib.sh"
+source "$LHELPER_DIR/lhelper-lib.sh"
 
 if [ ! -d "${LHELPER_DIR}" ]; then
     echo "error: directory \"${LHELPER_DIR}\" not found."
