@@ -125,40 +125,55 @@ local function resolve(input)
 
    local order, cycle_nodes = topological_sort(adj, rev_adj, nodes)
 
-   if not order then
-      io.stderr:write("error: dependency cycle detected:\n")
-      local cycle_str = table.concat(cycle_nodes, " -> ")
-      io.stderr:write("  " .. cycle_str .. "\n")
-      os.exit(1)
-   end
+    if not order then
+       return nil, cycle_nodes
+    end
 
-   return order
+    return order
 end
 
 local function main()
-   local input
+    local input
 
-   if arg[1] then
-      local f = io.open(arg[1], "r")
-      if not f then
-         io.stderr:write("error: cannot open file: " .. arg[1] .. "\n")
-         os.exit(2)
-      end
-      input = f:read("*a")
-      f:close()
-   else
-      input = io.stdin:read("*a")
-   end
+    if arg[1] then
+       local f = io.open(arg[1], "r")
+       if not f then
+          io.stderr:write("error: cannot open file: " .. arg[1] .. "\n")
+          os.exit(2)
+       end
+       input = f:read("*a")
+       f:close()
+    else
+       input = io.stdin:read("*a")
+    end
 
-   if not input or #input == 0 then
-      return
-   end
+    if not input or #input == 0 then
+       return
+    end
 
-   local order = resolve(input)
+    local order, cycle_nodes = resolve(input)
 
-   for _, pkg in ipairs(order) do
-      print(pkg)
-   end
+    if not order then
+       io.stderr:write("error: dependency cycle detected:\n")
+       local cycle_str = table.concat(cycle_nodes, " -> ")
+       io.stderr:write("  " .. cycle_str .. "\n")
+       os.exit(1)
+    end
+
+    for _, pkg in ipairs(order) do
+       print(pkg)
+    end
 end
 
-main()
+-- Standalone entry point: checks if we should run as a standalone script.
+-- When called as `lua resolve.lua <file>`, arg[0] is the script path.
+-- When required via require(), do not call main.
+local script_path = arg and arg[0]
+if script_path and script_path ~= "" then
+    local basename = script_path:match("[^/\\]+$")
+    if basename == "resolve.lua" then
+        main()
+    end
+end
+
+return { resolve = resolve }
