@@ -2,12 +2,19 @@
 
 LHELPER_PACKAGE_VERSION=2
 
-recipes_branch=lhelper-agent/dev
+recipes_branch=master
 if [[ "$1" == "--use="* ]]; then
     recipes_branch="${1#--use=}"
-    echo "Using recipes from branch: ${recipes_branch}"
     shift
 fi
+if [[ "$recipes_branch" == "master" || "$recipes_branch" == "" ]]; then
+    local_branch="$(git -C "$(dirname "$0")" rev-parse --abbrev-ref HEAD 2>/dev/null)"
+    if [[ -n "$local_branch" && "$local_branch" != "HEAD" ]]; then
+        recipes_branch="$local_branch"
+        echo "Auto-detected recipes branch from current git branch: $recipes_branch"
+    fi
+fi
+echo "Using recipes branch: $recipes_branch"
 
 if [ $# != "1" ]; then
     echo "Usage: $0 <prefix>"
