@@ -14,7 +14,7 @@ local LHELPER_RECIPES_DIR = os.getenv("LHELPER_RECIPES_DIR") or ""
 local LH_RECIPES_DIR = os.getenv("LH_RECIPES_DIR") or LHELPER_RECIPES_DIR
 
 local function find_lhelper_bin()
-    return (os.getenv("LHELPER_PREFIX") or (LHELPER_DIR .. "/../..")) .. "/lhelper"
+    return os.getenv("LHELPER_BIN") or (os.getenv("LHELPER_PREFIX") or (LHELPER_DIR .. "/../..")) .. "/bin/lhelper"
 end
 
 local LHELPER_BIN = find_lhelper_bin()

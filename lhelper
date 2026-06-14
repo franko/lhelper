@@ -31,6 +31,7 @@ fi
 
 LHELPER_BIN_DIRNAME="$(dirname "$0")"
 LHELPER_PREFIX="${LHELPER_BIN_DIRNAME%/bin}"
+export LHELPER_BIN="$(cd "$LHELPER_BIN_DIRNAME" 2>/dev/null && pwd)/$(basename "$0")"
 
 if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* || "$OSTYPE" == "cygwin"* ]]; then
     LHELPER_TMPDIR="C:/Windows/Temp"
