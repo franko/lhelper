@@ -112,6 +112,48 @@ for modname in path-replace sort cmp realpath; do
 done
 popd_quiet
 
+echo "compiling lua"
+pushd_quiet src/lua/src
+
+lua_srcs=()
+for f in l*.c; do
+    [[ "$f" == "luac.c" ]] && continue
+    lua_srcs+=("$f")
+done
+
+if [[ "$OSTYPE" == "linux"* ]]; then
+    lua_platform_flags="-DLUA_USE_LINUX"
+    lua_platform_libs="-ldl"
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+    lua_platform_flags="-DLUA_USE_MACOSX"
+    lua_platform_libs=""
+elif [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* || "$OSTYPE" == "cygwin"* ]]; then
+    lua_platform_flags="-DLUA_USE_POSIX"
+    lua_platform_libs=""
+else
+    lua_platform_flags="-DLUA_USE_POSIX"
+    lua_platform_libs="-ldl"
+fi
+
+lua_exe=lua
+if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* || "$OSTYPE" == "cygwin"* ]]; then
+    lua_exe=lua.exe
+fi
+
+lua_objs=()
+for src in "${lua_srcs[@]}"; do
+    obj="${src%.c}.o"
+    $lhcomp -std=gnu99 -O2 -DLUA_COMPAT_5_3 $lua_platform_flags -c "$src" -o "$obj" || { popd_quiet; echo "error: failed to compile $src"; exit 1; }
+    lua_objs+=("$obj")
+done
+
+$lhcomp -o "$lua_exe" "${lua_objs[@]}" -lm $lua_platform_libs || { popd_quiet; echo "error: failed to link lua"; exit 1; }
+rm -f "${lua_objs[@]}"
+
+popd_quiet
+cp src/lua/src/"$lua_exe" "$DESTDIR/bin"
+rm -f src/lua/src/"$lua_exe"
+
 for filename in common-lhelper.sh cpu-lhelper.sh build-helper.sh create-env.sh lhelper-bash-init; do
     cp "$filename" "$DESTDIR/share/lhelper"
 done

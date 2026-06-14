@@ -48,6 +48,9 @@ export LHELPER_DIR="$LHELPER_PREFIX/share/lhelper"
 export LHELPER_RECIPES_DIR="${LH_RECIPES_DIR:-$LHELPER_DIR/recipes}"
 export LHELPER_TMPDIR
 
+export PATH="$LHELPER_PREFIX/bin:$PATH"
+export LUA_PATH="$LHELPER_DIR/lua/?.lua;$LHELPER_DIR/lua/?/init.lua;;"
+
 # config files and directory used by lhelper
 LH_CONFIG_DIR="$HOME/.config/lhelper"
 LH_CONFIG_FILE="$LH_CONFIG_DIR/config"

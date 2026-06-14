@@ -9,3 +9,15 @@ src/lh-sort
 var/
 share/lhelper/*.sh
 
+# C helper build artifacts
+src/lh-path-replace
+src/lh-sort
+src/lh-cmp
+src/lh-realpath
+
+# Lua build artifacts
+src/lua/src/*.o
+src/lua/src/lua
+src/lua/src/luac
+src/lua/src/liblua.a
+
