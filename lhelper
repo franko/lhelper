@@ -1509,18 +1509,35 @@ update_command () {
 
 build_command () {
     local keep_env=false
+    local no_deps=false
+    local dry_run=false
     local recipe="$1"
     shift
-    local options_a=("$@")
+    local options_a=()
 
-    if [[ "$1" == "-k" || "$1" == "--keep" ]]; then
-        keep_env=true
-        shift
-        options_a=("$@")
-    fi
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+        -k|--keep)
+            keep_env=true
+            shift
+            ;;
+        --no-deps)
+            no_deps=true
+            shift
+            ;;
+        --dry-run)
+            dry_run=true
+            shift
+            ;;
+        *)
+            options_a+=("$1")
+            shift
+            ;;
+        esac
+    done
 
     if [ -z "$recipe" ]; then
-        echo "Usage: $LHELPER_COMMAND_NAME build <recipe> [options] [-k|--keep]"
+        echo "Usage: $LHELPER_COMMAND_NAME build [--no-deps] [--dry-run] [-k|--keep] <recipe> [options]"
         exit 1
     fi
 
@@ -1538,13 +1555,11 @@ SPECEOF
     local prev_lib_mode="$lib_install_mode"
     lib_install_mode=verbose
 
-    # Source the spec to get compiler config
     source "$spec_file"
     if [ -z ${BUILD_TYPE+x} ]; then
         BUILD_TYPE=Release
     fi
 
-    # CPU guessing (same logic as activate_command)
     local cpu_type_guess cpu_target_guess
     local mach_cpu="${MACHTYPE%%-*}"
     case "$mach_cpu" in
@@ -1558,7 +1573,6 @@ SPECEOF
 
     guess_missing_cpu_type_target
 
-    # Create environment
     local env_rel_workdir=".lhelper"
     local env_src_dir="$build_env_dir/$env_rel_workdir"
     mkdir -p "$env_src_dir"
@@ -1566,19 +1580,81 @@ SPECEOF
     local env_source="$env_prefix/bin/activate"
     create_env "_build" "$env_prefix" "$env_source" "_build.lhelper"
 
-    # Source and build
-    local build_ok=true
-    (
-        source "$env_source"
-        library_check_and_install run "$recipe" "${options_a[@]}"
-    ) || build_ok=false
-
     local recipe_filename version
     version="$(latest_package_version "$recipe")"
     if [ -n "$version" ]; then
         recipe_filename="$(find_recipe_filename "$LHELPER_RECIPES_DIR" "$recipe" "$version")"
     else
         recipe_filename="$recipe"
+    fi
+
+    local sorted_target_opts=($(lh-sort "${options_a[*]}"))
+    local target_spec="$recipe"
+    if [[ ${#sorted_target_opts[@]} -gt 0 ]]; then
+        target_spec="$recipe ${sorted_target_opts[*]}"
+    fi
+
+    if $dry_run; then
+        local build_order
+        build_order=$( ( source "$env_source"; resolve_command "$recipe" "${options_a[@]}"; ) )
+        local rc=$?
+        if [ $rc -ne 0 ]; then
+            rm -rf "$build_env_dir"
+            lib_install_mode="$prev_lib_mode"
+            exit $rc
+        fi
+        if [ -n "$build_order" ]; then
+            echo "Build plan for ${recipe} ${options_a[*]:-(default)}:"
+            local count=1
+            local dep_spec
+            while IFS= read -r dep_spec; do
+                [[ -z "$dep_spec" ]] && continue
+                echo "  ${count}. ${dep_spec}"
+                count=$((count + 1))
+            done <<< "$build_order"
+        else
+            echo "  (no dependencies)"
+        fi
+        rm -rf "$build_env_dir"
+        lib_install_mode="$prev_lib_mode"
+        return 0
+    fi
+
+    local build_ok=true
+
+    if ! $no_deps; then
+        local build_order
+        build_order=$( ( source "$env_source"; resolve_command "$recipe" "${options_a[@]}"; ) )
+        local rc=$?
+        if [ $rc -ne 0 ]; then
+            rm -rf "$build_env_dir"
+            lib_install_mode="$prev_lib_mode"
+            exit $rc
+        fi
+        if [ -n "$build_order" ]; then
+            local dep_spec
+            while IFS= read -r dep_spec; do
+                [[ -z "$dep_spec" ]] && continue
+                if [[ "$dep_spec" == "$target_spec" ]]; then
+                    continue
+                fi
+                echo "Building dependency: $dep_spec"
+                read -ra dep_a <<< "$dep_spec"
+                if ! ( source "$env_source"; library_check_and_install run "${dep_a[@]}"; ); then
+                    echo "FAIL  ${dep_spec}  (dependency)"
+                    build_ok=false
+                    break
+                fi
+                echo "OK  ${dep_spec}  (dependency)"
+            done <<< "$build_order"
+        fi
+    fi
+
+    if $build_ok; then
+        (
+            source "$env_source"
+            library_check_and_install run "$recipe" "${options_a[@]}"
+        ) || build_ok=false
     fi
 
     if $build_ok; then
