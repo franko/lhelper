@@ -1231,6 +1231,7 @@ activate_command () {
     local command="$1"
     shift
     local lib_install_mode=verbose edit_file show_dependencies build_filename
+    local no_auto_deps=false
     local ini_packages=()
     while [ ! -z ${1+x} ]; do
         case "$1" in
@@ -1239,6 +1240,9 @@ activate_command () {
             ;;
         --show-dependencies)
             show_dependencies=yes
+            ;;
+        --no-auto-deps)
+            no_auto_deps=true
             ;;
         --packages)
             ini_packages=("${@:2}")
@@ -1405,6 +1409,9 @@ BUILD_TYPE="${BUILD_TYPE:-Release}"
 # the libray name and its option followed by spaces.
 # For example:
 # packages=("freetype2"  "sdl2 -opengl")
+#
+# Dependencies are automatically resolved and built in the correct order.
+# Set LH_NO_AUTO_DEPS=1 above to disable auto-resolution.
 packages=($(if [[ ${#ini_packages[@]} -gt 0 ]]; then printf '"%s" ' "${ini_packages[@]}"; fi))
 EOF
     fi
@@ -1422,6 +1429,10 @@ EOF
     elif [[ $BUILD_TYPE != "Release" && $BUILD_TYPE != "Debug" ]]; then
         echo "Build type should be either Release or Debug, abort."
         exit 1
+    fi
+
+    if [[ "$LH_NO_AUTO_DEPS" == "1" ]]; then
+        no_auto_deps=true
     fi
 
     guess_missing_cpu_type_target
@@ -1455,11 +1466,33 @@ EOF
                 create_env "$env_test_name" "$env_prefix" "$env_source" "$build_filename"
                 # install packages, activate the environment before
                 source "$env_source"
-                for package_name in "${packages[@]}"; do
-                    # Important: variable package_name can contain spaces and it must be used
-                    # below *without* quotes.
-                    library_check_and_install run $package_name
-                done
+                if $no_auto_deps; then
+                    for package_name in "${packages[@]}"; do
+                        library_check_and_install run $package_name
+                    done
+                else
+                    local pkg_spec
+                    for pkg_spec in "${packages[@]}"; do
+                        local build_order
+                        build_order=$(resolve_command $pkg_spec)
+                        local res_rc=$?
+                        if [ $res_rc -ne 0 ]; then
+                            echo "error: cannot resolve dependencies for \"$pkg_spec\"" >&2
+                            exit 1
+                        fi
+                        if [ -n "$build_order" ]; then
+                            local dep_spec dep_name
+                            while IFS= read -r dep_spec; do
+                                [[ -z "$dep_spec" ]] && continue
+                                dep_name="${dep_spec%% *}"
+                                if package_is_installed "$LHELPER_ENV_PREFIX" "$dep_name"; then
+                                    continue
+                                fi
+                                library_check_and_install run $dep_spec
+                            done <<< "$build_order"
+                        fi
+                    done
+                fi
             fi
             if [ $command == activate ]; then
                 echo "Starting a new shell with the new environment"
