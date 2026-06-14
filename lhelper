@@ -45,6 +45,7 @@ LHELPER_WWW_DOMAIN="https://www.lhelper.cc"
 
 export LHELPER_WORKING_DIR="$LHELPER_PREFIX/var/lhelper"
 export LHELPER_DIR="$LHELPER_PREFIX/share/lhelper"
+export LHELPER_RECIPES_DIR="${LH_RECIPES_DIR:-$LHELPER_DIR/recipes}"
 export LHELPER_TMPDIR
 
 # config files and directory used by lhelper
@@ -259,7 +260,7 @@ set_prefix_variables () {
 
 latest_package_version () {
     local package="$1"
-    cat "$LHELPER_DIR/recipes/index" | while read index_package version
+    cat "$LHELPER_RECIPES_DIR/index" | while read index_package version
     do
         if [[ "$index_package" == "$package" ]]; then
             echo "$version"
@@ -773,7 +774,7 @@ library_install () {
     fi
     local recipe_dir
     if [ -z ${local_recipe+set} ]; then
-        recipe_dir="$LHELPER_DIR/recipes"
+        recipe_dir="$LHELPER_RECIPES_DIR"
     else
         recipe_dir=.
     fi
@@ -1480,17 +1481,421 @@ EOF
 update_command () {
     local branch_name
     if [ "$2" == recipes ]; then
-        pushd_quiet "${LHELPER_DIR}/recipes"
+        pushd_quiet "${LHELPER_RECIPES_DIR}"
         echo "Updating recipes"
         branch_name="$(git rev-parse --abbrev-ref HEAD)"
-        git fetch origin "$branch_name"
-        git checkout -q -f "$branch_name"
-        git reset --hard "origin/$branch_name"
+        if [ -z "${LH_RECIPES_DIR}" ]; then
+            # Built-in recipes dir: reset to match origin (user shouldn't edit here)
+            git fetch origin "$branch_name"
+            git checkout -q -f "$branch_name"
+            git reset --hard "origin/$branch_name"
+        else
+            # External recipes dir (LH_RECIPES_DIR): preserve local changes
+            if git remote -v | grep -q origin; then
+                git pull --rebase origin "$branch_name" 2>/dev/null || {
+                    echo "warning: git pull failed, skipping update"
+                }
+            else
+                echo "Using external recipes dir: ${LH_RECIPES_DIR}"
+                echo "Skipping update (no remote configured)"
+            fi
+        fi
         popd_quiet
     else
         echo "Usage: $LHELPER_COMMAND_NAME update recipes"
         exit 1
     fi
+}
+
+build_command () {
+    local keep_env=false
+    local recipe="$1"
+    shift
+    local options_a=("$@")
+
+    if [[ "$1" == "-k" || "$1" == "--keep" ]]; then
+        keep_env=true
+        shift
+        options_a=("$@")
+    fi
+
+    if [ -z "$recipe" ]; then
+        echo "Usage: $LHELPER_COMMAND_NAME build <recipe> [options] [-k|--keep]"
+        exit 1
+    fi
+
+    local build_env_dir="$LHELPER_TMPDIR/lhelper-build-$$"
+    rm -rf "$build_env_dir"
+    mkdir -p "$build_env_dir"
+
+    local spec_file="$build_env_dir/build.lhelper"
+    cat << 'SPECEOF' > "$spec_file"
+CC="${CC:-gcc}"
+CXX="${CXX:-g++}"
+BUILD_TYPE="Release"
+SPECEOF
+
+    local prev_lib_mode="$lib_install_mode"
+    lib_install_mode=verbose
+
+    # Source the spec to get compiler config
+    source "$spec_file"
+    if [ -z ${BUILD_TYPE+x} ]; then
+        BUILD_TYPE=Release
+    fi
+
+    # CPU guessing (same logic as activate_command)
+    local cpu_type_guess cpu_target_guess
+    local mach_cpu="${MACHTYPE%%-*}"
+    case "$mach_cpu" in
+    x86_64)     cpu_type_guess="x86-64"; cpu_target_guess="x86-64" ;;
+    i586)       cpu_type_guess="x86"; cpu_target_guess="i586" ;;
+    i686)       cpu_type_guess="x86"; cpu_target_guess="i686" ;;
+    arm64* | aarch64) cpu_type_guess="arm64"; cpu_target_guess="armv8" ;;
+    arm*)       cpu_type_guess="arm"; cpu_target_guess="armv6" ;;
+    *)          cpu_type_guess="unknown"; cpu_target_guess="unknown" ;;
+    esac
+
+    guess_missing_cpu_type_target
+
+    # Create environment
+    local env_rel_workdir=".lhelper"
+    local env_src_dir="$build_env_dir/$env_rel_workdir"
+    mkdir -p "$env_src_dir"
+    local env_prefix="$env_rel_workdir/_build"
+    local env_source="$env_prefix/bin/activate"
+    create_env "_build" "$env_prefix" "$env_source" "_build.lhelper"
+
+    # Source and build
+    local build_ok=true
+    (
+        source "$env_source"
+        library_check_and_install run "$recipe" "${options_a[@]}"
+    ) || build_ok=false
+
+    local recipe_filename version
+    version="$(latest_package_version "$recipe")"
+    if [ -n "$version" ]; then
+        recipe_filename="$(find_recipe_filename "$LHELPER_RECIPES_DIR" "$recipe" "$version")"
+    else
+        recipe_filename="$recipe"
+    fi
+
+    if $build_ok; then
+        echo "OK  ${recipe} ${recipe_filename:+($recipe_filename)}  ${options_a[*]:-(default)}"
+    else
+        echo "FAIL  ${recipe} ${recipe_filename:+($recipe_filename)}  ${options_a[*]:-(default)}"
+        if $keep_env; then
+            echo "Build environment preserved at: $build_env_dir"
+        fi
+    fi
+
+    if ! $keep_env; then
+        rm -rf "$build_env_dir"
+    fi
+
+    lib_install_mode="$prev_lib_mode"
+    $build_ok || exit 1
+}
+
+check_command () {
+    local recipe="$1"
+
+    if [ -z "$recipe" ]; then
+        echo "Usage: $LHELPER_COMMAND_NAME check <recipe>"
+        exit 1
+    fi
+
+    local version
+    version="$(latest_package_version "$recipe")"
+    if [ -z "$version" ]; then
+        echo "error: no recipe found for \"$recipe\""
+        exit 1
+    fi
+
+    local recipe_filename="$(find_recipe_filename "$LHELPER_RECIPES_DIR" "$recipe" "$version")"
+    if [ -z "$recipe_filename" ]; then
+        echo "error: no recipe file found for \"$recipe\" version $version"
+        exit 1
+    fi
+
+    local recipe_file="$LHELPER_RECIPES_DIR/$recipe_filename"
+
+    echo "${recipe_filename}:"
+
+    # Syntax check
+    if bash -n "$recipe_file" 2>/dev/null; then
+        echo "  Syntax: OK"
+    else
+        echo "  Syntax: FAIL"
+    fi
+
+    # Detect source type and URL
+    local source_type="" source_url="" source_tag="" resolved_tag=""
+    local url_line tag_line
+    while IFS= read -r line; do
+        [[ "$line" =~ ^[[:space:]]*# ]] && continue
+        if [[ "$line" =~ enter_archive\ \"([^\"]+)\" ]]; then
+            source_type="archive"
+            source_url="${BASH_REMATCH[1]}"
+            break
+        fi
+        if [[ "$line" =~ enter_git_repository\ (https?://[^ ]+)\ \"([^\"]+)\" ]]; then
+            source_type="git"
+            source_url="${BASH_REMATCH[1]}"
+            source_tag="${BASH_REMATCH[2]}"
+            break
+        fi
+    done < "$recipe_file"
+
+    if [ -n "$source_url" ]; then
+        local resolved_url="${source_url//\$\{version\}/$version}"
+        resolved_tag="${source_tag//\$\{version\}/$version}"
+        if [ "$source_type" == "archive" ]; then
+            echo "  Source: $resolved_url"
+            local http_code
+            http_code=$(curl -s -o /dev/null -w '%{http_code}' --head --max-time 10 "$resolved_url" 2>/dev/null)
+            if [ -n "$http_code" ]; then
+                if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 400 ]; then
+                    echo "  Status: OK ($http_code)"
+                else
+                    echo "  Status: FAIL (HTTP $http_code)"
+                fi
+            else
+                echo "  Status: UNREACHABLE"
+            fi
+        elif [ "$source_type" == "git" ]; then
+            echo "  Source: $source_url"
+            echo "  Tag:    $resolved_tag"
+            local tag_result
+            tag_result=$(git ls-remote --tags "$source_url" "$resolved_tag" 2>/dev/null)
+            if [ -n "$tag_result" ]; then
+                echo "  Status: OK (tag found)"
+            else
+                echo "  Status: FAIL (tag not found)"
+            fi
+        fi
+    else
+        echo "  Source: (could not detect)"
+    fi
+
+    # Detect build system
+    local build_system=""
+    if grep -q "build_and_install configure" "$recipe_file" 2>/dev/null; then
+        build_system="configure"
+    elif grep -q "build_and_install meson" "$recipe_file" 2>/dev/null; then
+        build_system="meson"
+    elif grep -q "build_and_install cmake" "$recipe_file" 2>/dev/null; then
+        build_system="cmake"
+    elif grep -q "\./configure" "$recipe_file" 2>/dev/null; then
+        build_system="configure (manual)"
+    elif grep -q "^make" "$recipe_file" 2>/dev/null; then
+        build_system="make (manual)"
+    else
+        build_system="custom"
+    fi
+    echo "  Build:  $build_system"
+
+    # Detect options
+    local options_list=()
+    if grep -q "^availables=" "$recipe_file" 2>/dev/null; then
+        echo "  Options:"
+        local avail_line
+        avail_line=$(grep -E "^\s*availables=\(" "$recipe_file" | tr -d '\\' | tr '\n' ' ')
+        if [[ "$avail_line" =~ availables=\((.*)\) ]]; then
+            local raw_opts="${BASH_REMATCH[1]}"
+            for opt in $raw_opts; do
+                opt="${opt//\"/}"
+                if [ -n "$opt" ]; then
+                    echo "    -$opt"
+                fi
+            done
+        fi
+    else
+        # Fall back to scanning case statement for -options
+        local case_opts=()
+        while IFS= read -r line; do
+            [[ "$line" =~ ^[[:space:]]*# ]] && continue
+            # Match unquoted case arms: "    -option)"
+            if [[ "$line" =~ ^[[:space:]]+(-[a-zA-Z][a-zA-Z0-9_-]*)\)[[:space:]]*$ ]]; then
+                optname="${BASH_REMATCH[1]}"
+                if [[ ! " ${case_opts[*]} " =~ " ${optname} " ]]; then
+                    case_opts+=("$optname")
+                fi
+            fi
+        done < "$recipe_file"
+        if [ ${#case_opts[@]} -gt 0 ]; then
+            echo "  Options:"
+            for o in "${case_opts[@]}"; do
+                echo "    $o"
+            done
+        else
+            echo "  Options: (none detected)"
+        fi
+    fi
+
+    # Dependencies
+    local deps=()
+    while IFS= read -r line; do
+        if [[ "$line" =~ ^[[:space:]]*dependency[[:space:]]+([a-zA-Z0-9_-]+) ]]; then
+            local dep="${BASH_REMATCH[1]}"
+            local dep_opts=""
+            if [[ "$line" =~ dependency[[:space:]]+[a-zA-Z0-9_-]+[[:space:]]+(.*) ]]; then
+                dep_opts="${BASH_REMATCH[1]}"
+            fi
+            if [ -n "$dep_opts" ]; then
+                deps+=("$dep ($dep_opts)")
+            else
+                deps+=("$dep")
+            fi
+        fi
+    done < "$recipe_file"
+    if [ ${#deps[@]} -gt 0 ]; then
+        echo "  Dependencies:"
+        for d in "${deps[@]}"; do
+            echo "    $d"
+        done
+    else
+        echo "  Dependencies: none"
+    fi
+}
+
+test_command () {
+    local recipe="$1"
+    local all_combos=false
+    local only_opts=()
+    local skip_opts=()
+
+    shift
+    while [ ! -z ${1+x} ]; do
+        case "$1" in
+        --all) all_combos=true ;;
+        --only)
+            IFS=',' read -ra only_opts <<< "$2"
+            shift
+            ;;
+        --skip)
+            IFS=',' read -ra skip_opts <<< "$2"
+            shift
+            ;;
+        *) echo "Unknown test option: $1"; exit 1 ;;
+        esac
+        shift
+    done
+
+    if [ -z "$recipe" ]; then
+        echo "Usage: $LHELPER_COMMAND_NAME test <recipe> [--all] [--only opt1,opt2] [--skip opt1]"
+        exit 1
+    fi
+
+    local version
+    version="$(latest_package_version "$recipe")"
+    if [ -z "$version" ]; then
+        echo "error: no recipe found for \"$recipe\""
+        exit 1
+    fi
+    local recipe_filename="$(find_recipe_filename "$LHELPER_RECIPES_DIR" "$recipe" "$version")"
+    local recipe_file="$LHELPER_RECIPES_DIR/$recipe_filename"
+
+    # Discover options from the recipe
+    local discovered_opts=()
+    if grep -q "^availables=" "$recipe_file" 2>/dev/null; then
+        local avail_line
+        avail_line=$(grep -E "^\s*availables=\(" "$recipe_file" | tr -d '\\' | tr '\n' ' ')
+        if [[ "$avail_line" =~ availables=\((.*)\) ]]; then
+            local raw_opts="${BASH_REMATCH[1]}"
+            for opt in $raw_opts; do
+                opt="${opt//\"/}"
+                if [ -n "$opt" ]; then
+                    discovered_opts+=("-$opt")
+                fi
+            done
+        fi
+    fi
+
+    # If no availables array, scan case statement
+    if [ ${#discovered_opts[@]} -eq 0 ]; then
+        while IFS= read -r line; do
+            [[ "$line" =~ ^[[:space:]]*# ]] && continue
+            if [[ "$line" =~ ^[[:space:]]+(-[a-zA-Z][a-zA-Z0-9_-]*)\)[[:space:]]*$ ]]; then
+                optname="${BASH_REMATCH[1]}"
+                if [[ ! " ${discovered_opts[*]} " =~ " ${optname} " ]]; then
+                    discovered_opts+=("$optname")
+                fi
+            fi
+        done < "$recipe_file"
+    fi
+
+    echo "${recipe_filename}:"
+
+    local test_opts_list=("-default-")
+    if $all_combos; then
+        # Generate all non-empty combinations (limited to reasonable count)
+        local n=${#discovered_opts[@]}
+        if [ "$n" -gt 5 ]; then
+            echo "  Warning: ${n} options, full combinations would be 2^${n}. Using pairwise testing."
+            n=5
+        fi
+        local max_combos=$(( 1 << n ))
+        for ((i=1; i<max_combos && i<64; i++)); do
+            local combo=()
+            for ((j=0; j<n; j++)); do
+                if (( (i >> j) & 1 )); then
+                    combo+=("${discovered_opts[$j]}")
+                fi
+            done
+            test_opts_list+=("${combo[*]}")
+        done
+    else
+        # Default: one build per option individually
+        for opt in "${discovered_opts[@]}"; do
+            test_opts_list+=("$opt")
+        done
+    fi
+
+    # Filter by --only and --skip
+    local filtered_opts=()
+    for entry in "${test_opts_list[@]}"; do
+        if [ "$entry" == "-default-" ]; then
+            filtered_opts+=("$entry")
+            continue
+        fi
+        local keep=true
+        if [ ${#skip_opts[@]} -gt 0 ]; then
+            for skip in "${skip_opts[@]}"; do
+                if [[ " $entry " == *" -$skip "* || " $entry " == " -$skip " ]]; then
+                    keep=false
+                fi
+            done
+        fi
+        if [ ${#only_opts[@]} -gt 0 ]; then
+            keep=false
+            for only in "${only_opts[@]}"; do
+                if [[ " $entry " == *" -$only "* || " $entry " == " -$only " ]]; then
+                    keep=true
+                fi
+            done
+        fi
+        if $keep; then
+            filtered_opts+=("$entry")
+        fi
+    done
+
+    local pass_count=0 fail_count=0
+    for entry in "${filtered_opts[@]}"; do
+        local opts_array=()
+        if [ "$entry" != "-default-" ]; then
+            read -ra opts_array <<< "$entry"
+        fi
+        if build_command "$recipe" "${opts_array[@]}" 2>/dev/null; then
+            pass_count=$((pass_count + 1))
+        else
+            fail_count=$((fail_count + 1))
+        fi
+    done
+
+    echo "  Results: $pass_count passed, $fail_count failed"
+    return $fail_count
 }
 
 install_command () {
@@ -1530,6 +1935,15 @@ install)
     ;;
 create | activate)
     activate_command "$@"
+    ;;
+build)
+    build_command "${@:2}"
+    ;;
+check)
+    check_command "${@:2}"
+    ;;
+test)
+    test_command "${@:2}"
     ;;
 env-source)
     if [ $# -ne 2 ]; then
@@ -1595,7 +2009,7 @@ remove)
     ;;
 list)
     if [ "$2" == recipes ]; then
-        ls -1 "$LHELPER_DIR/recipes"
+        ls -1 "$LHELPER_RECIPES_DIR"
     elif [ "$2" == packages ]; then
         check_env_active_or_exit
         print_installed_packages
