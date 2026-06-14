@@ -1511,8 +1511,7 @@ build_command () {
     local keep_env=false
     local no_deps=false
     local dry_run=false
-    local recipe="$1"
-    shift
+    local recipe=""
     local options_a=()
 
     while [[ $# -gt 0 ]]; do
@@ -1529,8 +1528,16 @@ build_command () {
             dry_run=true
             shift
             ;;
-        *)
+        -*)
             options_a+=("$1")
+            shift
+            ;;
+        *)
+            if [ -z "$recipe" ]; then
+                recipe="$1"
+            else
+                options_a+=("$1")
+            fi
             shift
             ;;
         esac
