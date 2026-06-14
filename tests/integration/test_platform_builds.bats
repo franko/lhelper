@@ -4,9 +4,8 @@
 #   bats tests/integration/test_platform_builds.bats
 #
 # These tests use the full lhelper-recipes repo and perform actual
-# package downloads and builds. They may require:
-#   - SDL2 system headers/frameworks (macOS: frameworks, Linux: libsdl2-dev)
-#   - OpenGL headers
+# package downloads and builds. All dependencies are built from recipes
+# (no system libraries required). They may need:
 #   - cmake (for fmt)
 #   - C++ compiler (g++ or clang++)
 #   - macOS: Xcode CLI tools
