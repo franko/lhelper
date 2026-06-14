@@ -95,6 +95,7 @@ fi
 
 mkdir -p "$DESTDIR/bin"
 mkdir -p "$DESTDIR/share/lhelper/patch"
+mkdir -p "$DESTDIR/share/lhelper/lua"
 mkdir -p "$DESTDIR/var/lhelper/archives"
 mkdir -p "$DESTDIR/var/lhelper/packages/$LHELPER_PACKAGE_VERSION"
 mkdir -p "$DESTDIR/var/lhelper/digests"
@@ -114,6 +115,7 @@ popd_quiet
 for filename in common-lhelper.sh cpu-lhelper.sh build-helper.sh create-env.sh lhelper-bash-init; do
     cp "$filename" "$DESTDIR/share/lhelper"
 done
+cp -a share/lhelper/lua/*.lua "$DESTDIR/share/lhelper/lua"
 cp patch/*.patch "$DESTDIR/share/lhelper/patch"
 cp lhelper "$DESTDIR/bin"
 

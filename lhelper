@@ -1524,6 +1524,190 @@ check_commands "${required_commands[@]}" || {
     exit 1
 }
 
+ensure_lua () {
+    if command -v lua >/dev/null 2>&1; then
+        LHELPER_LUA_BIN="$(command -v lua)"
+        return 0
+    fi
+    if [[ -n ${LHELPER_ENV_PREFIX+x} && -x "$LHELPER_ENV_PREFIX/bin/lua" ]]; then
+        LHELPER_LUA_BIN="$LHELPER_ENV_PREFIX/bin/lua"
+        return 0
+    fi
+    if [[ -z ${LHELPER_ENV_PREFIX+x} ]]; then
+        echo "error: no environment active and Lua is not installed." >&2
+        echo "Activate an environment first, then run: lhelper install lua" >&2
+        exit 1
+    fi
+    echo "Bootstrapping Lua 5.4.4 into the active environment..."
+    local prev_lib_install_mode="$lib_install_mode"
+    lib_install_mode=verbose
+    library_check_and_install run lua
+    lib_install_mode="$prev_lib_install_mode"
+    if [[ -x "$LHELPER_ENV_PREFIX/bin/lua" ]]; then
+        LHELPER_LUA_BIN="$LHELPER_ENV_PREFIX/bin/lua"
+        return 0
+    fi
+    echo "error: failed to bootstrap Lua in the environment" >&2
+    exit 1
+}
+
+resolve_command () {
+    check_env_active_or_exit
+    if [[ $# -lt 1 ]]; then
+        echo "Usage: $LHELPER_COMMAND_NAME resolve <package> [options]"
+        echo ""
+        echo "Resolve the full dependency tree and print the build order."
+        echo "Dependencies are printed first, the target package last."
+        echo ""
+        echo "Options may include recipe-specific flags (e.g., -sdl2 -freetype)"
+        echo "and standard flags (-shared, -pic, -prefix=PATH)."
+        exit 1
+    fi
+
+    local target_pkg="$1"
+    shift
+    local target_opts=("$@")
+
+    local sorted_target_opts=($(lh-sort "${target_opts[*]}"))
+    local target_spec="$target_pkg"
+    if [[ ${#sorted_target_opts[@]} -gt 0 ]]; then
+        target_spec="$target_pkg ${sorted_target_opts[*]}"
+    fi
+
+    local target_entry="$target_pkg ${sorted_target_opts[*]}"
+    local queue=("$target_entry")
+    local visited=()
+    local dag_edges=()
+
+    local qi=0
+    while [[ $qi -lt ${#queue[@]} ]]; do
+        local entry="${queue[$qi]}"
+        qi=$((qi + 1))
+
+        read -ra entry_a <<< "$entry"
+        local pkg="${entry_a[0]}"
+        local opts=("${entry_a[@]:1}")
+
+        local visit_key="$pkg ${opts[*]}"
+
+        local found=0
+        local v
+        for v in "${visited[@]}"; do
+            if [[ "$v" == "$visit_key" ]]; then
+                found=1
+                break
+            fi
+        done
+        if [[ $found -eq 1 ]]; then
+            continue
+        fi
+        visited+=("$visit_key")
+
+        if [[ -z $(latest_package_version "$pkg") ]]; then
+            echo "error: unknown recipe for package \"$pkg\"" >&2
+            return 2
+        fi
+
+        library_install dependencies "$pkg" "${opts[@]}"
+
+        local deps_file="$LHELPER_ENV_PREFIX/logs/$pkg-dependencies"
+        if [[ ! -f "$deps_file" ]]; then
+            continue
+        fi
+
+        local src_spec="$pkg"
+        if [[ ${#opts[@]} -gt 0 ]]; then
+            src_spec="$pkg ${opts[*]}"
+        fi
+
+        local dep_line
+        while IFS= read -r dep_line; do
+            dep_line="${dep_line#"${dep_line%%[![:space:]]*}"}"
+            dep_line="${dep_line%"${dep_line##*[![:space:]]}"}"
+            [[ -z "$dep_line" ]] && continue
+
+            if [[ "$dep_line" == "?"* ]]; then
+                continue
+            fi
+
+            read -ra dep_a <<< "$dep_line"
+            local dep_pkg="${dep_a[0]}"
+            local dep_opts=()
+            local a
+            for a in "${dep_a[@]:1}"; do
+                if [[ "$a" == "-"* ]]; then
+                    dep_opts+=("$a")
+                fi
+            done
+
+            local sorted_dep_opts=($(lh-sort "${dep_opts[*]}"))
+            local dep_spec="$dep_pkg"
+            if [[ ${#sorted_dep_opts[@]} -gt 0 ]]; then
+                dep_spec="$dep_pkg ${sorted_dep_opts[*]}"
+            fi
+
+            dag_edges+=("$src_spec > $dep_spec")
+
+            local dep_entry="$dep_pkg ${sorted_dep_opts[*]}"
+            local dep_found=0
+            local v2
+            for v2 in "${visited[@]}"; do
+                if [[ "$v2" == "$dep_entry" ]]; then
+                    dep_found=1
+                    break
+                fi
+            done
+            if [[ $dep_found -eq 0 ]]; then
+                local qf=0
+                local qe
+                for qe in "${queue[@]}"; do
+                    if [[ "$qe" == "$dep_entry" ]]; then
+                        qf=1
+                        break
+                    fi
+                done
+                if [[ $qf -eq 0 ]]; then
+                    queue+=("$dep_entry")
+                fi
+            fi
+        done < "$deps_file"
+    done
+
+    if [[ ${#dag_edges[@]} -eq 0 ]]; then
+        echo "$target_spec"
+        return 0
+    fi
+
+    ensure_lua
+
+    local dag_file="$LHELPER_TMPDIR/lhelper-dag-$$.txt"
+    printf '%s\n' "${dag_edges[@]}" > "$dag_file"
+
+    local stderr_file="$LHELPER_TMPDIR/lhelper-resolve-$$.log"
+    "$LHELPER_LUA_BIN" "$LHELPER_DIR/lua/resolve.lua" "$dag_file" 2>"$stderr_file"
+    local lua_rc=$?
+
+    case $lua_rc in
+    0) ;;
+    1)
+        cat "$stderr_file" >&2
+        rm -f "$dag_file" "$stderr_file"
+        return 1
+        ;;
+    2)
+        cat "$stderr_file" >&2
+        rm -f "$dag_file" "$stderr_file"
+        return 2
+        ;;
+    *)
+        echo "error: Lua resolver failed with exit code $lua_rc" >&2
+        rm -f "$dag_file" "$stderr_file"
+        return 1
+        ;;
+    esac
+    rm -f "$dag_file" "$stderr_file"
+}
+
 case $1 in
 install)
     install_command "$@"
@@ -1610,6 +1794,9 @@ list)
 dir)
     check_env_active_or_exit
     echo "${LHELPER_ENV_PREFIX}"
+    ;;
+resolve)
+    resolve_command "${@:2}"
     ;;
 update)
     update_command "$@"
