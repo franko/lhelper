@@ -1,0 +1,83 @@
+#!/bin/bash
+check_commands make "$CC"
+with_list=(zlib bzip2 png harfbuzz brotli librsvg)
+with_in=()
+options=()
+while [ ! -z ${1+x} ]; do
+    case $1 in
+    -brotli)
+        with_in+=(brotli)
+        dependency brotli
+        ;;
+    -librsvg)
+        with_in+=(librsvg)
+        # This library is provided by GNOME and is based on Cairo
+        dependency librsvg-2.0
+        ;;
+    *)
+        options+=("$1")
+        ;;
+    esac
+    shift
+done
+
+for name in "${with_in[@]}"; do
+    options+=("--with-$name=yes")
+done
+for name in "${with_list[@]}"; do
+    if [[ " ${with_in[*]} " != *" $name "* ]]; then
+        options+=("--with-$name=no")
+    fi
+done
+
+# Version from:
+# https://github.com/freetype/freetype/blob/master/docs/VERSIONS.TXT
+# We lookup the release number because the $version is the libtool version.
+while read line; do
+    IFS=' ' read -ra line_a <<< "$line"
+    if [[ ${line_a[1]} == $version ]]; then
+        release_ver=${line_a[0]}
+        break
+    fi
+done <<EOF
+     2.13.3     26.2.20   6.20.2
+     2.13.2     26.1.20   6.20.1
+     2.13.1     26.0.20   6.20.0
+     2.13.0     25.0.19   6.19.0
+     2.12.1     24.3.18   6.18.3
+     2.12.0     24.2.18   6.18.2
+     2.11.1     24.1.18   6.18.1
+     2.11.0     24.0.18   6.18.0
+     2.10.4     23.4.17   6.17.4
+     2.10.3     23.3.17   6.17.3
+     2.10.2     23.2.17   6.17.2
+     2.10.1     23.1.17   6.17.1
+     2.10.0     23.0.17   6.17.0
+     2.9.1      22.1.16   6.16.1
+     2.9.0      22.0.16   6.16.0
+     2.8.1      21.0.15   6.15.0
+     2.8.0      20.0.14   6.14.0
+     2.7.1      19.0.13   6.13.0
+     2.7.0      18.6.12   6.12.6
+     2.6.5      18.5.12   6.12.5
+     2.6.4      18.4.12   6.12.4
+     2.6.3      18.3.12   6.12.3
+     2.6.2      18.2.12   6.12.2
+     2.6.1      18.1.12   6.12.1
+     2.6.0      18.0.12   6.12.0
+     2.5.5      17.4.11   6.11.4
+     2.5.4      17.3.11   6.11.3
+     2.5.3      17.2.11   6.11.2
+     2.5.2      17.1.11   6.11.1
+     2.5.1      17.0.11   6.11.0
+     2.5.0      16.2.10   6.10.2
+EOF
+
+if [ -z ${release_ver+x} ]; then
+    echo "error: unknown release number for freetype2: $version"
+    exit 1
+fi
+
+enter_archive "http://download.savannah.gnu.org/releases/freetype/freetype-${release_ver}.tar.gz"
+build_and_install configure "${options[@]}"
+

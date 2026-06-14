@@ -1,0 +1,41 @@
+#!/bin/bash
+# enter_archive "https://www.zlib.net/zlib-${version}.tar.gz"
+# The website zlib.net doesn't provides older library versions, we use github instead.
+enter_archive "https://github.com/madler/zlib/archive/refs/tags/v${version}.tar.gz"
+
+use_static="yes"
+while [ ! -z ${1+x} ]; do
+    case $1 in
+        -shared)
+            use_static="no"
+            ;;
+        -pic)
+            CFLAGS+=" -fPIC"
+            ;;
+        *)
+            echo "error: unknown option \"$1\" in package recipe"
+            exit 1
+            ;;
+    esac
+    shift
+done
+zlib_options=("--prefix" "$LHELPER_SYSTEM_PREFIX")
+if [[ "$use_static" == "yes" ]]; then
+    zlib_options+=("--static")
+fi
+add_build_type_compiler_flags "$BUILD_TYPE"
+
+if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* || $OSTYPE == "cygwin"* ]]; then
+    export INCLUDE_PATH="${LHELPER_SYSTEM_PREFIX}/include"
+    export LIBRARY_PATH="${LHELPER_SYSTEM_PREFIX}/lib"
+    export BINARY_PATH="${LHELPER_SYSTEM_PREFIX}/lib"
+    make CC="$CC" CXX="$CXX" prefix="${LHELPER_SYSTEM_PREFIX}" -f win32/Makefile.gcc
+    echo "Using make instal command: " DESTDIR="$INSTALL_PREFIX" make prefix="$LHELPER_SYSTEM_PREFIX" -f win32/Makefile.gcc install
+    make CC="$CC" CXX="$CXX"  DESTDIR="$INSTALL_PREFIX" prefix="$LHELPER_SYSTEM_PREFIX" -f win32/Makefile.gcc install
+    normalize_destdir_install "$INSTALL_PREFIX" "$LHELPER_SYSTEM_PREFIX"
+else
+    ./configure --prefix="$LHELPER_SYSTEM_PREFIX" "${zlib_options[@]}"
+    make
+    make DESTDIR="$INSTALL_PREFIX" install
+    normalize_destdir_install "$INSTALL_PREFIX" "$LHELPER_SYSTEM_PREFIX"
+fi

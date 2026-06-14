@@ -1,0 +1,23 @@
+#!/bin/bash
+
+enter_git_repository https://github.com/troydhanson/uthash "v$version"
+
+mkdir -p "$INSTALL_PREFIX/include"
+for name in array hash list ringbuffer stack string; do
+    cp "src/ut${name}.h" "$INSTALL_PREFIX/include"
+done
+
+PKG_NAME=uthash
+
+cat << EOF > $PKG_NAME.pc
+Name: $PKG_NAME
+Description: C macros for hash tables and more 
+URL: github.com/troydhanson/uthash
+Requires: 
+Version: $version
+Libs: 
+Cflags: -I$WIN_INSTALL_PREFIX/include
+EOF
+
+install_pkgconfig_file "$PKG_NAME.pc"
+
