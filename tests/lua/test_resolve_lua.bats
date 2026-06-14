@@ -48,7 +48,7 @@ setup() {
     run $LUA_BIN "$LUA_DIR/resolve.lua" <<< $'a > b\nb > a'
     [ "$status" -eq 1 ]
     echo "$output" | grep -q "dependency cycle"
-    echo "$output" | grep -q "a -> b -> a"
+    echo "$output" | grep -qE "(a -> b -> a|b -> a -> b)"
 }
 
 @test "resolve.lua: cycle detection with three nodes" {

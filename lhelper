@@ -1912,6 +1912,10 @@ ensure_lua () {
         LHELPER_LUA_BIN="$LHELPER_ENV_PREFIX/bin/lua"
         return 0
     fi
+    if [[ -x "$LHELPER_PREFIX/src/lua/src/lua" ]]; then
+        LHELPER_LUA_BIN="$LHELPER_PREFIX/src/lua/src/lua"
+        return 0
+    fi
     if [[ -z ${LHELPER_ENV_PREFIX+x} ]]; then
         echo "error: no environment active and Lua is not installed." >&2
         echo "Activate an environment first, then run: lhelper install lua" >&2
