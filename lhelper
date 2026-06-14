@@ -88,27 +88,12 @@ fi
 source "$LHELPER_DIR/common-lhelper.sh"
 source "$LHELPER_DIR/cpu-lhelper.sh"
 source "$LHELPER_DIR/create-env.sh"
+source "$LHELPER_BIN_DIRNAME/lhelper-lib.sh"
 
 if [ ! -d "${LHELPER_DIR}" ]; then
     echo "error: directory \"${LHELPER_DIR}\" not found."
     echo "Lhelper may be not properly installed."
 fi
-
-urlencode() {
-    local string="$1"
-    local encoded=""
-
-    for (( i=0; i<${#string}; i++ )); do
-        local c="${string:$i:1}"
-        case $c in
-            [a-zA-Z0-9.~_-]) encoded+="$c" ;;
-            *) printf -v c_urlencoded '%%%02X' "'$c"
-               encoded+="$c_urlencoded"
-        esac
-    done
-
-    echo "$encoded"
-}
 
 upload_package() {
     package_version="$1"
@@ -270,8 +255,6 @@ latest_package_version () {
     return 1
 }
 
-join_by () { local IFS="$1"; shift; echo "$*"; }
-
 # Write a package line in the form "<package-name> [options] [version]" into
 # a register file, a line for each package. If the package is already
 # in the "register" file the line is updated otherwise it is added at the
@@ -431,135 +414,6 @@ system_library_version () {
         "$1-config" --version
     else
         return 1
-    fi
-}
-
-# From: https://stackoverflow.com/questions/4023830/how-to-compare-two-strings-in-dot-separated-version-format-in-bash
-vercomp () {
-    if [[ $1 == $2 ]]
-    then
-        return 0
-    fi
-    local IFS=.
-    local i ver1=($1) ver2=($2)
-    # fill empty fields in ver1 with zeros
-    for ((i=${#ver1[@]}; i<${#ver2[@]}; i++))
-    do
-        ver1[i]=0
-    done
-    for ((i=0; i<${#ver1[@]}; i++))
-    do
-        if [[ -z ${ver2[i]} ]]
-        then
-            # fill empty fields in ver2 with zeros
-            ver2[i]=0
-        fi
-        if ((10#${ver1[i]} > 10#${ver2[i]}))
-        then
-            return 1
-        fi
-        if ((10#${ver1[i]} < 10#${ver2[i]}))
-        then
-            return 2
-        fi
-    done
-    return 0
-}
-
-testvercomp () {
-    vercomp $1 $2
-    case $? in
-    0)
-        if [[ $3 == *"=" ]]; then
-            return 0
-        fi
-        ;;
-    1)
-        if [[ $3 == ">"* ]]; then
-            return 0
-        fi
-        ;;
-    2)
-        if [[ $3 == "<"* ]]; then
-            return 0
-        fi
-        ;;
-    esac
-    return 1
-}
-
-# Check that "$1" is a subset of "$2". Each argument is a space-separated
-# list of options.
-test_options () {
-    local e
-    for e in $1; do
-        if [[ " $2 " != *" $e "* ]]; then
-            return 1
-        fi
-    done
-}
-
-# Test if a package entry, second argument, for example "sdl2 -threads -opengl >=2.16.0",
-# matches a package spec, first argument, for example "sdl2 -opengl 2.14.0"
-#
-# The package spec should give a version with a comparison sign >, >=, < or <=.
-test_package_spec () {
-    local line_spec="$1"
-    local line_entry="$2"
-    local skip_options="$3"
-
-    IFS=' ' read -ra spec_a <<< "$line_spec"
-    local spec_name="${spec_a[0]}"
-    local spec_options=()
-    local spec_version
-    local spec_comp
-    for a in "${spec_a[@]:1}"; do
-        case "$a" in
-        -*)
-            spec_options+=("$a")
-            ;;
-        '>='* | '<='*)
-            spec_comp="${a:0:2}"
-            spec_version="${a:2}"
-            ;;
-        '>'* | '<'* | '='*)
-            spec_comp="${a:0:1}"
-            spec_version="${a:1}"
-            ;;
-        *)
-            # return 100 means abnormal error happended
-            return 100
-        esac
-    done
-    # spec_version may be unset
-
-    IFS=' ' read -ra entry_a <<< "$line_entry"
-    local entry_options=()
-    local entry_version
-    for a in "${entry_a[@]:1}"; do
-        case "$a" in
-        -*)
-            entry_options+=("$a")
-            ;;
-        *)
-            entry_version="$a"
-        esac
-    done
-    # entry_version must be set
-
-    if [ "$spec_name" != "${entry_a[0]}" ]; then
-        return 1
-    fi
-
-    # checks that all the spec options are included in the entry options
-    if [ "${skip_options}" != --skip ] && ! test_options "${spec_options[*]}" "${entry_options[*]}"; then
-        # return 2 means options do not match
-        return 2
-    fi
-
-    if [ ! -z ${spec_version+x} ] && [ ! testvercomp "$entry_version" "$spec_version" "$spec_comp" ]; then
-        # return 3 means version do not match
-        return 3
     fi
 }
 

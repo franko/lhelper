@@ -1,4 +1,9 @@
 source
 downloads
 builds
+.lhelper/
+src/lh-cmp
+src/lh-path-replace
+src/lh-realpath
+src/lh-sort
 
