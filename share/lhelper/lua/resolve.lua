@@ -66,13 +66,46 @@ local function topological_sort(adj, rev_adj, nodes)
    end
 
    if #result ~= #node_list then
-      local remaining = {}
+      local start = nil
       for name, _ in pairs(nodes) do
          if in_degree[name] > 0 then
-            table.insert(remaining, name)
+            start = name
+            break
          end
       end
-      return nil, remaining
+
+      local cycle_path = {}
+      local visited_in_path = {}
+      local current = start
+      while current and not visited_in_path[current] do
+         table.insert(cycle_path, current)
+         visited_in_path[current] = true
+         local next_node = nil
+         for _, dep in ipairs(rev_adj[current]) do
+            if in_degree[dep] > 0 then
+               next_node = dep
+               break
+            end
+         end
+         current = next_node
+      end
+
+      if current then
+         local cycle = {}
+         local found = false
+         for _, n in ipairs(cycle_path) do
+            if n == current then
+               found = true
+            end
+            if found then
+               table.insert(cycle, n)
+            end
+         end
+         table.insert(cycle, current)
+         return nil, cycle
+      else
+         return nil, cycle_path
+      end
    end
 
    return result

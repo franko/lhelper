@@ -1472,6 +1472,7 @@ SPECEOF
     mkdir -p "$env_src_dir"
     local env_prefix="$env_rel_workdir/_build"
     local env_source="$env_prefix/bin/activate"
+    cd "$build_env_dir"
     create_env "_build" "$env_prefix" "$env_source" "_build.lhelper"
 
     local recipe_filename version
