@@ -63,9 +63,20 @@ teardown() {
     echo "$output" | grep -q "fmt"
     echo "$output" | grep -q "cereal"
 
-    # Verify key headers
+    # Verify transitive dependencies were auto-resolved
+    # imgui -sdl2 pulls sdl2; imgui -freetype pulls freetype2; implot pulls glad
+    echo "$output" | grep -q "sdl2"
+    echo "$output" | grep -q "freetype2"
+    echo "$output" | grep -q "glad"
+
+    # Verify key headers (spec packages)
     [ -f "$env_dir/include/imgui.h" ]
     [ -f "$env_dir/include/implot.h" ]
     [ -f "$env_dir/include/fmt/core.h" ]
     [ -f "$env_dir/include/cereal/cereal.hpp" ]
+
+    # Verify transitive dep headers were installed
+    [ -f "$env_dir/include/SDL2/SDL.h" ]
+    [ -f "$env_dir/include/freetype2/freetype/freetype.h" ]
+    [ -f "$env_dir/include/glad/glad.h" ]
 }
