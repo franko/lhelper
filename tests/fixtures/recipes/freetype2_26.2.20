@@ -7,12 +7,12 @@ while [ ! -z ${1+x} ]; do
     case $1 in
     -brotli)
         with_in+=(brotli)
-        dependency brotli
+        declare_dependency brotli
         ;;
     -librsvg)
         with_in+=(librsvg)
         # This library is provided by GNOME and is based on Cairo
-        dependency librsvg-2.0
+        declare_dependency librsvg-2.0
         ;;
     *)
         options+=("$1")

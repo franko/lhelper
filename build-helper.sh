@@ -616,7 +616,7 @@ normalize_package_spec () {
     echo "${coll[@]}"
 }
 
-dependency () {
+declare_dependency () {
     if [[ "${_lh_recipe_run}" != "dependencies" ]]; then return 0; fi
     local opt_flag=""
     if [[ "$1" == --optional ]]; then
@@ -624,6 +624,10 @@ dependency () {
         shift
     fi
     echo "${opt_flag}$(normalize_package_spec $@)" >> "$LHELPER_ENV_PREFIX/logs/$package-dependencies"
+}
+
+dependency () {
+    declare_dependency "$@"
 }
 
 provides () {

@@ -1708,10 +1708,10 @@ check_command () {
     # Dependencies
     local deps=()
     while IFS= read -r line; do
-        if [[ "$line" =~ ^[[:space:]]*dependency[[:space:]]+([a-zA-Z0-9_-]+) ]]; then
+        if [[ "$line" =~ ^[[:space:]]*declare_dependency[[:space:]]+([a-zA-Z0-9_-]+) ]]; then
             local dep="${BASH_REMATCH[1]}"
             local dep_opts=""
-            if [[ "$line" =~ dependency[[:space:]]+[a-zA-Z0-9_-]+[[:space:]]+(.*) ]]; then
+            if [[ "$line" =~ declare_dependency[[:space:]]+[a-zA-Z0-9_-]+[[:space:]]+(.*) ]]; then
                 dep_opts="${BASH_REMATCH[1]}"
             fi
             if [ -n "$dep_opts" ]; then
