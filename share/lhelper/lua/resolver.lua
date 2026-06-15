@@ -19,6 +19,18 @@ end
 
 local LHELPER_BIN = find_lhelper_bin()
 
+local IS_WINDOWS = package.config:sub(1, 1) == "\\"
+
+-- A native Windows Lua build routes os.execute/io.popen through cmd.exe, which
+-- cannot parse the POSIX shell syntax used below (env-var prefixes, single
+-- quotes, 2>/dev/null). Wrap such commands so they run under a POSIX shell.
+local function shell(cmd)
+    if IS_WINDOWS then
+        return 'sh -c "' .. cmd:gsub('"', '\\"') .. '"'
+    end
+    return cmd
+end
+
 local function load_provides_table()
     local provides = {}
     local packages_file = LHELPER_ENV_PREFIX .. "/bin/lhelper-packages"
@@ -63,7 +75,7 @@ local function extract_deps(pkg, opts_str)
         "LHELPER_ENV_PREFIX='%s' LH_RECIPES_DIR='%s' '%s' _extract_deps %s %s 2>/dev/null",
         LHELPER_ENV_PREFIX, LH_RECIPES_DIR, LHELPER_BIN, pkg, opts_str or ""
     )
-    local f = io.popen(cmd)
+    local f = io.popen(shell(cmd))
     if not f then return {} end
     local output = f:read("*a") or ""
     local ok, reason, rc = f:close()
@@ -102,7 +114,7 @@ local function check_recipe_exists(pkg, ver_constraint)
             LH_RECIPES_DIR, LHELPER_BIN, pkg
         )
     end
-    local ok = os.execute(cmd)
+    local ok = os.execute(shell(cmd))
     return ok == 0 or ok == true
 end
 
