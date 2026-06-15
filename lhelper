@@ -265,6 +265,8 @@ latest_package_version () {
     local package="$1"
     cat "$LHELPER_RECIPES_DIR/index" | while read index_package version
     do
+        index_package="${index_package%$'\r'}"
+        version="${version%$'\r'}"
         if [[ "$index_package" == "$package" ]]; then
             echo "$version"
             return 0
@@ -1886,18 +1888,20 @@ resolve_command () {
     local target_opts=("$@")
 
     local stderr_file="$LHELPER_TMPDIR/lhelper-resolve-$$.log"
-    "$LHELPER_LUA_BIN" "$LHELPER_DIR/lua/resolver.lua" "$target_pkg" "${target_opts[@]}" 2>"$stderr_file"
-    local lua_rc=$?
+    # A native Windows Lua opens stdout in text mode, appending a carriage
+    # return to every line. Strip it so the build order is clean for callers.
+    "$LHELPER_LUA_BIN" "$LHELPER_DIR/lua/resolver.lua" "$target_pkg" "${target_opts[@]}" 2>"$stderr_file" | tr -d '\r'
+    local lua_rc=${PIPESTATUS[0]}
 
     case $lua_rc in
     0) ;;
     1)
-        cat "$stderr_file" >&2
+        tr -d '\r' < "$stderr_file" >&2
         rm -f "$stderr_file"
         return 1
         ;;
     2)
-        cat "$stderr_file" >&2
+        tr -d '\r' < "$stderr_file" >&2
         rm -f "$stderr_file"
         return 2
         ;;
