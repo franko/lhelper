@@ -72,6 +72,25 @@ options_from_recipe () {
     done <<< "$raw"
 }
 
+# Transform the variable named by $1 (bash nameref) in place: its content,
+# expected to be a download URL, is rewritten into a sanitized archive
+# filename. Backed by archive_filename.lua. Drops in for the former bash
+# char-loop in build-helper.sh. No fallback: lhelper requires Lua for the
+# resolver, so a missing interpreter here is a hard error, not a soft one.
+transform_to_archive_filename () {
+    local -n url="$1"
+    local luabin
+    luabin="$(_lh_lua)"
+    if [[ -z "$luabin" ]]; then
+        echo "error: no Lua interpreter found for transform_to_archive_filename" >&2
+        return 1
+    fi
+    # Pass the URL via stdin so the leading "-" tokens (none in a URL, but in
+    # general) cannot confuse lua's arg parser. Matches opts_canonical's
+    # invocation shape.
+    url="$(printf '%s' "$url" | "$luabin" -e 'local a=require("archive_filename");io.write(a.transform(io.read("*a")))')"
+}
+
 # Figure out the default library directory.
 # Adapted from https://github.com/mesonbuild/meson/blob/master/mesonbuild/mesonlib.py
 # Returns one or more paths separated by a colon. It can return multiple values
