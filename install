@@ -101,6 +101,7 @@ else
 fi
 
 mkdir -p "$DESTDIR/bin"
+mkdir -p "$DESTDIR/libexec/lhelper"
 mkdir -p "$DESTDIR/share/lhelper/patch"
 mkdir -p "$DESTDIR/share/lhelper/lua"
 mkdir -p "$DESTDIR/var/lhelper/archives"
@@ -158,7 +159,7 @@ $lhcomp -o "$lua_exe" "${lua_objs[@]}" -lm $lua_platform_libs || { popd_quiet; e
 rm -f "${lua_objs[@]}"
 
 popd_quiet
-cp src/lua/src/"$lua_exe" "$DESTDIR/bin"
+cp src/lua/src/"$lua_exe" "$DESTDIR/libexec/lhelper/lua"
 rm -f src/lua/src/"$lua_exe"
 
 for filename in common-lhelper.sh cpu-lhelper.sh build-helper.sh create-env.sh lhelper-bash-init lhelper-lib.sh; do

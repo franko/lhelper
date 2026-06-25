@@ -1,21 +1,13 @@
 pushd_quiet () { builtin pushd "$@" > /dev/null; }
 popd_quiet  () { builtin popd > /dev/null; }
 
-# Resolve a Lua interpreter for short-lived option-handling invocations.
-# Prefers LHELPER_LUA_BIN (set by ensure_lua in the lhelper main script when
-# already executed), then the installed binary, the in-tree compiled binary,
-# then any system `lua` on PATH. Echoes the path, or empty string if none.
+# Resolve the lhelper-specific Lua interpreter.
+# Set once at lhelper startup (LHELPER_LUA_BIN); if missing (standalone
+# sourcing of this file, e.g. by create-env.sh), recompute the canonical
+# private path from LHELPER_PREFIX. No validity check here -- it was done
+# once at lhelper startup; if the binary is gone, lua will simply fail.
 _lh_lua () {
-    if [[ -n "${LHELPER_LUA_BIN:-}" && -x "$LHELPER_LUA_BIN" ]]; then
-        echo "$LHELPER_LUA_BIN"; return
-    fi
-    if [[ -n "${LHELPER_PREFIX:-}" && -x "$LHELPER_PREFIX/bin/lua" ]]; then
-        echo "$LHELPER_PREFIX/bin/lua"; return
-    fi
-    if [[ -n "${LHELPER_PREFIX:-}" && -x "$LHELPER_PREFIX/src/lua/src/lua" ]]; then
-        echo "$LHELPER_PREFIX/src/lua/src/lua"; return
-    fi
-    command -v lua 2>/dev/null
+    printf '%s' "${LHELPER_LUA_BIN:-$LHELPER_PREFIX/libexec/lhelper/lua}"
 }
 
 # Sort option string $1 into canonical form (sorted, space-separated, no
@@ -24,14 +16,6 @@ _lh_lua () {
 opts_canonical () {
     local luabin
     luabin="$(_lh_lua)"
-    if [[ -z "$luabin" ]]; then
-        # Lua unavailable: fall back to the raw input verbatim. Sorting is
-        # lost, but callers still receive a value they can use. lhelper
-        # requires Lua for the resolver anyway, so this branch is a soft
-        # error path (not a hang).
-        printf '%s\n' "$1"
-        return 0
-    fi
     # Pass the option string via stdin so lua's command-line arg parser does
     # not get confused by tokens starting with "-" (which lua would otherwise
     # try to load as a script file after the -e chunk).
@@ -41,18 +25,13 @@ opts_canonical () {
 # Populate the array named by $1 with the option names accepted by the recipe
 # at $2 (via Options.from_recipe). Names are normalized to have a leading "-"
 # prepended, regardless of whether they were discovered from an
-# `availables=(...)` block (bare) or from case-arms (-prefixed). Returns zero
-# even if Lua is unavailable (array left empty) so callers can degrade
-# gracefully.
+# `availables=(...)` block (bare) or from case-arms (-prefixed).
 options_from_recipe () {
     local -n _ofr_out="$1"
     local recipe_file="$2"
     _ofr_out=()
     local luabin
     luabin="$(_lh_lua)"
-    if [[ -z "$luabin" ]]; then
-        return 0
-    fi
     # Pass the file path via the LH_FILE env var -- passing it as a positional
     # arg after `-e chunk` would make lua try to load it as a Lua script file.
     local raw
@@ -75,16 +54,11 @@ options_from_recipe () {
 # Transform the variable named by $1 (bash nameref) in place: its content,
 # expected to be a download URL, is rewritten into a sanitized archive
 # filename. Backed by archive_filename.lua. Drops in for the former bash
-# char-loop in build-helper.sh. No fallback: lhelper requires Lua for the
-# resolver, so a missing interpreter here is a hard error, not a soft one.
+# char-loop in build-helper.sh.
 transform_to_archive_filename () {
     local -n url="$1"
     local luabin
     luabin="$(_lh_lua)"
-    if [[ -z "$luabin" ]]; then
-        echo "error: no Lua interpreter found for transform_to_archive_filename" >&2
-        return 1
-    fi
     # Pass the URL via stdin so the leading "-" tokens (none in a URL, but in
     # general) cannot confuse lua's arg parser. Matches opts_canonical's
     # invocation shape.

@@ -10,6 +10,9 @@ setup() {
     # Make require("options") resolve to the module under test.
     LUA_DIR="$(cd "$BATS_TEST_DIRNAME/../../share/lhelper/lua" && pwd)"
     export LUA_PATH="$LUA_DIR/?.lua;$LUA_DIR/?/init.lua;;"
+    # _lh_lua uses LHELPER_LUA_BIN if set; bash's -x doesn't consult PATH, so
+    # resolve via command -v (handles LUA_BIN=lua or an explicit path).
+    export LHELPER_LUA_BIN="$(command -v "$LUA_BIN")"
     export LHELPER_PREFIX="$REPO"
     source "$REPO/common-lhelper.sh"
 }

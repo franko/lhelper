@@ -6,6 +6,10 @@ setup() {
     LUA_DIR="$LHELPER/../share/lhelper/lua"
     LUA_BIN="${LUA_BIN:-lua}"
     export LH_RECIPES_DIR="$FIXTURES"
+    # The lhelper startup check requires an executable at LHELPER_LUA_BIN
+    # (absolute path; bash -x doesn't consult PATH). Resolve via command -v
+    # so the test suite can be driven with LUA_BIN=lua or an explicit path.
+    export LHELPER_LUA_BIN="$(command -v "$LUA_BIN")"
 }
 
 @test "resolver: no deps package resolves itself" {
