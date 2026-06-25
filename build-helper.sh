@@ -609,7 +609,7 @@ normalize_package_spec () {
             rem+=("$opt")
         fi
     done
-    local sorted_options=($(lh-sort "${options[*]}"))
+    local sorted_options=($(opts_canonical "${options[*]}"))
     # By creating an array below we get rid of the trailing spaces we may
     # have is there are no options or version.
     local coll=("$1" "${sorted_options[@]}" "${rem[@]}")

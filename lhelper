@@ -611,7 +611,7 @@ library_install () {
         esac
     done
 
-    options_a=($(lh-sort "${options_a[*]}"))
+    options_a=($(opts_canonical "${options_a[*]}"))
 
     local options_tag=""
     if [[ ${#options_a[@]} -ne 0 ]]; then
@@ -1487,7 +1487,7 @@ SPECEOF
         recipe_filename="$recipe"
     fi
 
-    local sorted_target_opts=($(lh-sort "${options_a[*]}"))
+    local sorted_target_opts=($(opts_canonical "${options_a[*]}"))
     local target_spec="$recipe"
     if [[ ${#sorted_target_opts[@]} -gt 0 ]]; then
         target_spec="$recipe ${sorted_target_opts[*]}"

@@ -5,13 +5,11 @@ builds
 src/lh-cmp
 src/lh-path-replace
 src/lh-realpath
-src/lh-sort
 var/
 share/lhelper/*.sh
 
 # C helper build artifacts
 src/lh-path-replace
-src/lh-sort
 src/lh-cmp
 src/lh-realpath
 

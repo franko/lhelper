@@ -30,10 +30,15 @@ build_and_verify() {
         return 1
     fi
 
-    local env_dir="$WORK_DIR/.lhelper/_build"
+    # With -k, build_command preserves the env at
+    # "$TMPDIR/lhelper-build-$$/.lhelper/_build" (see lhelper:1444) -- NOT at
+    # $WORK_DIR/.lhelper/_build. The teardown removes any leftover builds,
+    # so the most recently modified match belongs to this invocation.
+    local env_dir
+    env_dir="$(ls -dt "${TMPDIR:-/tmp}/lhelper-build-"*/.lhelper/_build 2>/dev/null | head -1)"
 
-    if [ ! -d "$env_dir" ]; then
-        echo "env dir not found at $env_dir" >&2
+    if [ -z "$env_dir" ] || [ ! -d "$env_dir" ]; then
+        echo "preserved env dir not found under $TMPDIR" >&2
         return 1
     fi
 
@@ -87,7 +92,9 @@ build_and_verify() {
     run "$LHELPER" build uthash --no-deps -k
     [ "$status" -eq 0 ]
 
-    local env_dir="$WORK_DIR/.lhelper/_build"
+    local env_dir
+    env_dir="$(ls -dt "${TMPDIR:-/tmp}/lhelper-build-"*/.lhelper/_build 2>/dev/null | head -1)"
+    [ -n "$env_dir" ]
     [ -f "$env_dir/include/uthash.h" ]
     [ -f "$env_dir/lib/pkgconfig/uthash.pc" ]
 }
@@ -111,7 +118,9 @@ build_and_verify() {
         return 1
     fi
 
-    local env_dir="$WORK_DIR/.lhelper/_build"
+    local env_dir
+    env_dir="$(ls -dt "${TMPDIR:-/tmp}/lhelper-build-"*/.lhelper/_build 2>/dev/null | head -1)"
+    [ -n "$env_dir" ]
     [ -f "$env_dir/include/harfbuzz/hb.h" ]
     [ -f "$env_dir/lib/pkgconfig/harfbuzz.pc" ]
     ls "$env_dir/lib/libharfbuzz"* >&2
