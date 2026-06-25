@@ -1671,42 +1671,16 @@ check_command () {
     fi
     echo "  Build:  $build_system"
 
-    # Detect options
+    # Detect options via the unified Options.from_recipe scan
     local options_list=()
-    if grep -q "^availables=" "$recipe_file" 2>/dev/null; then
+    options_from_recipe options_list "$recipe_file"
+    if [ ${#options_list[@]} -gt 0 ]; then
         echo "  Options:"
-        local avail_line
-        avail_line=$(grep -E "^\s*availables=\(" "$recipe_file" | tr -d '\\' | tr '\n' ' ')
-        if [[ "$avail_line" =~ availables=\((.*)\) ]]; then
-            local raw_opts="${BASH_REMATCH[1]}"
-            for opt in $raw_opts; do
-                opt="${opt//\"/}"
-                if [ -n "$opt" ]; then
-                    echo "    -$opt"
-                fi
-            done
-        fi
+        for o in "${options_list[@]}"; do
+            echo "    $o"
+        done
     else
-        # Fall back to scanning case statement for -options
-        local case_opts=()
-        while IFS= read -r line; do
-            [[ "$line" =~ ^[[:space:]]*# ]] && continue
-            # Match unquoted case arms: "    -option)"
-            if [[ "$line" =~ ^[[:space:]]+(-[a-zA-Z][a-zA-Z0-9_-]*)\)[[:space:]]*$ ]]; then
-                optname="${BASH_REMATCH[1]}"
-                if [[ ! " ${case_opts[*]} " =~ " ${optname} " ]]; then
-                    case_opts+=("$optname")
-                fi
-            fi
-        done < "$recipe_file"
-        if [ ${#case_opts[@]} -gt 0 ]; then
-            echo "  Options:"
-            for o in "${case_opts[@]}"; do
-                echo "    $o"
-            done
-        else
-            echo "  Options: (none detected)"
-        fi
+        echo "  Options: (none detected)"
     fi
 
     # Dependencies
@@ -1772,34 +1746,10 @@ test_command () {
     local recipe_filename="$(find_recipe_filename "$LHELPER_RECIPES_DIR" "$recipe" "$version")"
     local recipe_file="$LHELPER_RECIPES_DIR/$recipe_filename"
 
-    # Discover options from the recipe
+    # Discover options from the recipe via the unified Options.from_recipe
+    # scan (handles both `availables=(...)` and case-arm forms).
     local discovered_opts=()
-    if grep -q "^availables=" "$recipe_file" 2>/dev/null; then
-        local avail_line
-        avail_line=$(grep -E "^\s*availables=\(" "$recipe_file" | tr -d '\\' | tr '\n' ' ')
-        if [[ "$avail_line" =~ availables=\((.*)\) ]]; then
-            local raw_opts="${BASH_REMATCH[1]}"
-            for opt in $raw_opts; do
-                opt="${opt//\"/}"
-                if [ -n "$opt" ]; then
-                    discovered_opts+=("-$opt")
-                fi
-            done
-        fi
-    fi
-
-    # If no availables array, scan case statement
-    if [ ${#discovered_opts[@]} -eq 0 ]; then
-        while IFS= read -r line; do
-            [[ "$line" =~ ^[[:space:]]*# ]] && continue
-            if [[ "$line" =~ ^[[:space:]]+(-[a-zA-Z][a-zA-Z0-9_-]*)\)[[:space:]]*$ ]]; then
-                optname="${BASH_REMATCH[1]}"
-                if [[ ! " ${discovered_opts[*]} " =~ " ${optname} " ]]; then
-                    discovered_opts+=("$optname")
-                fi
-            fi
-        done < "$recipe_file"
-    fi
+    options_from_recipe discovered_opts "$recipe_file"
 
     echo "${recipe_filename}:"
 

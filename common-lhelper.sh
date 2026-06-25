@@ -38,6 +38,40 @@ opts_canonical () {
     printf '%s' "$1" | "$luabin" -e 'local o=require("options");print(o.canonical(io.read("*a")))'
 }
 
+# Populate the array named by $1 with the option names accepted by the recipe
+# at $2 (via Options.from_recipe). Names are normalized to have a leading "-"
+# prepended, regardless of whether they were discovered from an
+# `availables=(...)` block (bare) or from case-arms (-prefixed). Returns zero
+# even if Lua is unavailable (array left empty) so callers can degrade
+# gracefully.
+options_from_recipe () {
+    local -n _ofr_out="$1"
+    local recipe_file="$2"
+    _ofr_out=()
+    local luabin
+    luabin="$(_lh_lua)"
+    if [[ -z "$luabin" ]]; then
+        return 0
+    fi
+    # Pass the file path via the LH_FILE env var -- passing it as a positional
+    # arg after `-e chunk` would make lua try to load it as a Lua script file.
+    local raw
+    raw="$(LH_FILE="$recipe_file" "$luabin" -e '
+        local o = require("options")
+        for _, n in ipairs(o.from_recipe(os.getenv("LH_FILE"))) do
+            print(n)
+        end' 2>/dev/null)"
+    local name
+    while IFS= read -r name; do
+        [[ -z "$name" ]] && continue
+        if [[ "$name" == -* ]]; then
+            _ofr_out+=("$name")
+        else
+            _ofr_out+=("-$name")
+        fi
+    done <<< "$raw"
+}
+
 # Figure out the default library directory.
 # Adapted from https://github.com/mesonbuild/meson/blob/master/mesonbuild/mesonlib.py
 # Returns one or more paths separated by a colon. It can return multiple values
