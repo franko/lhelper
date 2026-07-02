@@ -165,7 +165,7 @@ popd_quiet
 cp src/lua/src/"$lua_exe" "$DESTDIR/libexec/lhelper/lua"
 rm -f src/lua/src/"$lua_exe"
 
-for filename in common-lhelper.sh cpu-lhelper.sh build-helper.sh create-env.sh lhelper-bash-init lhelper-lib.sh; do
+for filename in common-lhelper.sh cpu-lhelper.sh build-helper.sh create-env.sh lhelper-bash-init lhelper-lib.sh env-packages-lib.sh; do
     cp "$filename" "$DESTDIR/share/lhelper"
 done
 cp -r share/lhelper/lua "$DESTDIR/share/lhelper"

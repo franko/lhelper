@@ -112,6 +112,7 @@ source "$LHELPER_DIR/common-lhelper.sh"
 source "$LHELPER_DIR/cpu-lhelper.sh"
 source "$LHELPER_DIR/create-env.sh"
 source "$LHELPER_DIR/lhelper-lib.sh"
+source "$LHELPER_DIR/env-packages-lib.sh"
 
 if [ ! -d "${LHELPER_DIR}" ]; then
     echo "error: directory \"${LHELPER_DIR}\" not found."
@@ -878,103 +879,6 @@ library_check_and_install () {
     library_install $mode "$@"
 }
 
-# Modify a package line so that it can be passed to library_check_and_install
-# to install the same package.
-# Remove the recipe version number after "+" in the 2nd argument and discard
-# the last argument, which is the digest of the package.
-package_of_line () {
-    join_by " " "$1" "${2%+*}" "${@:3:${#@}-3}"
-}
-
-# Update list of packages on the currently activated environment to match the
-# temporary environment whose env dir is given as the first argument.
-update_installed_packages () {
-    local new_env_dir="$1"
-
-    # Below old_list is the list of the currently installed packages while new_list
-    # is the list we want to have.
-    # We proceed to remove or install packages so that we match the "new_list" of
-    # installed packages.
-    local old_list=() new_list=() ll
-    while IFS= read -r ll; do old_list+=("$ll"); done < "$LHELPER_ENV_PREFIX/bin/lhelper-packages"
-    while IFS= read -r ll; do new_list+=("$ll"); done < "$new_env_dir/bin/lhelper-packages"
-
-    fs_security_delay
-    # truncate the lhelper-packages file
-    true > "$LHELPER_ENV_PREFIX/bin/lhelper-packages"
-
-    local newly_installed_packages=()
-    local skip_this newly_installed_package
-    local package_line i=0 j=0 n=${#new_list[@]} m=${#old_list[@]} k found
-    while [[ $i -lt $n ]]; do
-        # in the condition below $j may be out of bounds but that's fine.
-        if [[ ${new_list[$i]} == ${old_list[$j]} ]]; then
-            # lines match: write the line in lhelper-packages and move on
-            echo "${new_list[$i]}" >> "$LHELPER_ENV_PREFIX/bin/lhelper-packages"
-            i=$(( $i + 1 ))
-            j=$(( $j + 1 ))
-        else
-            # entries do not match: let's see if the entry in new_list is present
-            # is old_list but later
-            k=$(( $j + 1 ))
-            found=no
-            while [[ $k -lt $m ]]; do
-                if [[ ${new_list[$i]} == ${old_list[$k]} ]]; then
-                    found=yes
-                    break
-                fi
-                k=$(( $k + 1 ))
-            done
-            if [ $found == yes ]; then
-                # the new_list entry is found: remove all the old_list entries up to
-                # the one that match the new_list entry
-                while [[ $j -lt $k ]]; do
-                    skip_this=no
-                    for newly_installed_package in "${newly_installed_packages[@]}"; do
-                        if [[ ${old_list[$j]%% *} == $newly_installed_package ]]; then
-                            skip_this=yes
-                            break
-                        fi
-                    done
-                    if [[ $skip_this == no && ${old_list[$j]} != *" : "* ]]; then
-                        remove_package "$LHELPER_ENV_PREFIX" ${old_list[$j]}
-                    fi
-                    j=$(( $j + 1 ))
-                done
-            else
-                # The new_list entry is not found: install it in the new environment.
-                # NOTE: it will add one or more new lines in the lhelper-packages file.
-                # It will be more than one if the packages "provides" some virtual packages.
-                if [[ ${new_list[$i]} != *" : "* ]]; then
-                    # Just take the name of the package for the list of newly installed packages.
-                    newly_installed_packages+=("${new_list[$i]%% *}")
-                    library_check_and_install run $(package_of_line ${new_list[$i]})
-                fi
-                i=$(( $i + 1 ))
-            fi
-        fi
-    done
-    # Remove any remaining package not present in the new list
-    while [[ $j -lt $m ]]; do
-        # Check if the package was just installed before removing it.
-        # The package may be required with different options.
-        # If this is the case it was previously removed and installed above in this function using
-        # library_check_and_install with the new options so we don't want to remove it again here
-        # because we would remove the newly installed package.
-        skip_this=no
-        for newly_installed_package in "${newly_installed_packages[@]}"; do
-            if [[ ${old_list[$j]%% *} == $newly_installed_package ]]; then
-                skip_this=yes
-                break
-            fi
-        done
-        if [[ $skip_this == no && ${old_list[$j]} != *" : "* ]]; then
-            remove_package "$LHELPER_ENV_PREFIX" ${old_list[$j]}
-        fi
-        j=$(( $j + 1 ))
-    done
-}
-
 # Create and activate a temporary environment in the given directory
 # and pseudo-installs the packages from the array variable "packages"
 do_temporary_env () {
@@ -985,16 +889,15 @@ do_temporary_env () {
     rm -fr "$env_dir"
     mkdir -p "$env_dir"
     create_env "_tmp" "$env_dir" "$env_source"
-    # run through the packages to log them in the temporary environment
+    # Log the full package closure into the temporary environment using the same
+    # provisioning routine as the real activation path, so the two lists match.
     (
         source "$env_source"
-        for package_name in "${packages[@]}"; do
-            # Important: variable package_name can contain spaces and it must be used
-            # below *without* quotes.
-            library_check_and_install log $package_name
-        done
+        provision_packages log
     )
+    local rc=$?
     lib_install_mode="$prev_mode"
+    return $rc
 }
 
 # should be called using a subshell
@@ -1013,7 +916,14 @@ load_matching_env () {
 
     # Temporary environment creation and activation using local variable
     # array "packages"
-    do_temporary_env "$tmp_workdir"
+    if ! do_temporary_env "$tmp_workdir"; then
+        # The temporary environment could not be fully computed (e.g. a
+        # dependency tree failed to resolve). Reconciling against an incomplete
+        # package list could wrongly delete installed packages, so we treat this
+        # as a non-match and let the caller rebuild the environment from scratch.
+        rm -fr "$tmp_workdir"
+        return 1
+    fi
 
     local load_exit_code=1
     if [ -d "$env_workdir/$env_name" ] &&
@@ -1345,33 +1255,7 @@ EOF
                 create_env "$env_test_name" "$env_prefix" "$env_source" "$build_filename"
                 # install packages, activate the environment before
                 source "$env_source"
-                if $no_auto_deps; then
-                    for package_name in "${packages[@]}"; do
-                        library_check_and_install run $package_name
-                    done
-                else
-                    local pkg_spec
-                    for pkg_spec in "${packages[@]}"; do
-                        local build_order
-                        build_order=$(resolve_command $pkg_spec)
-                        local res_rc=$?
-                        if [ $res_rc -ne 0 ]; then
-                            echo "error: cannot resolve dependencies for \"$pkg_spec\"" >&2
-                            exit 1
-                        fi
-                        if [ -n "$build_order" ]; then
-                            local dep_spec dep_name
-                            while IFS= read -r dep_spec; do
-                                [[ -z "$dep_spec" ]] && continue
-                                dep_name="${dep_spec%% *}"
-                                if package_is_installed "$LHELPER_ENV_PREFIX" "$dep_name"; then
-                                    continue
-                                fi
-                                library_check_and_install run $dep_spec
-                            done <<< "$build_order"
-                        fi
-                    done
-                fi
+                provision_packages run || exit 1
             fi
             if [ $command == activate ]; then
                 echo "Starting a new shell with the new environment"
