@@ -50,7 +50,12 @@ export LHELPER_RECIPES_DIR="${LH_RECIPES_DIR:-$LHELPER_DIR/recipes}"
 export LHELPER_TMPDIR
 
 export PATH="$LHELPER_PREFIX/bin:$PATH"
-export LUA_PATH="$LHELPER_DIR/lua/?.lua;$LHELPER_DIR/lua/?/init.lua;;"
+if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* || "$OSTYPE" == "cygwin"* ]]; then
+    LHELPER_DIR_LUA="$(cygpath -m "$LHELPER_DIR")"
+else
+    LHELPER_DIR_LUA="$LHELPER_DIR"
+fi
+export LUA_PATH="$LHELPER_DIR_LUA/lua/?.lua;$LHELPER_DIR_LUA/lua/?/init.lua;;"
 
 # Canonical path for lhelper's private Lua interpreter. If LHELPER_LUA_BIN
 # is already set in the environment (e.g. by tests) it is honored as-is;
