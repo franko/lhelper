@@ -135,6 +135,9 @@ if [[ "$OSTYPE" == "linux"* ]]; then
 elif [[ "$OSTYPE" == "darwin"* ]]; then
     lua_platform_flags="-DLUA_USE_MACOSX"
     lua_platform_libs=""
+elif [[ -n "$OS" && "$OS" == "Windows"* ]]; then
+    lua_platform_flags=""
+    lua_platform_libs=""
 elif [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* || "$OSTYPE" == "cygwin"* ]]; then
     lua_platform_flags="-DLUA_USE_POSIX"
     lua_platform_libs=""
