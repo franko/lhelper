@@ -4,6 +4,9 @@ fi
 
 VIRTUAL_ENV="$LHELPER_ENV_NAME"
 
+# Used by "lhelper reload" to signal this shell to restart the environment.
+export LHELPER_SHELL_PID=$$
+
 if [ ! -z "${PS1+x}" ]; then
     PS1="($LHELPER_ENV_NAME) $PS1"
 fi
