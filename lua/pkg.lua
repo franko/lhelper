@@ -114,11 +114,10 @@ end
 -------------------------------------------------------------------------------
 -- packages register file
 
--- Add or update a package line "<package-name> [options] [version]" in
--- a register file, one line for each package.
-function pkg.file_add(filename, package_line)
+-- Add or update a package line "<package-name> [options] [version]" in a
+-- list of registry lines, one line for each package.
+function pkg.lines_add(lines, package_line)
     local package_name = package_line:match("^%S+")
-    local lines = util.read_lines(filename)
     local found = false
     for i, line in ipairs(lines) do
         if line:match("^%S+") == package_name then
@@ -129,7 +128,37 @@ function pkg.file_add(filename, package_line)
     if not found then
         lines[#lines + 1] = package_line
     end
-    util.write_lines(filename, lines)
+    return lines
+end
+
+-- Find the registry line of a package in a list of registry lines.
+function pkg.lines_query(lines, package_name)
+    for _, line in ipairs(lines) do
+        if line:match("^%S+") == package_name then
+            return line
+        end
+    end
+    return nil
+end
+
+-- Resolve a registry line: for a virtual package entry return the spec
+-- part or, when the "link" flag is given, the provider's line.
+function pkg.resolve_entry(line, link)
+    if not line or util.trim(line) == "" then return nil end
+    local pprov, pimpl = line:match("^(.-) : (.*)$")
+    if pprov then
+        return link and pimpl or pprov
+    end
+    return line
+end
+
+-- Query a package in a list of registry lines (see resolve_entry).
+function pkg.query_lines(lines, package_name, link)
+    return pkg.resolve_entry(pkg.lines_query(lines, package_name), link)
+end
+
+function pkg.file_add(filename, package_line)
+    util.write_lines(filename, pkg.lines_add(util.read_lines(filename), package_line))
 end
 
 function pkg.file_remove(filename, package_name)
@@ -143,28 +172,22 @@ function pkg.file_remove(filename, package_name)
     util.write_lines(filename, new_lines)
 end
 
-function pkg.file_query(filename, package_name)
-    for _, line in ipairs(util.read_lines(filename)) do
-        if line:match("^%S+") == package_name then
-            return line
-        end
-    end
-    return nil
-end
-
 local function packages_filename(env_prefix)
     return env_prefix .. "/bin/lhelper-packages"
 end
 
--- Register an installed package line. If the package provides some virtual
--- packages (recorded in the logs directory) register them too.
-function pkg.register_package(env_prefix, package, package_line)
+function pkg.registry_lines(env_prefix)
+    return util.read_lines(packages_filename(env_prefix))
+end
+
+-- Register an installed package line together with the virtual packages
+-- it provides (a list of package specs).
+function pkg.register_package(env_prefix, package_line, provides)
     pkg.file_add(packages_filename(env_prefix), package_line)
-    local provides_file = env_prefix .. "/logs/" .. package .. "-provides"
-    if util.is_file(provides_file) then
-        local f = io.open(packages_filename(env_prefix), "a")
-        for _, provide_line in ipairs(util.read_lines(provides_file)) do
-            f:write(provide_line .. " : " .. package_line .. "\n")
+    if provides and #provides > 0 then
+        local f = assert(io.open(packages_filename(env_prefix), "a"))
+        for _, provide_spec in ipairs(provides) do
+            f:write(provide_spec .. " : " .. package_line .. "\n")
         end
         f:close()
     end
@@ -190,13 +213,7 @@ end
 -- virtual package, the spec part (or the provider's line when the "link"
 -- flag is given).
 function pkg.query_package(env_prefix, package_name, link)
-    local line = pkg.file_query(packages_filename(env_prefix), package_name)
-    if not line or util.trim(line) == "" then return nil end
-    local pprov, pimpl = line:match("^(.-) : (.*)$")
-    if pprov then
-        return link and pimpl or pprov
-    end
-    return line
+    return pkg.query_lines(pkg.registry_lines(env_prefix), package_name, link)
 end
 
 -------------------------------------------------------------------------------

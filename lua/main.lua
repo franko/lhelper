@@ -315,7 +315,6 @@ local function activate_command(args)
 
     local build_realpath = util.realpath(build_filename)
     local env_workdir = util.dirname(build_realpath) .. "/.lhelper"
-    local tmp_workdir = env_workdir .. "/.tmp"
     if not util.is_dir(env_workdir) then
         if not util.mkdir_p(env_workdir) then
             print("error: cannot create local environment directory: " .. env_workdir)
@@ -343,7 +342,7 @@ local function activate_command(args)
         local restore_env = util.env_snapshot()
 
         if not installer.load_matching_env(env_test_name, env_workdir,
-            tmp_workdir, build_spec) then
+            build_spec) then
             -- Create a new environment.
             local env_prefix = env_workdir .. "/" .. env_test_name
             util.rm_rf(env_prefix)
@@ -363,7 +362,7 @@ local function activate_command(args)
             env.activate_in_process(env_prefix, lhsys.getcwd(), env_test_name,
                 build_filename)
             for _, package_spec in ipairs(build_spec.packages) do
-                installer.library_check_and_install("run", {}, util.split(package_spec))
+                installer.library_check_and_install({}, util.split(package_spec))
             end
         end
 
@@ -399,7 +398,7 @@ local function install_command(args)
         i = i + 1
     end
     local install_args = { table.unpack(args, i) }
-    installer.library_check_and_install("run", flags, install_args)
+    installer.library_check_and_install(flags, install_args)
 end
 
 local function env_source_command(args)

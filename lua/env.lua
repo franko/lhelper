@@ -118,17 +118,50 @@ source "$LHELPER_ENV_PREFIX/bin/lhelper-config"
         spec.env_root, spec.env_name, spec.build_filename or "")
 end
 
+-- Compute (and store into spec.cpu_flags) the compiler flags for the
+-- spec's CPU type and target.
+function env.compute_cpu_flags(spec)
+    if spec.cpu_flags then return true end
+    local cpu_flags = cpu.compiler_flags(spec.cpu_type, spec.cpu_target)
+    if not cpu_flags then
+        return nil, string.format("Unrecognized CPU type / target combination: %s:%s",
+            spec.cpu_type, spec.cpu_target)
+    end
+    spec.cpu_flags = cpu_flags
+    return true
+end
+
+-- The content of the environment's lhelper-config file for a build spec.
+function env.config_content(spec)
+    return config_format(spec)
+end
+
+-- The configuration values of a build spec, as the table that
+-- parse_config would return for the corresponding lhelper-config file.
+function env.spec_config(spec)
+    return {
+        CC_BARE = spec.cc,
+        CXX_BARE = spec.cxx,
+        CC = spec.cc .. " " .. spec.cpu_flags,
+        CXX = spec.cxx .. " " .. spec.cpu_flags,
+        CFLAGS = spec.cflags or "",
+        CXXFLAGS = spec.cxxflags or "",
+        LDFLAGS = spec.ldflags or "",
+        CPU_TYPE = spec.cpu_type,
+        CPU_TARGET = spec.cpu_target,
+        BUILD_TYPE = spec.build_type,
+    }
+end
+
 -- Create an environment: directories, lhelper-config and activate script.
 -- spec: {env_name=, prefix=, env_source=, build_filename=, cc=, cxx=,
 --        cflags=, cxxflags=, ldflags=, cpu_type=, cpu_target=, build_type=}
 function env.create_env(spec)
-    local cpu_flags = cpu.compiler_flags(spec.cpu_type, spec.cpu_target)
-    if not cpu_flags then
-        print(string.format("error: Unrecognized CPU type / target combination: %s:%s",
-            spec.cpu_type, spec.cpu_target))
+    local ok, err = env.compute_cpu_flags(spec)
+    if not ok then
+        print("error: " .. err)
         os.exit(1)
     end
-    spec.cpu_flags = cpu_flags
     spec.env_root = require("lhsys").getcwd()
 
     local prefix = spec.prefix

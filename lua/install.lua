@@ -1,6 +1,13 @@
 -- Package install orchestration: run recipes, package the build results,
 -- install them into an environment and keep the environment's package list
 -- up to date.
+--
+-- The information flow is kept in memory: the recipes' "dependencies"
+-- phase returns the declared dependencies and provided virtual packages as
+-- Lua values and the desired state of an environment is computed from the
+-- build spec without touching the disk. The only files used are the
+-- persistent ones: the lhelper-packages registry, the per-package .list
+-- files, the archives/packages caches and the build logs.
 
 local util = require "util"
 local lhsys = require "lhsys"
@@ -143,10 +150,16 @@ local function prepare_temp_dir(base_dir)
     util.mkdir_p(temp_dir)
 end
 
--- Re-apply the environment's compiler configuration. Needed because the
--- recipes may modify CC, CFLAGS and the other variables.
-local function source_env_config()
-    local config = env.parse_config(getenv("LHELPER_ENV_PREFIX") .. "/bin/lhelper-config")
+-- The configuration of the active environment, from its lhelper-config
+-- file (the user may have edited it).
+local function active_env_config()
+    return env.parse_config(getenv("LHELPER_ENV_PREFIX") .. "/bin/lhelper-config")
+end
+
+-- Re-apply the environment's compiler configuration as environment
+-- variables. Needed because the recipes may modify CC, CFLAGS and the
+-- other variables.
+local function apply_env_config(config)
     for name, value in pairs(config) do
         util.setenv(name, value)
     end
@@ -214,17 +227,15 @@ end
 -------------------------------------------------------------------------------
 -- dependencies
 
--- Check the recorded dependencies of a package against the installed
--- packages and system libraries. Returns the list of missing dependencies.
-local function check_dependencies(package)
+-- Check a package's declared dependencies against a package registry
+-- (a list of registry lines) and the system libraries. Returns the list
+-- of missing dependencies.
+local function check_dependencies(dependencies, registry_lines)
     local missing = {}
-    local env_prefix = getenv("LHELPER_ENV_PREFIX")
-    local deps_filename = env_prefix .. "/logs/" .. package .. "-dependencies"
-    if not util.is_file(deps_filename) then return missing end
-    for _, dependency in ipairs(util.read_lines(deps_filename)) do
+    for _, dependency in ipairs(dependencies) do
         if not util.starts_with(dependency, "?") then
             local dep_name = dependency:match("^%S+")
-            local found = pkg.query_package(env_prefix, dep_name)
+            local found = pkg.query_lines(registry_lines, dep_name)
             if found then
                 local rc = pkg.test_package_spec(dependency, found)
                 if rc == 1 then
@@ -262,16 +273,15 @@ local function check_dependencies(package)
     return missing
 end
 
--- Compute the list of the packages used by a package (its recorded
--- dependencies with the actual version used).
-local function compute_package_list(package)
-    local env_prefix = getenv("LHELPER_ENV_PREFIX")
-    local deps_filename = env_prefix .. "/logs/" .. package .. "-dependencies"
+-- Compute the list of the packages used by a package: its declared
+-- dependencies resolved against the registry lines and the system
+-- libraries, with the actual version used.
+local function compute_package_list(dependencies, registry_lines)
     local usage = {}
-    for _, dependency in ipairs(util.read_lines(deps_filename)) do
+    for _, dependency in ipairs(dependencies) do
         local name = dependency:match("^%S+"):gsub("^%?", "")
-        if pkg.query_package(env_prefix, name) then
-            local entry = pkg.query_package(env_prefix, name, true)
+        if pkg.query_lines(registry_lines, name) then
+            local entry = pkg.query_lines(registry_lines, name, true)
             if not util.contains(usage, entry) then
                 usage[#usage + 1] = entry
             end
@@ -296,8 +306,7 @@ local function machine_type()
     return machine .. "-" .. system:lower()
 end
 
-local function digest_content(usage_lines)
-    local config = env.parse_config(getenv("LHELPER_ENV_PREFIX") .. "/bin/lhelper-config")
+local function digest_content(config, usage_lines)
     local lines = {
         'CC="' .. (config.CC_BARE or "") .. '"',
         'CXX="' .. (config.CXX_BARE or "") .. '"',
@@ -317,14 +326,9 @@ local function digest_content(usage_lines)
     return table.concat(lines, "\n") .. "\n"
 end
 
--- Compute the digest identifying the build environment for a package and
--- record the package's dependencies usage file.
-local function build_env_digest(package)
-    local env_prefix = getenv("LHELPER_ENV_PREFIX")
-    local usage_lines = compute_package_list(package)
-    source_env_config()
-    util.write_lines(env_prefix .. "/logs/" .. package .. "-usage", usage_lines)
-    local content = digest_content(usage_lines)
+-- Compute the digest identifying the build environment of a package.
+local function build_env_digest(config, usage_lines)
+    local content = digest_content(config, usage_lines)
     local digest = md5.sumhexa(content)
     local digest_filename = getenv("LHELPER_WORKING_DIR") .. "/digests/" .. digest
     if not util.is_file(digest_filename) then
@@ -361,6 +365,43 @@ local function parse_install_args(args)
     end
     table.sort(spec.options)
     return spec
+end
+
+-- Find the recipe for a package spec and resolve the version when not
+-- given. Fills spec.version and returns recipe_dir, recipe_filename,
+-- recipe_version.
+local function resolve_recipe(flags, spec)
+    if flags.local_recipe and not spec.version then
+        print("error: version is required for local recipes")
+        os.exit(1)
+    end
+    if not spec.version then
+        spec.version = installer.latest_package_version(spec.package)
+        if not spec.version then
+            print(string.format("error: cannot find package \"%s\"", spec.package))
+            os.exit(1)
+        end
+    end
+    local recipe_dir = flags.local_recipe and "." or installer.recipes_dir()
+    local recipe_filename = installer.find_recipe_filename(recipe_dir,
+        spec.package, spec.version)
+    if not recipe_filename then
+        print(string.format("error: no recipe found for \"%s\" version %s.",
+            spec.package, spec.version))
+        os.exit(1)
+    end
+    local recipe_version = recipe_filename:gsub("^" ..
+        util.pattern_escape(spec.package .. "_"), ""):gsub("%.lua$", "")
+    return recipe_dir, recipe_filename, recipe_version
+end
+
+-- "<name> [options] <recipe-version> <digest>"
+local function make_package_line(spec, recipe_version, digest)
+    local coll = { spec.package }
+    util.append_all(coll, spec.options)
+    coll[#coll + 1] = recipe_version
+    coll[#coll + 1] = digest
+    return table.concat(coll, " ")
 end
 
 local function recipe_error_report(code, err_msg, package, log_dirname, log_prefix)
@@ -400,55 +441,72 @@ local function recipe_error_report(code, err_msg, package, log_dirname, log_pref
     os.exit(1)
 end
 
--- Install a library. run_mode is "dependencies", "log" or "run".
--- flags: {local_recipe=, rebuild=}; args: {package, [version], [options...]}.
--- In "dependencies" mode returns the list of missing dependencies.
-function installer.library_install(run_mode, flags, args)
+-- Run the "dependencies" phase of a recipe: returns the declared
+-- dependencies and virtual packages, {dependencies = ..., provides = ...}.
+local function run_dependencies_phase(recipe_dir, recipe_filename, spec,
+        log_dirname, log_prefix)
+    util.mkdir_p(getenv("LHELPER_TMPDIR") .. "/build")
+    local ctx = {
+        mode = "dependencies",
+        package = spec.package,
+        version = spec.version,
+        options = spec.options,
+        log_stdout = log_dirname .. "/" .. log_prefix .. spec.package .. "-stdout.log",
+        log_stderr = log_dirname .. "/" .. log_prefix .. spec.package .. "-stderr.log",
+    }
+    util.write_file(ctx.log_stdout, "")
+    util.write_file(ctx.log_stderr, "")
+    local deps, code, err_msg = recipe.run_recipe(
+        recipe_dir .. "/" .. recipe_filename, ctx)
+    if not deps then
+        recipe_error_report(code, err_msg, spec.package, log_dirname, log_prefix)
+    end
+    return deps
+end
+
+-- Install a library in the active environment. run_mode is "dependencies"
+-- or "run". flags: {local_recipe=, rebuild=};
+-- args: {package, [version], [options...]}.
+-- In "dependencies" mode returns the missing dependencies and the recipe's
+-- declarations; in "run" mode the declarations, obtained from a previous
+-- "dependencies" call, are passed as the deps argument.
+function installer.library_install(run_mode, flags, args, deps)
     flags = flags or {}
     local spec = parse_install_args(args)
     local package = spec.package
-    local version = spec.version
-    local options = spec.options
-
-    local options_tag = ""
-    if #options > 0 then
-        options_tag = table.concat(options, ""):gsub("^%-", "_")
-    end
-
-    if flags.local_recipe and not version then
-        print("error: version is required for local recipes")
-        os.exit(1)
-    end
-    if not version then
-        version = installer.latest_package_version(package)
-        if not version then
-            print(string.format("error: cannot find package \"%s\"", package))
-            os.exit(1)
-        end
-    end
-    local recipe_dir = flags.local_recipe and "." or installer.recipes_dir()
-    local recipe_filename = installer.find_recipe_filename(recipe_dir, package, version)
-    if not recipe_filename then
-        print(string.format("error: no recipe found for \"%s\" version %s.",
-            package, version))
-        os.exit(1)
-    end
-    local recipe_version = recipe_filename:gsub("^" ..
-        util.pattern_escape(package .. "_"), ""):gsub("%.lua$", "")
+    local recipe_dir, recipe_filename, recipe_version = resolve_recipe(flags, spec)
 
     local env_prefix = getenv("LHELPER_ENV_PREFIX")
+    local log_dirname = env_prefix .. "/logs"
+    local config = active_env_config()
+    apply_env_config(config)
+    util.setenv("package", package)
+    util.setenv("version", spec.version)
 
-    if run_mode == "run" then
-        if #options == 0 then
-            msg("Using recipe version " .. recipe_version)
-        else
-            msg("Using recipe version " .. recipe_version ..
-                " with options: " .. table.concat(options, " "))
-        end
-        if pkg.is_installed(env_prefix, package) then
-            pkg.remove_package_files(env_prefix, package)
-            msg("Removed previously installed package \"" .. package .. "\"")
-        end
+    if run_mode == "dependencies" then
+        local recipe_deps = run_dependencies_phase(recipe_dir, recipe_filename,
+            spec, log_dirname, "deps-")
+        local missing = check_dependencies(recipe_deps.dependencies,
+            pkg.registry_lines(env_prefix))
+        return missing, recipe_deps
+    end
+
+    deps = deps or { dependencies = {}, provides = {} }
+
+    local options_tag = ""
+    if #spec.options > 0 then
+        options_tag = table.concat(spec.options, ""):gsub("^%-", "_")
+    end
+
+    if #spec.options == 0 then
+        msg("Using recipe version " .. recipe_version)
+    else
+        msg("Using recipe version " .. recipe_version ..
+            " with options: " .. table.concat(spec.options, " "))
+    end
+    if pkg.is_installed(env_prefix, package) then
+        pkg.remove_package_files(env_prefix, package)
+        msg("Removed previously installed package \"" .. package .. "\"")
     end
 
     -- Ensure that the temporary build directory exists
@@ -457,50 +515,12 @@ function installer.library_install(run_mode, flags, args)
     local temp_root = getenv("LHELPER_WORKING_DIR") .. "/tmp"
     set_prefix_variables(temp_root)
     util.setenv("CONFIG_PREFIX", spec.package_prefix)
-    source_env_config()
-    util.setenv("package", package)
-    util.setenv("version", version)
 
-    local log_dirname = env_prefix .. "/logs"
+    local usage_lines = compute_package_list(deps.dependencies,
+        pkg.registry_lines(env_prefix))
+    local digest = build_env_digest(config, usage_lines)
+    local package_line = make_package_line(spec, recipe_version, digest)
 
-    local recipe_ctx = {
-        package = package,
-        version = version,
-        options = options,
-    }
-
-    if run_mode == "dependencies" then
-        -- Running recipe to get dependencies
-        util.write_file(log_dirname .. "/" .. package .. "-dependencies", "")
-        util.write_file(log_dirname .. "/" .. package .. "-provides", "")
-        recipe_ctx.mode = "dependencies"
-        recipe_ctx.log_stdout = log_dirname .. "/deps-" .. package .. "-stdout.log"
-        recipe_ctx.log_stderr = log_dirname .. "/deps-" .. package .. "-stderr.log"
-        util.write_file(recipe_ctx.log_stdout, "")
-        util.write_file(recipe_ctx.log_stderr, "")
-        local ok, code, err_msg = recipe.run_recipe(
-            recipe_dir .. "/" .. recipe_filename, recipe_ctx)
-        if not ok then
-            recipe_error_report(code, err_msg, package, log_dirname, "deps-")
-        end
-        return check_dependencies(package)
-    end
-
-    local digest = build_env_digest(package)
-    -- package line: "<name> [options] <recipe-version> <digest>"
-    local package_line_coll = { package }
-    util.append_all(package_line_coll, options)
-    package_line_coll[#package_line_coll + 1] = recipe_version
-    package_line_coll[#package_line_coll + 1] = digest
-    local package_line = table.concat(package_line_coll, " ")
-
-    if run_mode == "log" then
-        pkg.register_package(env_prefix, package, package_line)
-        return
-    end
-
-    local usage_lines = util.read_lines(log_dirname .. "/" .. package .. "-usage")
-    os.remove(log_dirname .. "/" .. package .. "-usage")
     if installer.show_dependencies then
         if #usage_lines > 0 then
             msg("The package dependencies are:")
@@ -517,7 +537,7 @@ function installer.library_install(run_mode, flags, args)
     local tar_package_filename = string.format("%s%s_%s_%s.tar.gz",
         package, options_tag, recipe_version, digest)
     local can_use_saved = not flags.rebuild and not flags.local_recipe and
-        not util.starts_with(version, "git-")
+        not util.starts_with(spec.version, "git-")
     if can_use_saved and util.is_file(package_dir() .. "/" .. tar_package_filename) then
         msg("Found an existing package")
     elseif can_use_saved and
@@ -534,9 +554,14 @@ function installer.library_install(run_mode, flags, args)
         msg("Building library...")
 
         -- Execute the recipe
-        recipe_ctx.mode = "run"
-        recipe_ctx.log_stdout = log_dirname .. "/" .. package .. "-stdout.log"
-        recipe_ctx.log_stderr = log_dirname .. "/" .. package .. "-stderr.log"
+        local recipe_ctx = {
+            mode = "run",
+            package = package,
+            version = spec.version,
+            options = spec.options,
+            log_stdout = log_dirname .. "/" .. package .. "-stdout.log",
+            log_stderr = log_dirname .. "/" .. package .. "-stderr.log",
+        }
         util.write_file(recipe_ctx.log_stdout, "")
         util.write_file(recipe_ctx.log_stderr, "")
         local ok, code, err_msg = recipe.run_recipe(
@@ -577,28 +602,26 @@ function installer.library_install(run_mode, flags, args)
     local filename_list = pkg.package_list_filename(env_prefix, package)
     extract_archive_reloc(tar_package_filename, "__LHELPER_PREFIX__",
         getenv("WIN_INSTALL_PREFIX"), getenv("INSTALL_PREFIX"), filename_list)
-    pkg.register_package(env_prefix, package, package_line)
+    pkg.register_package(env_prefix, package_line, deps.provides)
     msg("Package \"" .. package .. "\" successfully installed")
 end
 
 -- Get the package dependencies first and stop if some of them are missing,
--- then install the package. mode is "run" or "log".
-function installer.library_check_and_install(mode, flags, args)
-    local missing = installer.library_install("dependencies", flags, args)
+-- then install the package.
+function installer.library_check_and_install(flags, args)
+    local missing, deps = installer.library_install("dependencies", flags, args)
     if #missing > 0 then
-        msg("Found missing packages:")
+        print("Found missing packages:")
         print("")
         for _, line in ipairs(missing) do
-            msg("- " .. line)
+            print("- " .. line)
         end
-        msg("")
-        msg("The package " .. args[1] .. " cannot be installed due to missing dependencies.")
+        print("")
+        print("The package " .. args[1] .. " cannot be installed due to missing dependencies.")
         os.exit(1)
     end
-    if mode == "run" then
-        msg("Installing the requested package: " .. table.concat(args, " "))
-    end
-    installer.library_install(mode, flags, args)
+    msg("Installing the requested package: " .. table.concat(args, " "))
+    installer.library_install("run", flags, args, deps)
 end
 
 function installer.library_remove(package)
@@ -610,6 +633,59 @@ function installer.library_remove(package)
     pkg.remove_package_files(env_prefix, package)
     pkg.unregister_package(env_prefix, package)
     print("Package \"" .. package .. "\" successfully removed.")
+end
+
+-------------------------------------------------------------------------------
+-- desired environment state
+
+-- Compute in memory the registry lines an environment should have for a
+-- build spec: for each package of the spec, run the recipe's dependencies
+-- phase and compute the package's digest, resolving the dependencies
+-- against the packages appearing earlier in the spec. No environment is
+-- touched or created. Returns the registry lines.
+function installer.compute_desired_packages(build_spec)
+    local ok, err = env.compute_cpu_flags(build_spec)
+    if not ok then
+        print("error: " .. err)
+        os.exit(1)
+    end
+    local config = env.spec_config(build_spec)
+
+    -- The recipes' dependencies phase runs with the spec's compiler
+    -- configuration in the environment, in isolation (like a subshell).
+    local restore_env = util.env_snapshot()
+    apply_env_config(config)
+
+    local log_dirname = getenv("LHELPER_TMPDIR")
+    local registry_lines = {}
+    for _, package_spec in ipairs(build_spec.packages) do
+        local spec = parse_install_args(util.split(package_spec))
+        local recipe_dir, recipe_filename, recipe_version = resolve_recipe({}, spec)
+        local deps = run_dependencies_phase(recipe_dir, recipe_filename, spec,
+            log_dirname, "deps-")
+        local missing = check_dependencies(deps.dependencies, registry_lines)
+        if #missing > 0 then
+            print("Found missing packages:")
+            print("")
+            for _, line in ipairs(missing) do
+                print("- " .. line)
+            end
+            print("")
+            print("The package " .. spec.package ..
+                " cannot be installed due to missing dependencies.")
+            os.exit(1)
+        end
+        local usage_lines = compute_package_list(deps.dependencies, registry_lines)
+        local digest = build_env_digest(config, usage_lines)
+        local package_line = make_package_line(spec, recipe_version, digest)
+        pkg.lines_add(registry_lines, package_line)
+        for _, provide_spec in ipairs(deps.provides) do
+            registry_lines[#registry_lines + 1] = provide_spec .. " : " .. package_line
+        end
+    end
+
+    restore_env()
+    return registry_lines
 end
 
 -------------------------------------------------------------------------------
@@ -632,8 +708,8 @@ local function package_of_line(line)
 end
 
 -- Update the list of packages of the currently activated environment to
--- match the temporary environment whose directory is given as argument.
-function installer.update_installed_packages(new_env_dir)
+-- match the desired registry lines (new_list).
+function installer.update_installed_packages(new_list)
     local env_prefix = getenv("LHELPER_ENV_PREFIX")
     local packages_filename = env_prefix .. "/bin/lhelper-packages"
 
@@ -641,7 +717,6 @@ function installer.update_installed_packages(new_env_dir)
     -- the list we want to have. We remove or install packages so that we
     -- match the new list.
     local old_list = util.read_lines(packages_filename)
-    local new_list = util.read_lines(new_env_dir .. "/bin/lhelper-packages")
 
     fs_security_delay()
     util.write_file(packages_filename, "")
@@ -691,7 +766,7 @@ function installer.update_installed_packages(new_env_dir)
                     newly_installed_packages[#newly_installed_packages + 1] =
                         new_list[i]:match("^%S+")
                     out:close()
-                    installer.library_check_and_install("run", {},
+                    installer.library_check_and_install({},
                         package_of_line(new_list[i]))
                     out = assert(io.open(packages_filename, "a"))
                 end
@@ -712,34 +787,6 @@ function installer.update_installed_packages(new_env_dir)
     end
 end
 
--- Create and activate a temporary environment in the given directory and
--- pseudo-install (mode "log") the packages of the build spec.
-function installer.do_temporary_env(env_dir, build_spec)
-    local prev_mode = installer.lib_install_mode
-    installer.lib_install_mode = "quiet"
-    local env_source = env_dir .. "/.source"
-    util.rm_rf(env_dir)
-    util.mkdir_p(env_dir)
-    local spec = {
-        env_name = "_tmp", prefix = env_dir, env_source = env_source,
-        cc = build_spec.cc, cxx = build_spec.cxx,
-        cflags = build_spec.cflags, cxxflags = build_spec.cxxflags,
-        ldflags = build_spec.ldflags,
-        cpu_type = build_spec.cpu_type, cpu_target = build_spec.cpu_target,
-        build_type = build_spec.build_type,
-    }
-    env.create_env(spec)
-    -- log the packages in the temporary environment, in an isolated
-    -- environment (like a bash subshell)
-    local restore_env = util.env_snapshot()
-    env.activate_in_process(env_dir, lhsys.getcwd(), "_tmp", nil)
-    for _, package_spec in ipairs(build_spec.packages) do
-        installer.library_check_and_install("log", {}, util.split(package_spec))
-    end
-    restore_env()
-    installer.lib_install_mode = prev_mode
-end
-
 -- Check that the environment activate script was created from the current
 -- working directory.
 local function check_env_root_match(env_source)
@@ -752,27 +799,26 @@ local function check_env_root_match(env_source)
     return false
 end
 
--- Load the environment with the given name only if its config matches.
--- When it matches the environment is activated in-process and its package
--- list updated; returns true. Returns false otherwise.
-function installer.load_matching_env(env_name, env_workdir, tmp_workdir, build_spec)
+-- Load the environment with the given name only if its configuration
+-- matches the build spec. When it matches the environment is activated
+-- in-process and its package list updated to the desired one; returns
+-- true. Returns false otherwise.
+function installer.load_matching_env(env_name, env_workdir, build_spec)
     local env_prefix = env_workdir .. "/" .. env_name
     local env_source = env_prefix .. "/bin/activate"
 
-    installer.do_temporary_env(tmp_workdir, build_spec)
+    local desired_lines = installer.compute_desired_packages(build_spec)
+    local desired_config = env.config_content(build_spec)
 
-    local loaded = false
     if util.is_dir(env_prefix) and
-        util.files_equal(tmp_workdir .. "/bin/lhelper-config",
-            env_prefix .. "/bin/lhelper-config") and
+        util.read_file(env_prefix .. "/bin/lhelper-config") == desired_config and
         check_env_root_match(env_source) then
         env.activate_in_process(env_prefix, lhsys.getcwd(), env_name,
             build_spec.build_filename)
-        installer.update_installed_packages(tmp_workdir)
-        loaded = true
+        installer.update_installed_packages(desired_lines)
+        return true
     end
-    util.rm_rf(tmp_workdir)
-    return loaded
+    return false
 end
 
 return installer

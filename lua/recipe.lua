@@ -359,6 +359,8 @@ function recipe.make_recipe_env(ctx)
     end
 
     -- dependency("sdl2 -opengl >=2.0.14") or dependency("--optional", "...")
+    -- The declared dependencies are collected in ctx.deps; optional
+    -- dependencies are recorded with a "?" prefix.
     function R.dependency(...)
         if not dependencies_mode then return end
         local args = {...}
@@ -368,21 +370,15 @@ function recipe.make_recipe_env(ctx)
             table.remove(args, 1)
         end
         local spec = pkg.normalize_spec(table.concat(args, " "))
-        local filename = os.getenv("LHELPER_ENV_PREFIX") .. "/logs/" ..
-            ctx.package .. "-dependencies"
-        local f = assert(io.open(filename, "a"))
-        f:write(opt_flag .. spec .. "\n")
-        f:close()
+        local deps = ctx.deps.dependencies
+        deps[#deps + 1] = opt_flag .. spec
     end
 
     function R.provides(...)
         if not dependencies_mode then return end
         local spec = pkg.normalize_spec(table.concat({...}, " "))
-        local filename = os.getenv("LHELPER_ENV_PREFIX") .. "/logs/" ..
-            ctx.package .. "-provides"
-        local f = assert(io.open(filename, "a"))
-        f:write(spec .. "\n")
-        f:close()
+        local provides = ctx.deps.provides
+        provides[#provides + 1] = spec
     end
 
     function R.fail_config(msg)
@@ -615,12 +611,14 @@ function recipe.make_recipe_env(ctx)
 end
 
 -- Run a recipe file. ctx as in make_recipe_env.
--- Returns true or nil, error code, error message.
+-- Returns the recipe's declarations {dependencies = {...}, provides = {...}}
+-- (filled by the "dependencies" phase) or nil, error code, error message.
 function recipe.run_recipe(recipe_filename, ctx)
     local content, read_err = util.read_file(recipe_filename)
     if not content then
         return nil, 1, read_err
     end
+    ctx.deps = { dependencies = {}, provides = {} }
     local renv = recipe.make_recipe_env(ctx)
     local chunk, load_err = load(content, "@" .. recipe_filename, "t", renv)
     if not chunk then
@@ -637,7 +635,7 @@ function recipe.run_recipe(recipe_filename, ctx)
         end
         return nil, 1, tostring(err)
     end
-    return true
+    return ctx.deps
 end
 
 return recipe
