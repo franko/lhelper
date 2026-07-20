@@ -813,8 +813,7 @@ function installer.load_matching_env(env_name, env_workdir, build_spec)
     if util.is_dir(env_prefix) and
         util.read_file(env_prefix .. "/bin/lhelper-config") == desired_config and
         check_env_root_match(env_source) then
-        env.activate_in_process(env_prefix, lhsys.getcwd(), env_name,
-            build_spec.build_filename)
+        env.activate_in_process(env_prefix, lhsys.getcwd(), env_name)
         installer.update_installed_packages(desired_lines)
         return true
     end

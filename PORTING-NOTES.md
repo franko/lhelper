@@ -61,16 +61,25 @@ left are the genuinely persistent ones: the `lhelper-packages` registry,
 the per-package `.list` files, the archives/packages/digests caches and
 the build logs. The digest computation was verified to be unchanged.
 
+### Removal of the edit/reload cycle
+
+The interactive `lhelper edit` / `lhelper reload` restart mechanism was
+dropped from the Lua version. It used to edit the `build.lhelper` of the
+active environment and respawn the subshell in place (SIGUSR1 to the shell,
+`exit 11`, and an environment-restart loop in `activate`). To change an
+active environment now, exit the subshell, edit the `build.lhelper` file and
+activate it again. Removed with the feature: the `edit` and `reload`
+commands, `signal_environment_restart`, the `activate` restart loop and its
+env snapshot/restore, the `LHELPER_BUILD_FILENAME` variable, and the
+`LHELPER_SHELL_PID` export plus the SIGUSR1 trap in `lhelper-bash-init`. The
+bash implementation keeps the feature untouched.
+
 ## Known gaps (not implemented)
 
-1. **Untested platforms and the edit/reload cycle.** Only macOS was
-   actually exercised. The Linux and MSYS2 code paths are written
-   (per-platform code in `lhsys.c`, `build.sh`, `env.lua`, the sdl2
-   recipe) but have not been run on those systems. Likewise the
-   interactive `lhelper edit` / `lhelper reload` restart cycle (SIGUSR1 to
-   the environment shell, exit code 11, environment restart) is ported —
-   `lhelper-bash-init` now exports `LHELPER_SHELL_PID` for this — but was
-   not tested interactively.
+1. **Untested platforms.** Only macOS was actually exercised. The Linux
+   and MSYS2 code paths are written (per-platform code in `lhsys.c`,
+   `build.sh`, `env.lua`, the sdl2 recipe) but have not been run on those
+   systems.
 2. **No cleanup of partial downloads on Ctrl-C.** The bash implementation
    trapped SIGINT during downloads and removed the partially downloaded
    archive or git checkout. The Lua implementation does not install a

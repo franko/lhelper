@@ -107,7 +107,6 @@ export LHELPER_PKGCONFIG_RPATH="%s"
 export LHELPER_ENV_ROOT="%s"
 export LHELPER_ENV_PREFIX="$prefix"
 export LHELPER_ENV_NAME="%s"
-export LHELPER_BUILD_FILENAME="%s"
 
 source "$LHELPER_ENV_PREFIX/bin/lhelper-config"
 ]], abs_prefix,
@@ -115,7 +114,7 @@ source "$LHELPER_ENV_PREFIX/bin/lhelper-config"
         pkgconfig_path, libdir, datadir,
         pkgconfig_path,
         libdir, pkgconfig_reldir,
-        spec.env_root, spec.env_name, spec.build_filename or "")
+        spec.env_root, spec.env_name)
 end
 
 -- Compute (and store into spec.cpu_flags) the compiler flags for the
@@ -154,7 +153,7 @@ function env.spec_config(spec)
 end
 
 -- Create an environment: directories, lhelper-config and activate script.
--- spec: {env_name=, prefix=, env_source=, build_filename=, cc=, cxx=,
+-- spec: {env_name=, prefix=, env_source=, cc=, cxx=,
 --        cflags=, cxxflags=, ldflags=, cpu_type=, cpu_target=, build_type=}
 function env.create_env(spec)
     local ok, err = env.compute_cpu_flags(spec)
@@ -190,7 +189,7 @@ end
 
 -- Set in the current process the same variables the activate script would
 -- set in a shell, so that the packages installs run within the environment.
-function env.activate_in_process(prefix, env_root, env_name, build_filename)
+function env.activate_in_process(prefix, env_root, env_name)
     local abs_prefix = util.realpath(prefix)
     local libdir_array = env.default_libdir()
     local function prepend_path(name, value)
@@ -221,7 +220,6 @@ function env.activate_in_process(prefix, env_root, env_name, build_filename)
     util.setenv("LHELPER_ENV_ROOT", env_root)
     util.setenv("LHELPER_ENV_PREFIX", abs_prefix)
     util.setenv("LHELPER_ENV_NAME", env_name)
-    util.setenv("LHELPER_BUILD_FILENAME", build_filename or "")
 
     -- source lhelper-config
     local config = env.parse_config(abs_prefix .. "/bin/lhelper-config")

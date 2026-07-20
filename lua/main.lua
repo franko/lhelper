@@ -149,11 +149,11 @@ local function print_installed_packages()
     end
 end
 
--- Start the environment subshell. Returns the shell's exit code.
+-- Start the environment subshell.
 local function start_subshell()
     print_installed_packages()
     print("Starting a new shell with the new environment")
-    return util.spawn({"bash", "--init-file", lhelper_dir .. "/lhelper-bash-init"})
+    util.spawn({"bash", "--init-file", lhelper_dir .. "/lhelper-bash-init"})
 end
 
 -------------------------------------------------------------------------------
@@ -189,7 +189,6 @@ local function load_build_spec(build_filename)
         cpu_target = spec_env.cpu_target,
         build_type = spec_env.build_type or "Release",
         packages = spec_env.packages or {},
-        build_filename = build_filename,
     }
     if spec.build_type ~= "Release" and spec.build_type ~= "Debug" then
         print("Build type should be either Release or Debug, abort.")
@@ -323,60 +322,41 @@ local function activate_command(args)
     end
 
     local env_test_name = build_basename:gsub("%.lhelper$", "")
-    local start_env_shell = true
-    while start_env_shell do
-        start_env_shell = false
 
-        local build_spec = load_build_spec(build_filename)
-        local cpu_type, cpu_target, cpu_err = cpu.resolve(build_spec.cpu_type,
-            build_spec.cpu_target, cpu_type_guess, cpu_target_guess)
-        if not cpu_type then
-            print("error: " .. cpu_err)
-            os.exit(1)
+    local build_spec = load_build_spec(build_filename)
+    local cpu_type, cpu_target, cpu_err = cpu.resolve(build_spec.cpu_type,
+        build_spec.cpu_target, cpu_type_guess, cpu_target_guess)
+    if not cpu_type then
+        print("error: " .. cpu_err)
+        os.exit(1)
+    end
+    build_spec.cpu_type, build_spec.cpu_target = cpu_type, cpu_target
+
+    if not installer.load_matching_env(env_test_name, env_workdir,
+        build_spec) then
+        -- Create a new environment.
+        local env_prefix = env_workdir .. "/" .. env_test_name
+        util.rm_rf(env_prefix)
+        local env_spec = {
+            env_name = env_test_name,
+            prefix = env_prefix,
+            env_source = env_prefix .. "/bin/activate",
+            cc = build_spec.cc, cxx = build_spec.cxx,
+            cflags = build_spec.cflags, cxxflags = build_spec.cxxflags,
+            ldflags = build_spec.ldflags,
+            cpu_type = build_spec.cpu_type, cpu_target = build_spec.cpu_target,
+            build_type = build_spec.build_type,
+        }
+        env.create_env(env_spec)
+        -- install the packages, with the environment activated
+        env.activate_in_process(env_prefix, lhsys.getcwd(), env_test_name)
+        for _, package_spec in ipairs(build_spec.packages) do
+            installer.library_check_and_install({}, util.split(package_spec))
         end
-        build_spec.cpu_type, build_spec.cpu_target = cpu_type, cpu_target
+    end
 
-        -- The environment activation must not pollute the lhelper process
-        -- itself across restarts, so we save and restore the environment
-        -- variables (playing the role of the bash subshell).
-        local restore_env = util.env_snapshot()
-
-        if not installer.load_matching_env(env_test_name, env_workdir,
-            build_spec) then
-            -- Create a new environment.
-            local env_prefix = env_workdir .. "/" .. env_test_name
-            util.rm_rf(env_prefix)
-            local env_spec = {
-                env_name = env_test_name,
-                prefix = env_prefix,
-                env_source = env_prefix .. "/bin/activate",
-                build_filename = build_filename,
-                cc = build_spec.cc, cxx = build_spec.cxx,
-                cflags = build_spec.cflags, cxxflags = build_spec.cxxflags,
-                ldflags = build_spec.ldflags,
-                cpu_type = build_spec.cpu_type, cpu_target = build_spec.cpu_target,
-                build_type = build_spec.build_type,
-            }
-            env.create_env(env_spec)
-            -- install the packages, with the environment activated
-            env.activate_in_process(env_prefix, lhsys.getcwd(), env_test_name,
-                build_filename)
-            for _, package_spec in ipairs(build_spec.packages) do
-                installer.library_check_and_install({}, util.split(package_spec))
-            end
-        end
-
-        local exit_code = 0
-        if command == "activate" then
-            exit_code = start_subshell()
-        end
-        restore_env()
-
-        -- An exit status 11 is a request to restart the environment after
-        -- a change in the build file.
-        if exit_code == 11 and command == "activate" then
-            start_env_shell = true
-        end
+    if command == "activate" then
+        start_subshell()
     end
 end
 
@@ -418,17 +398,6 @@ local function env_source_command(args)
         print("is not yet created. You may need to run the \"create\" command.")
         os.exit(1)
     end
-end
-
-local function signal_environment_restart()
-    -- Send a SIGUSR1 to the activated bash shell: it traps the signal and
-    -- exits with code 11, asking lhelper to restart the environment.
-    local shell_pid = os.getenv("LHELPER_SHELL_PID")
-    if not shell_pid then
-        print("error: cannot find the environment shell process")
-        os.exit(1)
-    end
-    util.spawn({"bash", "-c", 'kill -s USR1 "$LHELPER_SHELL_PID"'})
 end
 
 local function update_command(args)
@@ -527,18 +496,6 @@ commands["env-source"] = env_source_command
 commands["update"] = update_command
 commands["register"] = register_command
 commands["list"] = list_command
-
-commands["edit"] = function(args)
-    check_env_active_or_exit()
-    run_editor(os.getenv("LHELPER_ENV_ROOT") .. "/" ..
-        os.getenv("LHELPER_BUILD_FILENAME"))
-    signal_environment_restart()
-end
-
-commands["reload"] = function()
-    check_env_active_or_exit()
-    signal_environment_restart()
-end
 
 commands["cleanup"] = function()
     local env_root = os.getenv("LHELPER_ENV_ROOT")
