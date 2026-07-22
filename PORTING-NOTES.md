@@ -11,7 +11,7 @@ functionalities. The work is in commit `4fbe151`.
   is built by `build.sh` with a single C compiler invocation, in a few
   seconds; `install.sh` builds and installs everything. The only
   requirements are a C compiler and the basic tools (tar, curl, git, ...).
-- A small C layer in `csrc/`:
+- A small C layer in `src/`:
   - `main.c` embeds the Lua interpreter, locates the install prefix from
     the executable path and runs the main script;
   - `lhsys.c` provides the OS facilities missing from the Lua standard
@@ -43,8 +43,8 @@ functionalities. The work is in commit `4fbe151`.
   remove / list commands, spec file change with package add/removal on
   reload, missing-dependency detection.
 
-The bash implementation is left in place; the two implementations coexist
-until the migration is considered complete.
+As of 2026-07-22 the bash implementation has been removed; the migration
+is considered complete.
 
 ### In-memory state (commit `72b6c15`)
 
@@ -106,22 +106,15 @@ bash implementation keeps the feature untouched.
   `C:/`), the `spawn` Windows implementation, and the temporary directory
   (`C:/Windows/Temp`).
 - **Implement the download interruption cleanup** (see gap 2).
-- **Decide the fate of the bash implementation.** Once the recipes are
-  ported and the platforms verified: remove `lhelper`, `build-helper.sh`,
-  `common-lhelper.sh`, `cpu-lhelper.sh`, `create-env.sh`, `src/`, the old
-  `install` and `install-github`, fold `README-lua.md` into `README.md`,
-  and update `lhelper-completion.bash` if the command set changed.
-- **Update the install-from-github path.** `install-github` still
-  installs the bash version; it should build and install the Lua version
-  (`install.sh`) instead.
+- ~~**Decide the fate of the bash implementation.**~~ Done (2026-07-22):
+  removed `lhelper`, `build-helper.sh`, `common-lhelper.sh`,
+  `cpu-lhelper.sh`, `create-env.sh`, `src/`, the old `install` and
+  `install-github`; folded `README-lua.md` into `README.md`; renamed
+  `csrc/` to `src/`.
+- **Update the install-from-github path.** `install-github` was removed; a
+  new version should install the Lua version (`install.sh`) instead.
 - **Minor leftovers.**
   - `lhelper list environments` is mentioned in the README but was not
     implemented in bash nor in Lua; either implement it or fix the
     documentation.
-  - The `tests/` directory contains fixtures for the old
-    `lh-path-replace` C tool; they could be reused for a small Lua test
-    of `pathreplace.lua`.
-  - Packages built by the Lua version use a slightly different digest
-    input (MACHTYPE format differs), so they will not be shared with the
-    ones built by the bash version on lhelper.cc. This is harmless but
-    worth knowing while both versions are in use.
+  - ~~The `tests/` directory~~ Removed with the bash implementation.
