@@ -26,9 +26,12 @@ interpreter and runs the lhelper logic, which lives entirely in Lua modules.
   - `main.c` embeds Lua, locates the install prefix from the executable path, sets a
     few globals (`LHELPER_EXE_PATH`, `LHELPER_LUA_DIR`, `arg`), and runs `main.lua`.
   - `lhsys.c` exposes the `lhsys` module: `mkdir`, `rmdir`, `chdir`, `getcwd`,
-    `setenv`, `environ`, `listdir`, `stat`, `realpath`, `spawn`, and `platform`.
+    `setenv`, `environ`, `listdir`, `stat`, `realpath`, `spawn`,
+    `arm_interrupt` / `disarm_interrupt` / `interrupted`, and `platform`.
     `spawn(argv)` runs commands **without a shell** (fork/exec on POSIX,
-    CreateProcess on Windows) — so there is no shell quoting anywhere.
+    CreateProcess on Windows) — so there is no shell quoting anywhere. The
+    `*_interrupt` trio lets `recipe.lua` catch Ctrl-C during a download and
+    clean up the partial file (see `download_guarded`).
 - `lua/` — the lhelper program:
   - `main.lua` — CLI parsing and command dispatch (start here).
   - `install.lua` — install orchestration, digests, remote package download/upload.
@@ -107,15 +110,13 @@ These are deliberate choices by the maintainer — respect them:
 Verified on **macOS (arm64)** only. The Linux and MSYS2 code paths exist (in
 `lhsys.c`, `build.sh`, `env.lua`, and the sdl2 recipe) but have **not been run** on
 those systems. On MSYS2, watch path translation (`LH_MSYSROOT`, `/c/` vs `C:/`), the
-Windows `spawn`, and the temp dir. See "Known gaps" in PORTING-NOTES.md (e.g. no
-cleanup of partial downloads on Ctrl-C).
+Windows `spawn`, and the temp dir. See "Known gaps" in PORTING-NOTES.md.
 
 ## Pending work
 
 - Port the rest of the recipe collection (only a handful exist in the new Lua format;
   the full set is in bash form in `external/lhelper-recipes`).
 - Test on Linux and MSYS2.
-- Add SIGINT cleanup for interrupted downloads.
 
 ## ⚠️ Important: do not upload packages during testing
 

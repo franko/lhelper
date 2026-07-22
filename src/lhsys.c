@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <signal.h>
 
 #include "lua.h"
 #include "lauxlib.h"
@@ -238,6 +239,72 @@ static void win_append_arg(luaL_Buffer *b, const char *arg) {
 }
 #endif
 
+/* Interrupt handling.
+
+   During a download lhelper needs to catch Ctrl-C so that the partially
+   downloaded file (or git checkout directory) can be removed before exiting,
+   instead of leaving it behind as a corrupt cached archive. The original bash
+   implementation did this with an "INT" trap around the curl / git commands.
+
+   Here the handler only records the received signal in a flag; the actual
+   cleanup (which may involve removing a whole directory tree) is performed by
+   the Lua code once the interrupted spawn has returned, where it is safe to do
+   so. Outside a download the handler is not installed, so Ctrl-C terminates
+   lhelper immediately, as before. */
+static volatile sig_atomic_t interrupted_signal = 0;
+
+static void lh_signal_handler(int sig) {
+    interrupted_signal = sig;
+}
+
+/* arm_interrupt(): start catching SIGINT and clear any pending flag. */
+static int l_arm_interrupt(lua_State *L) {
+    interrupted_signal = 0;
+#ifdef _WIN32
+    signal(SIGINT, lh_signal_handler);
+#else
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = lh_signal_handler;
+    sigemptyset(&sa.sa_mask);
+    /* No SA_RESTART: a blocking waitpid() must return EINTR so the caller can
+       observe the interruption. */
+    sa.sa_flags = 0;
+    sigaction(SIGINT, &sa, NULL);
+#endif
+    lua_pushboolean(L, 1);
+    return 1;
+}
+
+/* disarm_interrupt(): restore the default SIGINT disposition (terminate). */
+static int l_disarm_interrupt(lua_State *L) {
+#ifdef _WIN32
+    signal(SIGINT, SIG_DFL);
+#else
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = SIG_DFL;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(SIGINT, &sa, NULL);
+#endif
+    lua_pushboolean(L, 1);
+    return 1;
+}
+
+/* interrupted(): return the number of the signal caught since the last
+   arm_interrupt(), or nil if none. Clears the flag. */
+static int l_interrupted(lua_State *L) {
+    int sig = (int) interrupted_signal;
+    interrupted_signal = 0;
+    if (sig == 0) {
+        lua_pushnil(L);
+    } else {
+        lua_pushinteger(L, sig);
+    }
+    return 1;
+}
+
 /* spawn(argv, opts) -> exit code | nil, error message
    argv: array of strings; opts (optional): {cwd=, stdout=, stderr=, append=} */
 static int l_spawn(lua_State *L) {
@@ -358,6 +425,9 @@ static const luaL_Reg lhsys_funcs[] = {
     { "stat",     l_stat },
     { "realpath", l_realpath },
     { "spawn",    l_spawn },
+    { "arm_interrupt",    l_arm_interrupt },
+    { "disarm_interrupt", l_disarm_interrupt },
+    { "interrupted",      l_interrupted },
     { NULL, NULL }
 };
 

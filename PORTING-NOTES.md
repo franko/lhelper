@@ -80,15 +80,14 @@ bash implementation keeps the feature untouched.
    and MSYS2 code paths are written (per-platform code in `lhsys.c`,
    `build.sh`, `env.lua`, the sdl2 recipe) but have not been run on those
    systems.
-2. **No cleanup of partial downloads on Ctrl-C.** The bash implementation
-   trapped SIGINT during downloads and removed the partially downloaded
-   archive or git checkout. The Lua implementation does not install a
-   signal handler yet: interrupting lhelper during a download can leave a
-   partial file in `var/lhelper/archives`, which would then be picked up
-   as a (corrupt) cached archive on the next run. Workaround: delete the
-   file by hand. A proper fix is a small SIGINT handler in `lhsys.c` plus
-   a cleanup hook in `recipe.lua`, or downloading to a `.part` name and
-   renaming on success (probably the simplest and most robust option).
+2. ~~**No cleanup of partial downloads on Ctrl-C.**~~ Done (2026-07-22).
+   `lhsys.c` now exposes `arm_interrupt` / `disarm_interrupt` /
+   `interrupted`: while a download runs the SIGINT handler only records the
+   signal (so the interrupted `spawn` returns), and `recipe.lua`'s
+   `download_guarded` then removes the partial file or git checkout and
+   exits with the "interrupted" code (4). Outside a download the default
+   SIGINT disposition is restored, so Ctrl-C still terminates lhelper
+   immediately. This mirrors the SIGINT trap of the original bash version.
 
 ## What remains to be done to complete the porting
 
@@ -105,7 +104,7 @@ bash implementation keeps the feature untouched.
   the points to watch are: path translation (`LH_MSYSROOT`, `/c/` vs
   `C:/`), the `spawn` Windows implementation, and the temporary directory
   (`C:/Windows/Temp`).
-- **Implement the download interruption cleanup** (see gap 2).
+- ~~**Implement the download interruption cleanup**~~ Done (2026-07-22, see gap 2).
 - ~~**Decide the fate of the bash implementation.**~~ Done (2026-07-22):
   removed `lhelper`, `build-helper.sh`, `common-lhelper.sh`,
   `cpu-lhelper.sh`, `create-env.sh`, `src/`, the old `install` and

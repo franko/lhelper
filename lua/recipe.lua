@@ -321,6 +321,27 @@ function recipe.make_recipe_env(ctx)
         end
     end
 
+    -- Run a download step (curl or git clone) while catching Ctrl-C, so that
+    -- an interrupted download does not leave a partial file behind in the
+    -- archives cache. `cleanup_path` is the file or directory being written;
+    -- if a SIGINT is received while `body` runs, it is removed and lhelper
+    -- exits with the "interrupted" code (4). This mirrors the SIGINT trap the
+    -- original bash implementation installed around curl and git clone.
+    local function download_guarded(cleanup_path, body)
+        lhsys.arm_interrupt()
+        local results = { pcall(body) }
+        lhsys.disarm_interrupt()
+        if lhsys.interrupted() then
+            if cleanup_path then
+                log_print("cleaning up interrupted download \"" .. cleanup_path .. "\"")
+                util.rm_rf(cleanup_path)
+            end
+            util.fail(4, "error: package install was interrupted")
+        end
+        if not results[1] then error(results[2], 0) end
+        return table.unpack(results, 2)
+    end
+
     ---------------------------------------------------------------------------
     -- recipe API
 
@@ -395,22 +416,27 @@ function recipe.make_recipe_env(ctx)
         opts = opts or {}
         local archives_dir = os.getenv("LHELPER_WORKING_DIR") .. "/archives"
         local filename = recipe.archive_filename_of_url(url)
-        if not util.is_file(archives_dir .. "/" .. filename) then
+        local dest = archives_dir .. "/" .. filename
+        if not util.is_file(dest) then
             local cmd = {"curl"}
             util.append_all(cmd, opts.curl_options or {})
             -- The option --insecure is used to ignore SSL certificate issues.
             -- The option --fail let the command fail if the response is a 404.
             util.append_all(cmd, {"--fail", "--retry", "5", "--retry-delay", "2",
-                "--insecure", "-L", url, "-o", archives_dir .. "/" .. filename})
+                "--insecure", "-L", url, "-o", dest})
             log_print("downloading " .. url)
-            local code = log_run(cmd, { no_fail = true })
+            -- Guard the download so that a Ctrl-C removes the partial file
+            -- instead of leaving it behind as a corrupt cached archive.
+            local code = download_guarded(dest, function()
+                return log_run(cmd, { no_fail = true })
+            end)
             if code ~= 0 then
-                os.remove(archives_dir .. "/" .. filename)
+                os.remove(dest)
                 util.fail(5, "error downloading " .. url)
             end
         end
         clean_build_root()
-        expand_enter_archive(archives_dir .. "/" .. filename, opts.extract_options)
+        expand_enter_archive(dest, opts.extract_options)
     end
 
     function R.enter_git_repository(repo_url, repo_tag)
@@ -429,26 +455,30 @@ function recipe.make_recipe_env(ctx)
             util.mkdir_p(temp_dir)
             log_print("git clone --depth 1 --branch " .. repo_tag .. " " ..
                 repo_url .. " " .. checkout_name)
-            -- Retry if there is a network error. It can happen with bad networks.
-            local cloned = false
-            for _ = 1, 3 do
-                local code = log_run({"git", "clone", "--depth", "1", "--branch",
-                    repo_tag, repo_url, checkout_name},
-                    { cwd = temp_dir, no_fail = true })
-                if code == 0 then
-                    cloned = true
-                    break
+            -- Guard the clone and archive creation so that a Ctrl-C removes the
+            -- partial checkout directory instead of leaving it behind.
+            download_guarded(temp_dir, function()
+                -- Retry if there is a network error. It can happen with bad networks.
+                local cloned = false
+                for _ = 1, 3 do
+                    local code = log_run({"git", "clone", "--depth", "1", "--branch",
+                        repo_tag, repo_url, checkout_name},
+                        { cwd = temp_dir, no_fail = true })
+                    if code == 0 then
+                        cloned = true
+                        break
+                    end
+                    util.spawn({"sleep", "2"})
                 end
-                util.spawn({"sleep", "2"})
-            end
-            if not cloned then
-                util.rm_rf(temp_dir)
-                util.fail(5, "error cloning repository " .. repo_url)
-            end
-            util.rm_rf(temp_dir .. "/" .. checkout_name .. "/.git")
-            log_run({"tar", "czf", archive_filename, checkout_name},
-                { cwd = temp_dir, on_error_code = 5,
-                  error_message = "Got invalid archive: " .. archive_filename })
+                if not cloned then
+                    util.rm_rf(temp_dir)
+                    util.fail(5, "error cloning repository " .. repo_url)
+                end
+                util.rm_rf(temp_dir .. "/" .. checkout_name .. "/.git")
+                log_run({"tar", "czf", archive_filename, checkout_name},
+                    { cwd = temp_dir, on_error_code = 5,
+                      error_message = "Got invalid archive: " .. archive_filename })
+            end)
             os.rename(temp_dir .. "/" .. archive_filename,
                 archives_dir .. "/" .. archive_filename)
             util.rm_rf(temp_dir)
