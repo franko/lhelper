@@ -61,6 +61,38 @@ left are the genuinely persistent ones: the `lhelper-packages` registry,
 the per-package `.list` files, the archives/packages/digests caches and
 the build logs. The digest computation was verified to be unchanged.
 
+### Install plans (2026-07-23)
+
+The install orchestration used to compute everything about a package
+twice: on activation `compute_desired_packages` ran every recipe's
+dependencies phase and computed the digests to obtain the desired registry
+lines, then every package actually installed went through
+`library_install`, which re-ran the dependencies phase and recomputed the
+digest against the on-disk registry. Convergence relied on the two
+independent computations producing byte-identical lines, and
+`update_installed_packages` maintained the lhelper-packages file
+incrementally (a two-pointer merge of the old and new line lists, with a
+skip-list to protect just-reinstalled packages) precisely to keep the
+on-disk state in the shape the recomputation needed.
+
+Now the dependencies phase runs once per package: `prepare_install_plan`
+returns an install *plan* (parsed spec, recipe location, declared
+dependencies, usage lines, digest, registry line) and
+`execute_install_plan` builds or reuses the package archive using the
+planned values, so what is registered is exactly what was planned and the
+environment converges by construction. `update_installed_packages` became
+a plain set reconciliation: remove the files of the packages whose line is
+no longer desired, then walk the plans in order, re-registering the
+unchanged ones and installing the missing ones. Creating a new environment
+is the same reconciliation against an empty registry, so `main.lua` no
+longer has its own install loop. Deleted with the change: the merge and
+its skip-list, the registry-line-to-install-arguments conversion
+(`package_of_line`) and the `run_mode` dual dispatch of `library_install`.
+Small behavior deltas: files of removed or changed packages are deleted
+before any install instead of interleaved with them, and the registry is
+rewritten from the plans on every activation (which also heals stray
+lines).
+
 ### Removal of the edit/reload cycle
 
 The interactive `lhelper edit` / `lhelper reload` restart mechanism was

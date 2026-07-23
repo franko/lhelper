@@ -2,12 +2,15 @@
 -- install them into an environment and keep the environment's package list
 -- up to date.
 --
--- The information flow is kept in memory: the recipes' "dependencies"
--- phase returns the declared dependencies and provided virtual packages as
--- Lua values and the desired state of an environment is computed from the
--- build spec without touching the disk. The only files used are the
--- persistent ones: the lhelper-packages registry, the per-package .list
--- files, the archives/packages caches and the build logs.
+-- The unit of work is the install plan: for each requested package the
+-- recipe's "dependencies" phase runs once and everything the install needs
+-- is computed up front — recipe location, declared dependencies, resolved
+-- usage lines, build environment digest and registry line. The plans are
+-- then executed, reusing a saved or remote package archive when possible,
+-- and the registry lines written into the environment are the planned ones,
+-- so the environment always converges to the computed state. The only files
+-- used are the persistent ones: the lhelper-packages registry, the
+-- per-package .list files, the archives/packages caches and the build logs.
 
 local util = require "util"
 local lhsys = require "lhsys"
@@ -464,34 +467,65 @@ local function run_dependencies_phase(recipe_dir, recipe_filename, spec,
     return deps
 end
 
--- Install a library in the active environment. run_mode is "dependencies"
--- or "run". flags: {local_recipe=, rebuild=};
--- args: {package, [version], [options...]}.
--- In "dependencies" mode returns the missing dependencies and the recipe's
--- declarations; in "run" mode the declarations, obtained from a previous
--- "dependencies" call, are passed as the deps argument.
-function installer.library_install(run_mode, flags, args, deps)
-    flags = flags or {}
+-- Prepare the installation of a package: resolve the recipe, run its
+-- "dependencies" phase and compute everything the install needs — the
+-- declared dependencies, the usage lines, the build environment digest and
+-- the registry line — resolving the dependencies against the given
+-- registry lines. The compiler configuration `config` is applied to the
+-- process environment before running the recipe. If some dependencies are
+-- missing they are reported and lhelper exits.
+-- flags: {local_recipe=, rebuild=}; args: {package, [version], [options...]}.
+local function prepare_install_plan(flags, args, registry_lines, config, log_dirname)
     local spec = parse_install_args(args)
-    local package = spec.package
     local recipe_dir, recipe_filename, recipe_version = resolve_recipe(flags, spec)
+    apply_env_config(config)
+    util.setenv("package", spec.package)
+    util.setenv("version", spec.version)
+    local deps = run_dependencies_phase(recipe_dir, recipe_filename, spec,
+        log_dirname, "deps-")
+    local missing = check_dependencies(deps.dependencies, registry_lines)
+    if #missing > 0 then
+        print("Found missing packages:")
+        print("")
+        for _, line in ipairs(missing) do
+            print("- " .. line)
+        end
+        print("")
+        print("The package " .. spec.package ..
+            " cannot be installed due to missing dependencies.")
+        os.exit(1)
+    end
+    local usage_lines = compute_package_list(deps.dependencies, registry_lines)
+    local digest = build_env_digest(config, usage_lines)
+    return {
+        flags = flags,
+        args = args,
+        spec = spec,
+        recipe_dir = recipe_dir,
+        recipe_filename = recipe_filename,
+        recipe_version = recipe_version,
+        deps = deps,
+        usage_lines = usage_lines,
+        digest = digest,
+        package_line = make_package_line(spec, recipe_version, digest),
+    }
+end
 
+-- Execute an install plan in the active environment: reuse a saved or
+-- remote package archive when available, otherwise build the package with
+-- its recipe; then extract the files into the environment and register the
+-- package. The digest and registry line are the planned ones, so what is
+-- registered is exactly what was computed by prepare_install_plan.
+local function execute_install_plan(plan)
+    local flags, spec = plan.flags, plan.spec
+    local package = spec.package
     local env_prefix = getenv("LHELPER_ENV_PREFIX")
     local log_dirname = env_prefix .. "/logs"
-    local config = active_env_config()
-    apply_env_config(config)
+    -- The recipes run so far may have modified CC, CFLAGS and the other
+    -- variables: restart from the environment's configuration.
+    apply_env_config(active_env_config())
     util.setenv("package", package)
     util.setenv("version", spec.version)
-
-    if run_mode == "dependencies" then
-        local recipe_deps = run_dependencies_phase(recipe_dir, recipe_filename,
-            spec, log_dirname, "deps-")
-        local missing = check_dependencies(recipe_deps.dependencies,
-            pkg.registry_lines(env_prefix))
-        return missing, recipe_deps
-    end
-
-    deps = deps or { dependencies = {}, provides = {} }
 
     local options_tag = ""
     if #spec.options > 0 then
@@ -499,9 +533,9 @@ function installer.library_install(run_mode, flags, args, deps)
     end
 
     if #spec.options == 0 then
-        msg("Using recipe version " .. recipe_version)
+        msg("Using recipe version " .. plan.recipe_version)
     else
-        msg("Using recipe version " .. recipe_version ..
+        msg("Using recipe version " .. plan.recipe_version ..
             " with options: " .. table.concat(spec.options, " "))
     end
     if pkg.is_installed(env_prefix, package) then
@@ -516,16 +550,11 @@ function installer.library_install(run_mode, flags, args, deps)
     set_prefix_variables(temp_root)
     util.setenv("CONFIG_PREFIX", spec.package_prefix)
 
-    local usage_lines = compute_package_list(deps.dependencies,
-        pkg.registry_lines(env_prefix))
-    local digest = build_env_digest(config, usage_lines)
-    local package_line = make_package_line(spec, recipe_version, digest)
-
     if installer.show_dependencies then
-        if #usage_lines > 0 then
+        if #plan.usage_lines > 0 then
             msg("The package dependencies are:")
             print("")
-            for _, line in ipairs(usage_lines) do
+            for _, line in ipairs(plan.usage_lines) do
                 msg("* " .. line)
             end
             msg("")
@@ -535,7 +564,7 @@ function installer.library_install(run_mode, flags, args, deps)
     end
 
     local tar_package_filename = string.format("%s%s_%s_%s.tar.gz",
-        package, options_tag, recipe_version, digest)
+        package, options_tag, plan.recipe_version, plan.digest)
     local can_use_saved = not flags.rebuild and not flags.local_recipe and
         not util.starts_with(spec.version, "git-")
     if can_use_saved and util.is_file(package_dir() .. "/" .. tar_package_filename) then
@@ -565,7 +594,7 @@ function installer.library_install(run_mode, flags, args, deps)
         util.write_file(recipe_ctx.log_stdout, "")
         util.write_file(recipe_ctx.log_stderr, "")
         local ok, code, err_msg = recipe.run_recipe(
-            recipe_dir .. "/" .. recipe_filename, recipe_ctx)
+            plan.recipe_dir .. "/" .. plan.recipe_filename, recipe_ctx)
         if not ok then
             recipe_error_report(code, err_msg, package, log_dirname, "")
         end
@@ -602,26 +631,19 @@ function installer.library_install(run_mode, flags, args, deps)
     local filename_list = pkg.package_list_filename(env_prefix, package)
     extract_archive_reloc(tar_package_filename, "__LHELPER_PREFIX__",
         getenv("WIN_INSTALL_PREFIX"), getenv("INSTALL_PREFIX"), filename_list)
-    pkg.register_package(env_prefix, package_line, deps.provides)
+    pkg.register_package(env_prefix, plan.package_line, plan.deps.provides)
     msg("Package \"" .. package .. "\" successfully installed")
 end
 
--- Get the package dependencies first and stop if some of them are missing,
--- then install the package.
+-- Prepare the install plan of a package against the active environment
+-- (stopping if some dependencies are missing), then install it.
 function installer.library_check_and_install(flags, args)
-    local missing, deps = installer.library_install("dependencies", flags, args)
-    if #missing > 0 then
-        print("Found missing packages:")
-        print("")
-        for _, line in ipairs(missing) do
-            print("- " .. line)
-        end
-        print("")
-        print("The package " .. args[1] .. " cannot be installed due to missing dependencies.")
-        os.exit(1)
-    end
+    local env_prefix = getenv("LHELPER_ENV_PREFIX")
+    local plan = prepare_install_plan(flags, args,
+        pkg.registry_lines(env_prefix), active_env_config(),
+        env_prefix .. "/logs")
     msg("Installing the requested package: " .. table.concat(args, " "))
-    installer.library_install("run", flags, args, deps)
+    execute_install_plan(plan)
 end
 
 function installer.library_remove(package)
@@ -638,12 +660,12 @@ end
 -------------------------------------------------------------------------------
 -- desired environment state
 
--- Compute in memory the registry lines an environment should have for a
--- build spec: for each package of the spec, run the recipe's dependencies
--- phase and compute the package's digest, resolving the dependencies
--- against the packages appearing earlier in the spec. No environment is
--- touched or created. Returns the registry lines.
-function installer.compute_desired_packages(build_spec)
+-- Compute the install plans for the packages of a build spec: for each
+-- package of the spec, run the recipe's dependencies phase and compute the
+-- package's digest and registry line, resolving the dependencies against
+-- the packages appearing earlier in the spec. No environment is touched or
+-- created. Exits when some dependencies cannot be satisfied.
+local function compute_install_plans(build_spec)
     local ok, err = env.compute_cpu_flags(build_spec)
     if not ok then
         print("error: " .. err)
@@ -654,136 +676,67 @@ function installer.compute_desired_packages(build_spec)
     -- The recipes' dependencies phase runs with the spec's compiler
     -- configuration in the environment, in isolation (like a subshell).
     local restore_env = util.env_snapshot()
-    apply_env_config(config)
 
     local log_dirname = getenv("LHELPER_TMPDIR")
     local registry_lines = {}
+    local plans = {}
     for _, package_spec in ipairs(build_spec.packages) do
-        local spec = parse_install_args(util.split(package_spec))
-        local recipe_dir, recipe_filename, recipe_version = resolve_recipe({}, spec)
-        local deps = run_dependencies_phase(recipe_dir, recipe_filename, spec,
-            log_dirname, "deps-")
-        local missing = check_dependencies(deps.dependencies, registry_lines)
-        if #missing > 0 then
-            print("Found missing packages:")
-            print("")
-            for _, line in ipairs(missing) do
-                print("- " .. line)
-            end
-            print("")
-            print("The package " .. spec.package ..
-                " cannot be installed due to missing dependencies.")
-            os.exit(1)
+        local plan = prepare_install_plan({}, util.split(package_spec),
+            registry_lines, config, log_dirname)
+        pkg.lines_add(registry_lines, plan.package_line)
+        for _, provide_spec in ipairs(plan.deps.provides) do
+            registry_lines[#registry_lines + 1] =
+                provide_spec .. " : " .. plan.package_line
         end
-        local usage_lines = compute_package_list(deps.dependencies, registry_lines)
-        local digest = build_env_digest(config, usage_lines)
-        local package_line = make_package_line(spec, recipe_version, digest)
-        pkg.lines_add(registry_lines, package_line)
-        for _, provide_spec in ipairs(deps.provides) do
-            registry_lines[#registry_lines + 1] = provide_spec .. " : " .. package_line
-        end
+        plans[#plans + 1] = plan
     end
 
     restore_env()
-    return registry_lines
+    return plans
 end
 
 -------------------------------------------------------------------------------
 -- environment package list update
 
--- Turn a package line from the lhelper-packages file into the install
--- arguments for the same package: remove the recipe revision after "+" in
--- the version and discard the digest.
-local function package_of_line(line)
-    local words = util.split(line)
-    local args = { words[1] }
-    for i = 2, #words - 1 do
-        local w = words[i]
-        if i == #words - 1 then
-            w = w:gsub("%+.*$", "")
-        end
-        args[#args + 1] = w
-    end
-    return args
-end
-
--- Update the list of packages of the currently activated environment to
--- match the desired registry lines (new_list).
-function installer.update_installed_packages(new_list)
+-- Update the currently activated environment to match the given install
+-- plans: remove the files of the packages whose registry line is no longer
+-- desired, install the packages not already present and rebuild the
+-- lhelper-packages registry in the plans' order.
+function installer.update_installed_packages(plans)
     local env_prefix = getenv("LHELPER_ENV_PREFIX")
     local packages_filename = env_prefix .. "/bin/lhelper-packages"
+    local old_lines = util.read_lines(packages_filename)
 
-    -- old_list is the list of the currently installed packages, new_list is
-    -- the list we want to have. We remove or install packages so that we
-    -- match the new list.
-    local old_list = util.read_lines(packages_filename)
+    local desired = {}
+    for _, plan in ipairs(plans) do
+        desired[plan.package_line] = true
+    end
+    -- Remove the files of the packages that are not in the desired state;
+    -- the packages whose registry line changed are reinstalled below.
+    local kept = {}
+    for _, line in ipairs(old_lines) do
+        if not line:find(" : ", 1, true) then
+            if desired[line] then
+                kept[line] = true
+            else
+                pkg.remove_package_files(env_prefix, line:match("^%S+"))
+            end
+        end
+    end
 
     fs_security_delay()
     util.write_file(packages_filename, "")
-    local out = assert(io.open(packages_filename, "a"))
-
-    local newly_installed_packages = {}
-    local function skip_removal(line)
-        local name = line:match("^%S+")
-        return util.contains(newly_installed_packages, name)
-    end
-
-    local i, j = 1, 1
-    local n, m = #new_list, #old_list
-    while i <= n do
-        if new_list[i] == old_list[j] then
-            -- lines match: write the line in lhelper-packages and move on
-            out:write(new_list[i], "\n")
-            out:flush()
-            i = i + 1
-            j = j + 1
+    for _, plan in ipairs(plans) do
+        if kept[plan.package_line] then
+            -- already installed and unchanged: keep the files and
+            -- re-register the package and its virtual packages
+            pkg.register_package(env_prefix, plan.package_line,
+                plan.deps.provides)
         else
-            -- entries do not match: look if the new_list entry is present
-            -- in old_list but later
-            local k, found = j + 1, false
-            while k <= m do
-                if new_list[i] == old_list[k] then
-                    found = true
-                    break
-                end
-                k = k + 1
-            end
-            if found then
-                -- remove all the old_list entries up to the matching one
-                while j < k do
-                    if not skip_removal(old_list[j]) and
-                        not old_list[j]:find(" : ", 1, true) then
-                        pkg.remove_package_files(env_prefix, old_list[j]:match("^%S+"))
-                    end
-                    j = j + 1
-                end
-            else
-                -- The new_list entry is not found: install it.
-                -- NOTE: it adds one or more lines in the lhelper-packages
-                -- file (more than one if the package "provides" some
-                -- virtual packages).
-                if not new_list[i]:find(" : ", 1, true) then
-                    newly_installed_packages[#newly_installed_packages + 1] =
-                        new_list[i]:match("^%S+")
-                    out:close()
-                    installer.library_check_and_install({},
-                        package_of_line(new_list[i]))
-                    out = assert(io.open(packages_filename, "a"))
-                end
-                i = i + 1
-            end
+            msg("Installing the requested package: " ..
+                table.concat(plan.args, " "))
+            execute_install_plan(plan)
         end
-    end
-    out:close()
-    -- Remove any remaining package not present in the new list. Skip the
-    -- packages just installed: they may have been reinstalled above with
-    -- different options and we don't want to remove the new files.
-    while j <= m do
-        if not skip_removal(old_list[j]) and
-            not old_list[j]:find(" : ", 1, true) then
-            pkg.remove_package_files(env_prefix, old_list[j]:match("^%S+"))
-        end
-        j = j + 1
     end
 end
 
@@ -801,23 +754,25 @@ end
 
 -- Load the environment with the given name only if its configuration
 -- matches the build spec. When it matches the environment is activated
--- in-process and its package list updated to the desired one; returns
--- true. Returns false otherwise.
+-- in-process and its packages updated to the spec's install plans; returns
+-- true. Returns false otherwise. The computed plans are returned as the
+-- second value, so the caller can use them to populate a freshly created
+-- environment when no matching one was found.
 function installer.load_matching_env(env_name, env_workdir, build_spec)
     local env_prefix = env_workdir .. "/" .. env_name
     local env_source = env_prefix .. "/bin/activate"
 
-    local desired_lines = installer.compute_desired_packages(build_spec)
+    local plans = compute_install_plans(build_spec)
     local desired_config = env.config_content(build_spec)
 
     if util.is_dir(env_prefix) and
         util.read_file(env_prefix .. "/bin/lhelper-config") == desired_config and
         check_env_root_match(env_source) then
         env.activate_in_process(env_prefix, lhsys.getcwd(), env_name)
-        installer.update_installed_packages(desired_lines)
-        return true
+        installer.update_installed_packages(plans)
+        return true, plans
     end
-    return false
+    return false, plans
 end
 
 return installer

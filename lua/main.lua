@@ -332,8 +332,9 @@ local function activate_command(args)
     end
     build_spec.cpu_type, build_spec.cpu_target = cpu_type, cpu_target
 
-    if not installer.load_matching_env(env_test_name, env_workdir,
-        build_spec) then
+    local env_loaded, install_plans = installer.load_matching_env(
+        env_test_name, env_workdir, build_spec)
+    if not env_loaded then
         -- Create a new environment.
         local env_prefix = env_workdir .. "/" .. env_test_name
         util.rm_rf(env_prefix)
@@ -350,9 +351,7 @@ local function activate_command(args)
         env.create_env(env_spec)
         -- install the packages, with the environment activated
         env.activate_in_process(env_prefix, lhsys.getcwd(), env_test_name)
-        for _, package_spec in ipairs(build_spec.packages) do
-            installer.library_check_and_install({}, util.split(package_spec))
-        end
+        installer.update_installed_packages(install_plans)
     end
 
     if command == "activate" then
