@@ -157,10 +157,6 @@ function pkg.query_lines(lines, package_name, link)
     return pkg.resolve_entry(pkg.lines_query(lines, package_name), link)
 end
 
-function pkg.file_add(filename, package_line)
-    util.write_lines(filename, pkg.lines_add(util.read_lines(filename), package_line))
-end
-
 function pkg.file_remove(filename, package_name)
     local lines = util.read_lines(filename)
     local new_lines = {}
@@ -181,16 +177,24 @@ function pkg.registry_lines(env_prefix)
 end
 
 -- Register an installed package line together with the virtual packages
--- it provides (a list of package specs).
+-- it provides (a list of package specs). The provide lines left by a
+-- previous install of the same package are dropped so a reinstall does
+-- not accumulate duplicate or stale "<virtual> : <package-line>" entries.
 function pkg.register_package(env_prefix, package_line, provides)
-    pkg.file_add(packages_filename(env_prefix), package_line)
-    if provides and #provides > 0 then
-        local f = assert(io.open(packages_filename(env_prefix), "a"))
-        for _, provide_spec in ipairs(provides) do
-            f:write(provide_spec .. " : " .. package_line .. "\n")
+    local filename = packages_filename(env_prefix)
+    local package_name = package_line:match("^%S+")
+    local lines = {}
+    for _, line in ipairs(util.read_lines(filename)) do
+        local pimpl = line:match("^.- : (.*)$")
+        if not (pimpl and pimpl:match("^%S+") == package_name) then
+            lines[#lines + 1] = line
         end
-        f:close()
     end
+    pkg.lines_add(lines, package_line)
+    for _, provide_spec in ipairs(provides or {}) do
+        lines[#lines + 1] = provide_spec .. " : " .. package_line
+    end
+    util.write_lines(filename, lines)
 end
 
 function pkg.unregister_package(env_prefix, package)
