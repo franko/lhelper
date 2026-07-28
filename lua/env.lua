@@ -69,52 +69,84 @@ export BUILD_TYPE="%s"
         spec.cpu_type, spec.cpu_target, spec.build_type)
 end
 
-local function printf_join(fmt, list)
-    local parts = {}
-    for _, item in ipairs(list) do
-        parts[#parts + 1] = string.format(fmt, item)
+-- The environment variables that define an activated environment, as an
+-- ordered list of operations. This is the single source of truth used both
+-- to generate the bash "activate" script (serialize_activation, sourced by
+-- the user's subshell) and to set the same variables in lhelper's own
+-- process (apply_activation, so package builds run inside the environment).
+-- Each entry is { name=, value=, prepend=, default= }:
+--   prepend   the value is prepended to the variable's current content;
+--   default   when the variable is unset this value is used instead of
+--             prepending (only PKG_CONFIG_PATH needs it).
+-- The paths are absolute (abs_prefix inlined) rather than expressed through
+-- a bash "prefix" variable, so the very same entries can be applied
+-- in-process, where no shell expansion happens.
+local function activation_entries(env_root, env_name, abs_prefix, libdir_array)
+    local ldlibpath_var = (util.platform == "darwin") and
+        "DYLD_LIBRARY_PATH" or "LD_LIBRARY_PATH"
+    local ldpaths, pkgconfig_paths = {}, {}
+    for _, libdir in ipairs(libdir_array) do
+        ldpaths[#ldpaths + 1] = abs_prefix .. "/" .. libdir
+        pkgconfig_paths[#pkgconfig_paths + 1] = abs_prefix .. "/" .. libdir .. "/pkgconfig"
     end
-    return table.concat(parts, ":")
+    local pkgconfig_value = table.concat(pkgconfig_paths, ":")
+    return {
+        { name = "PATH", value = abs_prefix .. "/bin", prepend = true },
+        { name = ldlibpath_var, value = table.concat(ldpaths, ":"), prepend = true },
+        -- NOTE: the unset ("default") case keeps a bare relative
+        -- "lib/pkgconfig" entry, carried over verbatim from the original
+        -- implementation.
+        { name = "PKG_CONFIG_PATH", value = pkgconfig_value, prepend = true,
+          default = pkgconfig_value .. ":" .. libdir_array[1] .. "/pkgconfig:" ..
+              abs_prefix .. "/share/pkgconfig" },
+        { name = "CMAKE_PREFIX_PATH", value = abs_prefix },
+        { name = "LHELPER_LIBDIR", value = libdir_array[1] },
+        { name = "LHELPER_PKGCONFIG_RPATH", value = libdir_array[1] .. "/pkgconfig" },
+        { name = "LHELPER_ENV_ROOT", value = env_root },
+        { name = "LHELPER_ENV_PREFIX", value = abs_prefix },
+        { name = "LHELPER_ENV_NAME", value = env_name },
+    }
+end
+
+-- Serialize the activation entries as bash "export" lines.
+local function serialize_activation(entries)
+    local lines = {}
+    for _, e in ipairs(entries) do
+        if e.default then
+            lines[#lines + 1] = string.format(
+                'if [ -z ${%s+x} ]; then\n    export %s="%s"\nelse\n' ..
+                '    export %s="%s${%s:+:}$%s"\nfi',
+                e.name, e.name, e.default, e.name, e.value, e.name, e.name)
+        elseif e.prepend then
+            lines[#lines + 1] = string.format('export %s="%s${%s:+:}$%s"',
+                e.name, e.value, e.name, e.name)
+        else
+            lines[#lines + 1] = string.format('export %s="%s"', e.name, e.value)
+        end
+    end
+    return table.concat(lines, "\n")
+end
+
+-- Apply the activation entries to lhelper's own process environment.
+local function apply_activation(entries)
+    for _, e in ipairs(entries) do
+        if e.default and os.getenv(e.name) == nil then
+            util.setenv(e.name, e.default)
+        elseif e.prepend then
+            local old = os.getenv(e.name)
+            util.setenv(e.name, e.value ..
+                (old and old ~= "" and (":" .. old) or ""))
+        else
+            util.setenv(e.name, e.value)
+        end
+    end
 end
 
 local function activate_script_format(spec, abs_prefix, libdir_array)
-    local libdir = libdir_array[1]
-    local datadir = abs_prefix .. "/share"
-    local pkgconfig_reldir = libdir .. "/pkgconfig"
-    local pkgconfig_path = printf_join("$prefix/%s/pkgconfig", libdir_array)
-    local ldpath = printf_join("$prefix/%s", libdir_array)
-    local ldlibpath_var_name
-    if util.platform == "darwin" then
-        ldlibpath_var_name = "DYLD_LIBRARY_PATH"
-    else
-        ldlibpath_var_name = "LD_LIBRARY_PATH"
-    end
-    local lv = ldlibpath_var_name
-    return string.format([[
-prefix="%s"
-export PATH="$prefix/bin${PATH:+:}$PATH"
-
-export %s="%s${%s:+:}$%s"
-if [ -z ${PKG_CONFIG_PATH+x} ]; then
-    export PKG_CONFIG_PATH="%s:%s/pkgconfig:%s/pkgconfig"
-else
-    export PKG_CONFIG_PATH="%s${PKG_CONFIG_PATH:+:}$PKG_CONFIG_PATH"
-fi
-
-export CMAKE_PREFIX_PATH="$prefix"
-export LHELPER_LIBDIR="%s"
-export LHELPER_PKGCONFIG_RPATH="%s"
-export LHELPER_ENV_ROOT="%s"
-export LHELPER_ENV_PREFIX="$prefix"
-export LHELPER_ENV_NAME="%s"
-
-source "$LHELPER_ENV_PREFIX/bin/lhelper-config"
-]], abs_prefix,
-        lv, ldpath, lv, lv,
-        pkgconfig_path, libdir, datadir,
-        pkgconfig_path,
-        libdir, pkgconfig_reldir,
-        spec.env_root, spec.env_name)
+    local entries = activation_entries(spec.env_root, spec.env_name,
+        abs_prefix, libdir_array)
+    return serialize_activation(entries) ..
+        '\n\nsource "$LHELPER_ENV_PREFIX/bin/lhelper-config"\n'
 end
 
 -- Compute (and store into spec.cpu_flags) the compiler flags for the
@@ -192,34 +224,7 @@ end
 function env.activate_in_process(prefix, env_root, env_name)
     local abs_prefix = util.realpath(prefix)
     local libdir_array = env.default_libdir()
-    local function prepend_path(name, value)
-        local old = os.getenv(name)
-        util.setenv(name, value .. (old and old ~= "" and (":" .. old) or ""))
-    end
-    prepend_path("PATH", abs_prefix .. "/bin")
-
-    local ldlibpath_var = (util.platform == "darwin") and
-        "DYLD_LIBRARY_PATH" or "LD_LIBRARY_PATH"
-    local ldpaths = {}
-    local pkgconfig_paths = {}
-    for _, libdir in ipairs(libdir_array) do
-        ldpaths[#ldpaths + 1] = abs_prefix .. "/" .. libdir
-        pkgconfig_paths[#pkgconfig_paths + 1] = abs_prefix .. "/" .. libdir .. "/pkgconfig"
-    end
-    prepend_path(ldlibpath_var, table.concat(ldpaths, ":"))
-    if os.getenv("PKG_CONFIG_PATH") == nil then
-        util.setenv("PKG_CONFIG_PATH", table.concat(pkgconfig_paths, ":") ..
-            ":" .. libdir_array[1] .. "/pkgconfig:" .. abs_prefix .. "/share/pkgconfig")
-    else
-        prepend_path("PKG_CONFIG_PATH", table.concat(pkgconfig_paths, ":"))
-    end
-
-    util.setenv("CMAKE_PREFIX_PATH", abs_prefix)
-    util.setenv("LHELPER_LIBDIR", libdir_array[1])
-    util.setenv("LHELPER_PKGCONFIG_RPATH", libdir_array[1] .. "/pkgconfig")
-    util.setenv("LHELPER_ENV_ROOT", env_root)
-    util.setenv("LHELPER_ENV_PREFIX", abs_prefix)
-    util.setenv("LHELPER_ENV_NAME", env_name)
+    apply_activation(activation_entries(env_root, env_name, abs_prefix, libdir_array))
 
     -- source lhelper-config
     local config = env.parse_config(abs_prefix .. "/bin/lhelper-config")
