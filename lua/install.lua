@@ -245,8 +245,21 @@ local function check_dependencies(dependencies, registry_lines)
                     print("Error: internal error, package name mismatch.")
                     os.exit(1)
                 elseif rc == 2 then
-                    print("Error: options for installed package " .. dep_name ..
-                        " does not match.")
+                    local function extract_opts(line)
+                        local t = {}
+                        for _, w in ipairs(util.split(line)) do
+                            if util.starts_with(w, "-") then
+                                t[#t + 1] = w
+                            end
+                        end
+                        return table.concat(t, " ")
+                    end
+                    local req = extract_opts(dependency)
+                    local ins = extract_opts(found)
+                    print("Error: options for installed package \"" ..
+                        dep_name .. "\" do not match the required spec.\n" ..
+                        "  Required:  " .. dep_name .. " " .. req .. "\n" ..
+                        "  Installed: " .. dep_name .. " " .. ins)
                     os.exit(1)
                 elseif rc == 3 then
                     print("Error: incompatible version for installed package " ..
