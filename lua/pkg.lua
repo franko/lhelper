@@ -12,6 +12,12 @@ local pkg = {}
 -------------------------------------------------------------------------------
 -- version comparison
 
+-- The number of a version component: its leading digits, so that the
+-- recipe revision of a version like "2.28.5+2" is ignored.
+local function version_number(component)
+    return tonumber((component or ""):match("^%d+")) or 0
+end
+
 -- Compare two dot-separated version strings.
 -- Returns 0 (equal), 1 (a > b) or 2 (a < b), like the bash vercomp.
 function pkg.vercomp(a, b)
@@ -19,8 +25,8 @@ function pkg.vercomp(a, b)
     local va, vb = util.split(a, "."), util.split(b, ".")
     local n = math.max(#va, #vb)
     for i = 1, n do
-        local na = tonumber(va[i]) or 0
-        local nb = tonumber(vb[i]) or 0
+        local na = version_number(va[i])
+        local nb = version_number(vb[i])
         if na > nb then return 1 end
         if na < nb then return 2 end
     end
@@ -67,7 +73,9 @@ local function options_subset(a, b)
 end
 
 -- Test if a package entry, for example "sdl2 -threads -opengl 2.16.0",
--- matches a package spec, for example "sdl2 -opengl >=2.14.0".
+-- matches a package spec, for example "sdl2 -opengl >=2.14.0". The entry
+-- may be a registry line, "<name> [options] <version> <digest>": the
+-- version is the first word after the name and the options.
 -- Returns 0 on match or an error code like the bash implementation:
 -- 1 name mismatch, 2 options mismatch, 3 version mismatch, 100 invalid spec.
 function pkg.test_package_spec(spec_line, entry_line, skip_options)
@@ -95,7 +103,7 @@ function pkg.test_package_spec(spec_line, entry_line, skip_options)
         local a = entry_a[i]
         if util.starts_with(a, "-") then
             entry_options[#entry_options + 1] = a
-        else
+        elseif not entry_version then
             entry_version = a
         end
     end

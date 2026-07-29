@@ -79,7 +79,9 @@ mode. The build is a single C-compiler invocation and takes a few seconds.
   `cc`, `cxx`, `cflags`, `cxxflags`, `ldflags`, `cpu_type`, `cpu_target`,
   `build_type` (`"Release"`/`"Debug"`), and a `packages` list. It runs in a
   restricted sandbox (`getenv`, `os`, `string` only). `lhelper create -e <name>`
-  generates a commented template.
+  generates a commented template. The `packages` list needs only the libraries
+  used directly: missing dependencies are resolved and installed automatically
+  (`resolve_install_plans` in `install.lua`).
 - A **recipe** is a Lua script run with the recipe API in scope (`version`,
   `options`, `platform`, `cpu_type`, `cpu_target`, `build_type` are provided).
   Key functions: `check_commands`, `dependency`/`provides`, `enter_archive`,

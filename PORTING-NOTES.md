@@ -93,6 +93,36 @@ before any install instead of interleaved with them, and the registry is
 rewritten from the plans on every activation (which also heals stray
 lines).
 
+### Automatic dependencies resolution (2026-07-29)
+
+The `packages` list of a spec file used to be the complete list of the
+packages to install, dependencies included: a package requiring something
+not already in the list made lhelper stop with a "Found missing packages"
+report. The dependencies are now resolved automatically. The install plan
+computation was split in two, `begin_install_plan` (recipe lookup and
+dependencies phase) and `complete_install_plan` (usage lines, digest and
+registry line), so that the packages needed by a dependency can be planned
+in between: `resolve_plans_pass` walks the requested packages depth-first,
+adding the dependencies that neither the registry nor a system library
+provides, with the options of the dependency spec, before the package
+requiring them. An explicitly requested package always takes the place of
+an automatically added one, wherever it appears in the list, so the spec
+file no longer has to be in dependency order.
+
+When two packages need the same automatically added dependency with
+different options, the options are accumulated and the whole resolution is
+run again (`resolve_install_plans`); the accumulated set grows strictly at
+every pass, so this terminates. The `install` command resolves the same
+way against the packages of the activated environment. Dependency cycles
+are detected and reported.
+
+Fixed with the change, in `pkg.test_package_spec`: the version of a
+registry line, "<name> [options] <version> <digest>", was taken from its
+*last* word, the digest, so every version-constrained dependency on an
+installed package failed; and `pkg.vercomp` now compares the leading
+number of a version component, so a recipe version like "2.28.5+2"
+compares equal to "2.28.5" instead of lower.
+
 ### Removal of the edit/reload cycle
 
 The interactive `lhelper edit` / `lhelper reload` restart mechanism was

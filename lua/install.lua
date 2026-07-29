@@ -11,6 +11,11 @@
 -- so the environment always converges to the computed state. The only files
 -- used are the persistent ones: the lhelper-packages registry, the
 -- per-package .list files, the archives/packages caches and the build logs.
+--
+-- The requested packages do not need to list their dependencies: the
+-- dependencies that are not explicitly requested and are provided neither
+-- by the environment nor by a system library are added to the plans, before
+-- the package requiring them (see resolve_install_plans).
 
 local util = require "util"
 local lhsys = require "lhsys"
@@ -230,63 +235,76 @@ end
 -------------------------------------------------------------------------------
 -- dependencies
 
--- Check a package's declared dependencies against a package registry
--- (a list of registry lines) and the system libraries. Returns the list
--- of missing dependencies.
-local function check_dependencies(dependencies, registry_lines)
-    local missing = {}
-    for _, dependency in ipairs(dependencies) do
-        if not util.starts_with(dependency, "?") then
-            local dep_name = dependency:match("^%S+")
-            local found = pkg.query_lines(registry_lines, dep_name)
-            if found then
-                local rc = pkg.test_package_spec(dependency, found)
-                if rc == 1 then
-                    print("Error: internal error, package name mismatch.")
-                    os.exit(1)
-                elseif rc == 2 then
-                    local function extract_opts(line)
-                        local t = {}
-                        for _, w in ipairs(util.split(line)) do
-                            if util.starts_with(w, "-") then
-                                t[#t + 1] = w
-                            end
-                        end
-                        return table.concat(t, " ")
-                    end
-                    local req = extract_opts(dependency)
-                    local ins = extract_opts(found)
-                    print("Error: options for installed package \"" ..
-                        dep_name .. "\" do not match the required spec.\n" ..
-                        "  Required:  " .. dep_name .. " " .. req .. "\n" ..
-                        "  Installed: " .. dep_name .. " " .. ins)
-                    os.exit(1)
-                elseif rc == 3 then
-                    print("Error: incompatible version for installed package " ..
-                        dep_name .. ".")
-                    os.exit(1)
-                elseif rc == 100 then
-                    print("Error: Invalid package spec: \"" .. dependency .. "\"")
-                    os.exit(1)
-                end
-                -- otherwise the package is already installed: do nothing
-            else
-                local sys_version = pkg.system_library_version(dep_name)
-                if sys_version then
-                    local entry = dep_name .. " " .. sys_version
-                    if pkg.test_package_spec(dependency, entry, true) ~= 0 then
-                        print("Error: incompatible version for system library " ..
-                            dep_name .. ".")
-                        os.exit(1)
-                    end
-                    -- Using system library
-                else
-                    missing[#missing + 1] = dependency
-                end
-            end
+-- The options, the words starting with "-", of a package spec or of a
+-- registry line.
+local function spec_options(line)
+    local options = {}
+    for _, word in ipairs(util.split(line)) do
+        if util.starts_with(word, "-") then
+            options[#options + 1] = word
         end
     end
-    return missing
+    return options
+end
+
+-- Add to a list of options the ones not already present.
+local function add_options(list, options)
+    for _, option in ipairs(options) do
+        if not util.contains(list, option) then
+            list[#list + 1] = option
+        end
+    end
+    return list
+end
+
+-- Report a dependency spec that the package entry found does not satisfy
+-- and exit. The code rc is the one returned by pkg.test_package_spec.
+local function report_dependency_error(rc, dependency, entry)
+    local dep_name = dependency:match("^%S+")
+    if rc == 1 then
+        print("Error: internal error, package name mismatch.")
+    elseif rc == 2 then
+        print("Error: options for installed package \"" ..
+            dep_name .. "\" do not match the required spec.\n" ..
+            "  Required:  " .. dep_name .. " " ..
+            table.concat(spec_options(dependency), " ") .. "\n" ..
+            "  Installed: " .. dep_name .. " " ..
+            table.concat(spec_options(entry), " "))
+    elseif rc == 3 then
+        print("Error: incompatible version for installed package " ..
+            dep_name .. ".")
+    else
+        print("Error: Invalid package spec: \"" .. dependency .. "\"")
+    end
+    os.exit(1)
+end
+
+-- Check a package's declared dependency against a package registry (a list
+-- of registry lines) and the system libraries. Returns "ok" when the
+-- dependency is already satisfied, "missing" when no package provides it
+-- or, when a package with that name does not satisfy the spec, "mismatch"
+-- with the pkg.test_package_spec code and the registry entry found.
+local function dependency_status(dependency, registry_lines)
+    local dep_name = dependency:match("^%S+")
+    local found = pkg.query_lines(registry_lines, dep_name)
+    if found then
+        local rc = pkg.test_package_spec(dependency, found)
+        if rc ~= 0 then return "mismatch", rc, found end
+        -- the package is already installed: do nothing
+        return "ok"
+    end
+    local sys_version = pkg.system_library_version(dep_name)
+    if sys_version then
+        local entry = dep_name .. " " .. sys_version
+        if pkg.test_package_spec(dependency, entry, true) ~= 0 then
+            print("Error: incompatible version for system library " ..
+                dep_name .. ".")
+            os.exit(1)
+        end
+        -- Using system library
+        return "ok"
+    end
+    return "missing"
 end
 
 -- Compute the list of the packages used by a package: its declared
@@ -385,8 +403,11 @@ end
 
 -- Find the recipe for a package spec and resolve the version when not
 -- given. Fills spec.version and returns recipe_dir, recipe_filename,
--- recipe_version.
-local function resolve_recipe(flags, spec)
+-- recipe_version. When the package is installed to satisfy a dependency
+-- required_by names the package requiring it, for the error messages.
+local function resolve_recipe(flags, spec, required_by)
+    local context = required_by and
+        string.format(" (required by \"%s\")", required_by) or ""
     if flags.local_recipe and not spec.version then
         print("error: version is required for local recipes")
         os.exit(1)
@@ -394,7 +415,8 @@ local function resolve_recipe(flags, spec)
     if not spec.version then
         spec.version = installer.latest_package_version(spec.package)
         if not spec.version then
-            print(string.format("error: cannot find package \"%s\"", spec.package))
+            print(string.format("error: cannot find package \"%s\"%s",
+                spec.package, context))
             os.exit(1)
         end
     end
@@ -402,8 +424,8 @@ local function resolve_recipe(flags, spec)
     local recipe_filename = installer.find_recipe_filename(recipe_dir,
         spec.package, spec.version)
     if not recipe_filename then
-        print(string.format("error: no recipe found for \"%s\" version %s.",
-            spec.package, spec.version))
+        print(string.format("error: no recipe found for \"%s\" version %s%s.",
+            spec.package, spec.version, context))
         os.exit(1)
     end
     local recipe_version = recipe_filename:gsub("^" ..
@@ -480,36 +502,21 @@ local function run_dependencies_phase(recipe_dir, recipe_filename, spec,
     return deps
 end
 
--- Prepare the installation of a package: resolve the recipe, run its
--- "dependencies" phase and compute everything the install needs — the
--- declared dependencies, the usage lines, the build environment digest and
--- the registry line — resolving the dependencies against the given
--- registry lines. The compiler configuration `config` is applied to the
--- process environment before running the recipe. If some dependencies are
--- missing they are reported and lhelper exits.
+-- Start the installation of a package: resolve the recipe and run its
+-- "dependencies" phase, so that the packages it depends on are known. The
+-- compiler configuration `config` is applied to the process environment
+-- before running the recipe. Returns a partial install plan, to be
+-- completed with complete_install_plan once the dependencies are resolved.
 -- flags: {local_recipe=, rebuild=}; args: {package, [version], [options...]}.
-local function prepare_install_plan(flags, args, registry_lines, config, log_dirname)
+local function begin_install_plan(flags, args, config, log_dirname, required_by)
     local spec = parse_install_args(args)
-    local recipe_dir, recipe_filename, recipe_version = resolve_recipe(flags, spec)
+    local recipe_dir, recipe_filename, recipe_version =
+        resolve_recipe(flags, spec, required_by)
     apply_env_config(config)
     util.setenv("package", spec.package)
     util.setenv("version", spec.version)
     local deps = run_dependencies_phase(recipe_dir, recipe_filename, spec,
         log_dirname, "deps-")
-    local missing = check_dependencies(deps.dependencies, registry_lines)
-    if #missing > 0 then
-        print("Found missing packages:")
-        print("")
-        for _, line in ipairs(missing) do
-            print("- " .. line)
-        end
-        print("")
-        print("The package " .. spec.package ..
-            " cannot be installed due to missing dependencies.")
-        os.exit(1)
-    end
-    local usage_lines = compute_package_list(deps.dependencies, registry_lines)
-    local digest = build_env_digest(config, usage_lines)
     return {
         flags = flags,
         args = args,
@@ -518,10 +525,193 @@ local function prepare_install_plan(flags, args, registry_lines, config, log_dir
         recipe_filename = recipe_filename,
         recipe_version = recipe_version,
         deps = deps,
-        usage_lines = usage_lines,
-        digest = digest,
-        package_line = make_package_line(spec, recipe_version, digest),
     }
+end
+
+-- Complete an install plan, once its dependencies are all satisfied by the
+-- given registry lines, with everything else the install needs: the usage
+-- lines, the build environment digest and the package's registry line.
+local function complete_install_plan(plan, registry_lines, config)
+    plan.usage_lines = compute_package_list(plan.deps.dependencies, registry_lines)
+    plan.digest = build_env_digest(config, plan.usage_lines)
+    plan.package_line = make_package_line(plan.spec, plan.recipe_version,
+        plan.digest)
+    return plan
+end
+
+-------------------------------------------------------------------------------
+-- dependencies resolution
+
+-- Maximum number of resolution passes: every pass but the first one is due
+-- to an automatically added package that gained at least one option.
+local RESOLVE_PASSES_LIMIT = 16
+
+-- The install arguments for a dependency spec: the package name, the
+-- options of the spec together with the extra options accumulated for the
+-- package, and the version when the spec requires an exact one.
+local function dependency_install_args(dependency, extra_options)
+    local args = { dependency:match("^%S+") }
+    local options = add_options(spec_options(dependency), extra_options or {})
+    table.sort(options)
+    util.append_all(args, options)
+    for _, word in ipairs(util.split(dependency)) do
+        local exact_version = word:match("^=(%S+)$")
+        if exact_version then args[#args + 1] = exact_version end
+    end
+    return args
+end
+
+-- The package entry of a plan, "<name> [options] <version>", used to check
+-- that the package satisfies the dependency specs requiring it.
+local function plan_entry_line(plan)
+    local coll = { plan.spec.package }
+    util.append_all(coll, plan.spec.options)
+    coll[#coll + 1] = plan.spec.version
+    return table.concat(coll, " ")
+end
+
+-- Resolve the requested packages into an ordered list of install plans, in
+-- a single pass. Each request is a table {args = ..., flags = ...}. The
+-- dependencies satisfied neither by the registry lines nor by a system
+-- library are added to the plans, before the package requiring them, with
+-- the options of the dependency spec plus the ones accumulated for the
+-- package in extra_options. An explicitly requested package is used, and
+-- moved before the packages depending on it, in place of an automatically
+-- added one. When an automatically added package turns out to need more
+-- options than it was given the options are recorded in extra_options and
+-- the pass is abandoned raising a {restart = true} error.
+local function resolve_plans_pass(requested, registry_lines, config,
+        log_dirname, extra_options)
+    local explicit = {}
+    for _, request in ipairs(requested) do
+        explicit[request.args[1]] = request
+    end
+    local lines = util.append_all({}, registry_lines)
+    local plans, planned, resolving, stack = {}, {}, {}, {}
+    local resolve
+
+    -- Satisfy a dependency of the package required_by, adding to the plans
+    -- the package needed for it when there is none.
+    local function satisfy(dependency, required_by)
+        local dep_name = dependency:match("^%S+")
+        local status, rc, entry = dependency_status(dependency, lines)
+        if status == "ok" then return end
+        if status == "mismatch" then
+            local found = planned[dep_name]
+            if rc == 2 and found and found.auto then
+                -- The package was added automatically with too few options:
+                -- accumulate the options of both packages requiring it and
+                -- resolve everything again.
+                local extra = extra_options[dep_name] or {}
+                add_options(extra, spec_options(entry))
+                add_options(extra, spec_options(dependency))
+                extra_options[dep_name] = extra
+                error({ restart = true }, 0)
+            end
+            report_dependency_error(rc, dependency, entry)
+        end
+        local request = explicit[dep_name]
+        local plan = resolve(request or {
+            args = dependency_install_args(dependency, extra_options[dep_name]),
+        }, request == nil, required_by)
+        -- The options of an automatically added package are the required
+        -- ones by construction but its version, the latest one available,
+        -- may not satisfy the dependency spec.
+        local check = pkg.test_package_spec(dependency, plan_entry_line(plan))
+        if check ~= 0 then
+            if plan.auto then
+                print(string.format("error: the available version %s of the " ..
+                    "package \"%s\" does not satisfy the dependency \"%s\" of " ..
+                    "the package \"%s\".", plan.spec.version, dep_name,
+                    dependency, required_by))
+                os.exit(1)
+            end
+            report_dependency_error(check, dependency, plan_entry_line(plan))
+        end
+    end
+
+    -- Add a package to the plans, preceded by the packages needed by its
+    -- dependencies. Returns the package's plan.
+    resolve = function(request, auto, required_by)
+        local name = request.args[1]
+        if planned[name] then return planned[name] end
+        if resolving[name] then
+            print("error: dependency cycle for the package \"" .. name ..
+                "\": " .. table.concat(stack, " -> ") .. " -> " .. name)
+            os.exit(1)
+        end
+        resolving[name] = true
+        stack[#stack + 1] = name
+        local plan = begin_install_plan(request.flags or {}, request.args,
+            config, log_dirname, auto and required_by or nil)
+        plan.auto = auto
+        plan.required_by = required_by
+        for _, dependency in ipairs(plan.deps.dependencies) do
+            if not util.starts_with(dependency, "?") then
+                satisfy(dependency, name)
+            end
+        end
+        resolving[name] = nil
+        stack[#stack] = nil
+        complete_install_plan(plan, lines, config)
+        plans[#plans + 1] = plan
+        planned[name] = plan
+        pkg.lines_add(lines, plan.package_line)
+        for _, provide_spec in ipairs(plan.deps.provides) do
+            lines[#lines + 1] = provide_spec .. " : " .. plan.package_line
+        end
+        return plan
+    end
+
+    for _, request in ipairs(requested) do
+        resolve(request, false)
+    end
+    return plans
+end
+
+-- Resolve the requested packages, {args = ..., flags = ...} tables, into an
+-- ordered list of install plans including the packages needed to satisfy
+-- the dependencies missing from the registry lines. The resolution is
+-- repeated as long as the options of an automatically added package need to
+-- be extended.
+local function resolve_install_plans(requested, registry_lines, config, log_dirname)
+    local extra_options = {}
+    for _ = 1, RESOLVE_PASSES_LIMIT do
+        local ok, result = pcall(resolve_plans_pass, requested, registry_lines,
+            config, log_dirname, extra_options)
+        if ok then return result end
+        if not (type(result) == "table" and result.restart) then
+            error(result, 0)
+        end
+    end
+    print("error: cannot resolve the packages dependencies, giving up after " ..
+        RESOLVE_PASSES_LIMIT .. " attempts.")
+    os.exit(1)
+end
+
+-- Report the packages that were added to satisfy the dependencies.
+local function report_added_packages(plans)
+    local added = {}
+    for _, plan in ipairs(plans) do
+        if plan.auto then added[#added + 1] = plan end
+    end
+    if #added == 0 then return end
+    msg("Packages added to satisfy the dependencies:")
+    msg("")
+    for _, plan in ipairs(added) do
+        msg(string.format("* %s (required by %s)",
+            table.concat(plan.args, " "), plan.required_by))
+    end
+    msg("")
+end
+
+-- The message announcing the install of a package.
+local function install_message(plan)
+    if plan.auto then
+        return "Installing the package \"" .. table.concat(plan.args, " ") ..
+            "\" required by \"" .. plan.required_by .. "\""
+    end
+    return "Installing the requested package: " .. table.concat(plan.args, " ")
 end
 
 -- Execute an install plan in the active environment: reuse a saved or
@@ -648,15 +838,19 @@ local function execute_install_plan(plan)
     msg("Package \"" .. package .. "\" successfully installed")
 end
 
--- Prepare the install plan of a package against the active environment
--- (stopping if some dependencies are missing), then install it.
+-- Prepare the install plan of a package against the active environment,
+-- with the plans of the dependencies the environment does not provide,
+-- then install them all.
 function installer.library_check_and_install(flags, args)
     local env_prefix = getenv("LHELPER_ENV_PREFIX")
-    local plan = prepare_install_plan(flags, args,
+    local plans = resolve_install_plans({ { args = args, flags = flags } },
         pkg.registry_lines(env_prefix), active_env_config(),
         env_prefix .. "/logs")
-    msg("Installing the requested package: " .. table.concat(args, " "))
-    execute_install_plan(plan)
+    report_added_packages(plans)
+    for _, plan in ipairs(plans) do
+        msg(install_message(plan))
+        execute_install_plan(plan)
+    end
 end
 
 function installer.library_remove(package)
@@ -674,10 +868,11 @@ end
 -- desired environment state
 
 -- Compute the install plans for the packages of a build spec: for each
--- package of the spec, run the recipe's dependencies phase and compute the
--- package's digest and registry line, resolving the dependencies against
--- the packages appearing earlier in the spec. No environment is touched or
--- created. Exits when some dependencies cannot be satisfied.
+-- package of the spec, and for each package added to satisfy a dependency,
+-- run the recipe's dependencies phase and compute the package's digest and
+-- registry line. The plans are ordered so that every package comes after
+-- the ones it depends on. No environment is touched or created. Exits when
+-- some dependencies cannot be satisfied.
 local function compute_install_plans(build_spec)
     local ok, err = env.compute_cpu_flags(build_spec)
     if not ok then
@@ -691,20 +886,14 @@ local function compute_install_plans(build_spec)
     local restore_env = util.env_snapshot()
 
     local log_dirname = getenv("LHELPER_TMPDIR")
-    local registry_lines = {}
-    local plans = {}
+    local requested = {}
     for _, package_spec in ipairs(build_spec.packages) do
-        local plan = prepare_install_plan({}, util.split(package_spec),
-            registry_lines, config, log_dirname)
-        pkg.lines_add(registry_lines, plan.package_line)
-        for _, provide_spec in ipairs(plan.deps.provides) do
-            registry_lines[#registry_lines + 1] =
-                provide_spec .. " : " .. plan.package_line
-        end
-        plans[#plans + 1] = plan
+        requested[#requested + 1] = { args = util.split(package_spec), flags = {} }
     end
+    local plans = resolve_install_plans(requested, {}, config, log_dirname)
 
     restore_env()
+    report_added_packages(plans)
     return plans
 end
 
@@ -746,8 +935,7 @@ function installer.update_installed_packages(plans)
             pkg.register_package(env_prefix, plan.package_line,
                 plan.deps.provides)
         else
-            msg("Installing the requested package: " ..
-                table.concat(plan.args, " "))
+            msg(install_message(plan))
             execute_install_plan(plan)
         end
     end

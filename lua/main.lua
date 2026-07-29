@@ -242,6 +242,9 @@ build_type = getenv("BUILD_TYPE") or "Release"
 
 -- List of the libraries to be installed. Each entry is a string with the
 -- library name possibly followed by its options separated by spaces.
+-- The dependencies are added automatically, so only the libraries used
+-- directly need to be listed. A library required by another one is listed
+-- here only to choose its options or its version.
 -- For example:
 -- packages = { "freetype2", "sdl2 -opengl" }
 packages = {

@@ -75,6 +75,44 @@ packages = {
 `lhelper create -e <name>` generates a commented template with the CPU
 targets available for the current machine.
 
+### Dependencies
+
+The `packages` list only needs the libraries used directly: the packages
+required by a recipe and provided neither by a system library nor by the
+list itself are added automatically, and installed before the package
+requiring them. Listing a package explicitly is still useful to choose its
+options or its version: the explicit entry is always used, wherever it
+appears in the list, and the packages depending on it are installed after
+it. When two packages require the same automatically added dependency with
+different options, the union of the options is used.
+
+For example, with the recipes requiring `sdl2 -opengl`, `imgui -largeidx
+-opengl3 -sdl2` and `glad -loader`:
+
+```lua
+packages = {
+    "implot",
+}
+```
+
+installs `sdl2`, `imgui`, `glad` and `implot`, while
+
+```lua
+packages = {
+    "sdl2 -opengl -joystick",
+    "implot",
+}
+```
+
+installs the same packages, with the joystick support added to `sdl2`.
+
+The same happens with `lhelper install <package>` in an activated
+environment: the dependencies missing from the environment are installed
+first. A package already installed with options that do not satisfy a
+requirement is instead reported as an error: rebuilding it with different
+options is done by changing the spec file and activating the environment
+again.
+
 ## Recipes
 
 Recipes are Lua scripts run with the API functions in scope. The variables
