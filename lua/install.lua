@@ -13,9 +13,12 @@
 -- per-package .list files, the archives/packages caches and the build logs.
 --
 -- The requested packages do not need to list their dependencies: the
--- dependencies that are not explicitly requested and are provided neither
--- by the environment nor by a system library are added to the plans, before
--- the package requiring them (see resolve_install_plans).
+-- dependencies that are not explicitly requested and are not provided by
+-- the environment are added to the plans, before the package requiring
+-- them (see resolve_install_plans). A dependency for which lhelper has a
+-- recipe is always installed in the environment; a system library is used
+-- only when no recipe provides the package or when the environment asks
+-- for the system one, with LHELPER_PREFER_SYSTEM_LIBRARIES.
 
 local util = require "util"
 local lhsys = require "lhsys"
@@ -279,12 +282,28 @@ local function report_dependency_error(rc, dependency, entry)
     os.exit(1)
 end
 
+-- The packages for which a system library is used in place of a lhelper
+-- recipe, from the environment's LHELPER_PREFER_SYSTEM_LIBRARIES
+-- configuration variable: "*" for every package, otherwise the package
+-- names separated by spaces. Returns a predicate on a package name.
+local function system_libraries_preference(config)
+    local value = config and config.LHELPER_PREFER_SYSTEM_LIBRARIES or ""
+    if value == "*" then
+        return function() return true end
+    end
+    local names = util.split(value)
+    return function(name) return util.contains(names, name) end
+end
+
 -- Check a package's declared dependency against a package registry (a list
--- of registry lines) and the system libraries. Returns "ok" when the
--- dependency is already satisfied, "missing" when no package provides it
--- or, when a package with that name does not satisfy the spec, "mismatch"
--- with the pkg.test_package_spec code and the registry entry found.
-local function dependency_status(dependency, registry_lines)
+-- of registry lines) and the system libraries. A system library is used
+-- only when no recipe provides the package or when the environment prefers
+-- the system one for it, prefer_system being the predicate returned by
+-- system_libraries_preference. Returns "ok" when the dependency is already
+-- satisfied, "missing" when no package provides it or, when a package with
+-- that name does not satisfy the spec, "mismatch" with the
+-- pkg.test_package_spec code and the registry entry found.
+local function dependency_status(dependency, registry_lines, prefer_system)
     local dep_name = dependency:match("^%S+")
     local found = pkg.query_lines(registry_lines, dep_name)
     if found then
@@ -293,16 +312,19 @@ local function dependency_status(dependency, registry_lines)
         -- the package is already installed: do nothing
         return "ok"
     end
-    local sys_version = pkg.system_library_version(dep_name)
-    if sys_version then
-        local entry = dep_name .. " " .. sys_version
-        if pkg.test_package_spec(dependency, entry, true) ~= 0 then
-            print("Error: incompatible version for system library " ..
-                dep_name .. ".")
-            os.exit(1)
+    if prefer_system(dep_name) or
+        not installer.latest_package_version(dep_name) then
+        local sys_version = pkg.system_library_version(dep_name)
+        if sys_version then
+            local entry = dep_name .. " " .. sys_version
+            if pkg.test_package_spec(dependency, entry, true) ~= 0 then
+                print("Error: incompatible version for system library " ..
+                    dep_name .. ".")
+                os.exit(1)
+            end
+            -- Using system library
+            return "ok"
         end
-        -- Using system library
-        return "ok"
     end
     return "missing"
 end
@@ -572,8 +594,9 @@ end
 
 -- Resolve the requested packages into an ordered list of install plans, in
 -- a single pass. Each request is a table {args = ..., flags = ...}. The
--- dependencies satisfied neither by the registry lines nor by a system
--- library are added to the plans, before the package requiring them, with
+-- dependencies not satisfied by the registry lines, nor by a system
+-- library when one is used for them (see dependency_status), are added to
+-- the plans, before the package requiring them, with
 -- the options of the dependency spec plus the ones accumulated for the
 -- package in extra_options. An explicitly requested package is used, and
 -- moved before the packages depending on it, in place of an automatically
@@ -586,6 +609,7 @@ local function resolve_plans_pass(requested, registry_lines, config,
     for _, request in ipairs(requested) do
         explicit[request.args[1]] = request
     end
+    local prefer_system = system_libraries_preference(config)
     local lines = util.append_all({}, registry_lines)
     local plans, planned, resolving, stack = {}, {}, {}, {}
     local resolve
@@ -594,7 +618,8 @@ local function resolve_plans_pass(requested, registry_lines, config,
     -- the package needed for it when there is none.
     local function satisfy(dependency, required_by)
         local dep_name = dependency:match("^%S+")
-        local status, rc, entry = dependency_status(dependency, lines)
+        local status, rc, entry = dependency_status(dependency, lines,
+            prefer_system)
         if status == "ok" then return end
         if status == "mismatch" then
             local found = planned[dep_name]

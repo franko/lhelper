@@ -77,11 +77,16 @@ mode. The build is a single C-compiler invocation and takes a few seconds.
 
 - A **`.lhelper` spec file** is a plain Lua script setting lowercase variables:
   `cc`, `cxx`, `cflags`, `cxxflags`, `ldflags`, `cpu_type`, `cpu_target`,
-  `build_type` (`"Release"`/`"Debug"`), and a `packages` list. It runs in a
+  `build_type` (`"Release"`/`"Debug"`), `prefer_system_libraries`, and a
+  `packages` list. It runs in a
   restricted sandbox (`getenv`, `os`, `string` only). `lhelper create -e <name>`
   generates a commented template. The `packages` list needs only the libraries
   used directly: missing dependencies are resolved and installed automatically
-  (`resolve_install_plans` in `install.lua`).
+  (`resolve_install_plans` in `install.lua`). A dependency is taken from the
+  system libraries only when no recipe provides it, unless
+  `prefer_system_libraries` (`true` or a list of names) asks otherwise; it is
+  stored in the environment's `lhelper-config` as
+  `LHELPER_PREFER_SYSTEM_LIBRARIES` so that `install` uses it too.
 - A **recipe** is a Lua script run with the recipe API in scope (`version`,
   `options`, `platform`, `cpu_type`, `cpu_target`, `build_type` are provided).
   Key functions: `check_commands`, `dependency`/`provides`, `enter_archive`,

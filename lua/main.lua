@@ -159,9 +159,40 @@ end
 -------------------------------------------------------------------------------
 -- build spec (.lhelper) file handling
 
+-- Normalize the spec's "prefer_system_libraries" value into the string
+-- stored in the environment's configuration: "*" when it is true, the
+-- package names separated by spaces when it is a list of names or a string
+-- of names. The names are sorted so that their order in the spec file does
+-- not change the configuration. Returns nil when the option is not used.
+local function prefer_system_libraries_value(value, build_filename)
+    if value == nil or value == false then return nil end
+    if value == true then return "*" end
+    local names
+    if type(value) == "string" then
+        names = util.split(value)
+    elseif type(value) == "table" then
+        names = {}
+        for _, name in ipairs(value) do
+            if type(name) ~= "string" then
+                names = nil
+                break
+            end
+            names[#names + 1] = name
+        end
+    end
+    if not names then
+        print("error in " .. build_filename .. ": prefer_system_libraries " ..
+            "should be true or a list of package names")
+        os.exit(1)
+    end
+    if #names == 0 then return nil end
+    table.sort(names)
+    return table.concat(names, " ")
+end
+
 -- Load a .lhelper build spec file. The file is a simple Lua script setting
 -- the variables: cc, cxx, cflags, cxxflags, ldflags, cpu_type, cpu_target,
--- build_type and the list "packages".
+-- build_type, prefer_system_libraries and the list "packages".
 local function load_build_spec(build_filename)
     local content, err = util.read_file(build_filename)
     if not content then
@@ -188,6 +219,8 @@ local function load_build_spec(build_filename)
         cpu_type = spec_env.cpu_type,
         cpu_target = spec_env.cpu_target,
         build_type = spec_env.build_type or "Release",
+        prefer_system_libraries = prefer_system_libraries_value(
+            spec_env.prefer_system_libraries, build_filename),
         packages = spec_env.packages or {},
     }
     if spec.build_type ~= "Release" and spec.build_type ~= "Debug" then
@@ -239,6 +272,13 @@ cxx = getenv("CXX") or "g++"
 -- Can be "Release" or "Debug". Debug builds the libraries including debug
 -- information. If omitted it will default to a release build.
 build_type = getenv("BUILD_TYPE") or "Release"
+
+-- A dependency for which lhelper has a recipe is built and installed in the
+-- environment, even when the system provides the same library. Set
+-- prefer_system_libraries to use the system libraries instead: true for
+-- every package or a list of the package names.
+-- For example:
+-- prefer_system_libraries = { "zlib", "openssl" }
 
 -- List of the libraries to be installed. Each entry is a string with the
 -- library name possibly followed by its options separated by spaces.
@@ -350,6 +390,7 @@ local function activate_command(args)
             ldflags = build_spec.ldflags,
             cpu_type = build_spec.cpu_type, cpu_target = build_spec.cpu_target,
             build_type = build_spec.build_type,
+            prefer_system_libraries = build_spec.prefer_system_libraries,
         }
         env.create_env(env_spec)
         -- install the packages, with the environment activated

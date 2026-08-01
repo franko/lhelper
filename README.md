@@ -78,9 +78,9 @@ targets available for the current machine.
 ### Dependencies
 
 The `packages` list only needs the libraries used directly: the packages
-required by a recipe and provided neither by a system library nor by the
-list itself are added automatically, and installed before the package
-requiring them. Listing a package explicitly is still useful to choose its
+required by a recipe and not provided by the list itself are added
+automatically, and installed before the package requiring them. Listing a
+package explicitly is still useful to choose its
 options or its version: the explicit entry is always used, wherever it
 appears in the list, and the packages depending on it are installed after
 it. When two packages require the same automatically added dependency with
@@ -112,6 +112,28 @@ first. A package already installed with options that do not satisfy a
 requirement is instead reported as an error: rebuilding it with different
 options is done by changing the spec file and activating the environment
 again.
+
+### System libraries
+
+A dependency for which lhelper has a recipe is always built and installed
+in the environment, even when the system provides the same library, so that
+the environment does not depend on what happens to be installed on the
+machine. A system library is used only for the packages lhelper has no
+recipe for.
+
+The variable `prefer_system_libraries` asks for the opposite, using the
+system library when there is one and falling back to the recipe otherwise:
+
+```lua
+-- every package, or a list of names: { "zlib", "openssl" }
+prefer_system_libraries = true
+```
+
+The system library version still has to satisfy the requirement of the
+recipe using it, otherwise the install stops with an error. The setting is
+part of the environment configuration, so `lhelper install <package>` in
+the activated environment resolves the dependencies the same way; changing
+it in the spec file recreates the environment.
 
 ## Recipes
 

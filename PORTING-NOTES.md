@@ -93,6 +93,32 @@ before any install instead of interleaved with them, and the registry is
 rewritten from the plans on every activation (which also heals stray
 lines).
 
+### Recipes preferred to the system libraries (2026-08-01)
+
+A dependency provided by a system library used to be taken from the system
+even when lhelper had a recipe for it, so an environment silently depended
+on what was installed on the machine. `dependency_status` now consults the
+system libraries only when the recipes index has no recipe for the package,
+so a missing dependency is installed in the environment whenever lhelper
+can build it. The previous behaviour is available with the spec file's
+`prefer_system_libraries`, `true` for every package or a list of package
+names; when it applies and the system version does not satisfy the
+requirement the install stops with an error, as before, instead of falling
+back to the recipe.
+
+The option is written in the environment's `lhelper-config` as
+`LHELPER_PREFER_SYSTEM_LIBRARIES` ("*" or the names separated by spaces),
+so `library_check_and_install` resolves the dependencies of `lhelper
+install` the same way through `active_env_config()`. The export line is
+written only when the option is used, so the environments created before
+this change still match their configuration file and are not recreated from
+scratch; the names are sorted, so their order in the spec file does not
+change the configuration. Recipe existence alone decides, not the recipe
+version: when the available version does not satisfy the dependency the
+error reporting it is the same as for any other unsatisfiable dependency.
+Optional dependencies ("?name") are unchanged: they are never installed and
+keep using a system library when there is one.
+
 ### Automatic dependencies resolution (2026-07-29)
 
 The `packages` list of a spec file used to be the complete list of the

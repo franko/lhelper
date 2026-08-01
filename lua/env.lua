@@ -43,6 +43,21 @@ function env.parse_config(filename)
     return config
 end
 
+-- The lhelper-config block declaring the packages taken from the system
+-- libraries instead of the lhelper recipes. Written only when the spec asks
+-- for it, so that the environments created without the option keep matching
+-- their configuration file.
+local function prefer_system_format(spec)
+    if not spec.prefer_system_libraries then return "" end
+    return string.format([[
+
+# Packages taken from the system libraries instead of being built from a
+# lhelper recipe: "*" for every package or the package names separated by
+# spaces.
+export LHELPER_PREFER_SYSTEM_LIBRARIES="%s"
+]], spec.prefer_system_libraries)
+end
+
 local function config_format(spec)
     return string.format([[
 # Edit here the compiler variables and flags for this
@@ -64,9 +79,10 @@ export CPU_TARGET="%s"
 
 # Can be Release or Debug
 export BUILD_TYPE="%s"
-]], spec.cc, spec.cxx, spec.cc, spec.cpu_flags, spec.cxx, spec.cpu_flags,
+%s]], spec.cc, spec.cxx, spec.cc, spec.cpu_flags, spec.cxx, spec.cpu_flags,
         spec.cflags or "", spec.cxxflags or "", spec.ldflags or "",
-        spec.cpu_type, spec.cpu_target, spec.build_type)
+        spec.cpu_type, spec.cpu_target, spec.build_type,
+        prefer_system_format(spec))
 end
 
 -- The environment variables that define an activated environment, as an
@@ -181,12 +197,14 @@ function env.spec_config(spec)
         CPU_TYPE = spec.cpu_type,
         CPU_TARGET = spec.cpu_target,
         BUILD_TYPE = spec.build_type,
+        LHELPER_PREFER_SYSTEM_LIBRARIES = spec.prefer_system_libraries,
     }
 end
 
 -- Create an environment: directories, lhelper-config and activate script.
 -- spec: {env_name=, prefix=, env_source=, cc=, cxx=,
---        cflags=, cxxflags=, ldflags=, cpu_type=, cpu_target=, build_type=}
+--        cflags=, cxxflags=, ldflags=, cpu_type=, cpu_target=, build_type=,
+--        prefer_system_libraries=}
 function env.create_env(spec)
     local ok, err = env.compute_cpu_flags(spec)
     if not ok then
