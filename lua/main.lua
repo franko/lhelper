@@ -199,7 +199,7 @@ local function load_build_spec(build_filename)
         print("error: cannot read the file " .. build_filename)
         os.exit(1)
     end
-    local spec_env = { getenv = os.getenv, os = os, string = string }
+    local spec_env = { getenv = os.getenv, os = os, string = string, platform = util.platform }
     local chunk, load_err = load(content, "@" .. build_filename, "t", spec_env)
     if not chunk then
         print("error loading " .. build_filename .. ": " .. load_err)
