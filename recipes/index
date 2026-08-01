@@ -5,3 +5,4 @@ cereal 1.3.2
 glad 0.1.36
 imgui 1.92.8-1
 implot 1.0
+pcre2 10.39
