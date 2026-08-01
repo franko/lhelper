@@ -67,6 +67,23 @@ sh install.sh <prefix>
 There is **no test suite** and **no CI** — verify changes by running the binary in dev
 mode. The build is a single C-compiler invocation and takes a few seconds.
 
+### Sandboxed testing: `tools/lhtest`
+
+Dev mode as written above writes `var/lhelper` into the repo and reads the real
+`~/.config/lhelper/config`. `tools/lhtest` runs the same binary with `HOME` faked and
+`LHELPER_LUA_DIR` pointed at a sandbox tree that symlinks `lua/`, `recipes/` and
+`patch/` — so edits take effect immediately, the repo stays clean, and no upload key
+is ever in scope. The sandbox persists between invocations; `--fresh` resets it.
+
+```sh
+tools/lhtest create test --packages freetype2   # sandboxed run
+tools/lhtest -f -b create test.lhelper          # rebuild + fresh sandbox
+tools/lhtest sh 'cat test.lhelper'              # inspect results in the sandbox
+tools/lhtest -t <other-checkout> list recipes   # run against another tree
+tools/lhtest -i create demo                     # test the installed layout
+tools/lhtest env | path | reset                 # env lines / location / wipe
+```
+
 ## Commands (see `lua/main.lua`)
 
 `create` / `activate` (with `-e`/`--edit`, `--packages`), `install`
@@ -131,5 +148,6 @@ Windows `spawn`, and the temp dir. See "Known gaps" in PORTING-NOTES.md.
 SSH upload key** (`LH_SSH_KEY_PATH` / `LH_SSH_KEY_PORT`). Building packages can upload
 the results to lhelper.cc. When running builds for testing, **fake `HOME`** (or
 otherwise ensure no config with an SSH key is picked up) so nothing is uploaded to the
-real server. Avoid the `register key` command and anything that triggers remote upload
-unless the user explicitly asks for it.
+real server. Use `tools/lhtest`, which does this by construction. Avoid the
+`register key` command and anything that triggers remote upload unless the user
+explicitly asks for it.

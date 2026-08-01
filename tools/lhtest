@@ -1,0 +1,156 @@
+#!/bin/sh
+# lhtest — run lhelper inside an isolated sandbox for development testing.
+#
+# Two things have to be arranged for every dev test, and they are easy to get
+# wrong by hand:
+#
+#   HOME              faked, so ~/.config/lhelper/config — which holds the real
+#                     lhelper.cc SSH upload key on the maintainer's machine — is
+#                     never read and no build can upload anything (see AGENTS.md).
+#   LHELPER_LUA_DIR   pointed at <sandbox>/tree/lua, so LHELPER_WORKING_DIR
+#                     becomes <sandbox>/tree/var/lhelper instead of <repo>/var.
+#                     lua/, recipes/ and patch/ are symlinked from the source
+#                     tree, so edits to them take effect with no copy step.
+#
+# The sandbox persists between invocations (shell state does not), so a sequence
+# of runs shares one environment. Use --fresh to start clean.
+
+set -e
+
+usage() {
+    cat <<'EOF'
+usage: tools/lhtest [options] [--] <lhelper arguments>
+       tools/lhtest [options] sh '<shell command>'
+       tools/lhtest [options] env | path | reset
+
+Runs ./build/lhelper with a faked HOME and a sandboxed working directory.
+
+Subcommands:
+  <args>...       run lhelper with these arguments (default)
+  sh '<cmd>'      run an arbitrary shell command inside the sandbox environment
+  env             print the export lines for the sandbox environment
+  path            print the sandbox directory
+  reset           delete the sandbox and exit
+
+Options:
+  -f, --fresh          wipe the sandbox before running
+  -p, --project NAME   project subdirectory used as cwd (default: p1)
+  -t, --tree DIR       source tree providing lua/recipes/patch (default: repo root)
+  -e, --exe PATH       lhelper binary to run (default: <repo>/build/lhelper)
+  -s, --sandbox DIR    sandbox location (default: $LHTEST_DIR or $TMPDIR/lhtest)
+  -b, --build          run `sh build.sh` in the repo first
+  -i, --installed      `sh install.sh <sandbox>/prefix` first, then test that
+                       installed copy (installed mode: LHELPER_LUA_DIR unset)
+  -q, --quiet          do not print the sandbox banner
+  -h, --help           this message
+
+Examples:
+  tools/lhtest create test --packages freetype2       # sandboxed create
+  tools/lhtest -f -b create test.lhelper              # rebuild, fresh sandbox
+  tools/lhtest list recipes
+  tools/lhtest sh 'cat test.lhelper; ls .lhelper'     # inspect the result
+  tools/lhtest -t /path/to/old/checkout create test   # run against another tree
+  tools/lhtest -i create demo                         # test the installed layout
+  eval "$(tools/lhtest env)"                          # set up an interactive shell
+EOF
+}
+
+repo=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+
+fresh=0
+build=0
+installed=0
+quiet=0
+project=p1
+tree=$repo
+exe=
+tmpdir=${TMPDIR:-/tmp}          # on macOS this ends with a slash
+sandbox=${LHTEST_DIR:-${tmpdir%/}/lhtest}
+
+while [ $# -gt 0 ]; do
+    case $1 in
+        -f|--fresh)     fresh=1 ;;
+        -b|--build)     build=1 ;;
+        -i|--installed) installed=1 ;;
+        -q|--quiet)     quiet=1 ;;
+        -p|--project)   project=$2; shift ;;
+        -t|--tree)      tree=$(CDPATH= cd -- "$2" && pwd); shift ;;
+        -e|--exe)       exe=$2; shift ;;
+        -s|--sandbox)   sandbox=$2; shift ;;
+        -h|--help)      usage; exit 0 ;;
+        --)             shift; break ;;
+        -*)             echo "lhtest: unknown option $1" >&2; usage >&2; exit 2 ;;
+        *)              break ;;
+    esac
+    shift
+done
+
+sandbox=${sandbox%/}
+case $sandbox in
+    ""|/|"$HOME") echo "lhtest: refusing to use '$sandbox' as sandbox" >&2; exit 2 ;;
+esac
+
+if [ "$1" = reset ]; then
+    rm -rf "$sandbox"
+    echo "lhtest: removed $sandbox"
+    exit 0
+fi
+if [ "$1" = path ]; then
+    echo "$sandbox"
+    exit 0
+fi
+
+[ "$fresh" = 1 ] && rm -rf "$sandbox"
+[ "$build" = 1 ] && (cd "$repo" && sh build.sh)
+
+# sandbox layout: home/ (fake HOME), tree/ (symlinked source + var/), proj/<name>/
+mkdir -p "$sandbox/home" "$sandbox/tree" "$sandbox/proj/$project"
+for d in lua recipes patch; do
+    [ -d "$tree/$d" ] && ln -sfn "$tree/$d" "$sandbox/tree/$d"
+done
+
+if [ "$installed" = 1 ]; then
+    (cd "$repo" && sh install.sh "$sandbox/prefix")
+    : "${exe:=$sandbox/prefix/bin/lhelper}"
+    lua_dir=                        # installed mode resolves <prefix>/share/lhelper/lua
+else
+    : "${exe:=$repo/build/lhelper}"
+    lua_dir=$sandbox/tree/lua
+fi
+
+if [ ! -x "$exe" ]; then
+    echo "lhtest: $exe not found or not executable (run with --build?)" >&2
+    exit 1
+fi
+
+if [ "$1" = env ]; then
+    echo "export HOME='$sandbox/home'"
+    [ -n "$lua_dir" ] && echo "export LHELPER_LUA_DIR='$lua_dir'"
+    echo "export PATH='$(dirname -- "$exe")':\"\$PATH\""
+    echo "cd '$sandbox/proj/$project'"
+    exit 0
+fi
+
+[ "$quiet" = 1 ] || echo "lhtest: sandbox=$sandbox project=$project exe=$exe" >&2
+
+cd "$sandbox/proj/$project"
+
+# HOME is deliberately left without a .config/lhelper: no SSH key means no upload.
+# In installed mode LHELPER_LUA_DIR must be *absent*, not empty: main.lua treats
+# an empty string as set and would fall back to dev-mode paths.
+run_in_sandbox() {
+    if [ -n "$lua_dir" ]; then
+        exec env HOME="$sandbox/home" LHELPER_LUA_DIR="$lua_dir" \
+            PATH="$(dirname -- "$exe"):$PATH" "$@"
+    else
+        exec env -u LHELPER_LUA_DIR HOME="$sandbox/home" \
+            PATH="$(dirname -- "$exe"):$PATH" "$@"
+    fi
+}
+
+if [ "$1" = sh ]; then
+    [ -n "$2" ] || { echo "lhtest: sh needs a command" >&2; exit 2; }
+    run_in_sandbox sh -c "$2"
+fi
+
+run_in_sandbox "$exe" "$@"
