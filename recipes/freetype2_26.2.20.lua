@@ -83,6 +83,6 @@ if not release_ver then
     fail_config("error: unknown release number for freetype2: " .. version)
 end
 
-enter_archive("http://download.savannah.gnu.org/releases/freetype/freetype-" ..
+enter_archive("https://download.savannah.gnu.org/releases/freetype/freetype-" ..
     release_ver .. ".tar.gz")
 build_and_install("configure", table.unpack(opts))
