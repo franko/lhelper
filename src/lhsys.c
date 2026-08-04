@@ -46,7 +46,9 @@ static int l_mkdir(lua_State *L) {
 #else
     int rc = mkdir(path, 0777);
 #endif
-    if (rc != 0) return push_errno(L, path);
+    if (rc != 0 && errno != EEXIST) {
+        return push_errno(L, path);
+    }
     lua_pushboolean(L, 1);
     return 1;
 }
