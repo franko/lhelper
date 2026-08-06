@@ -8,14 +8,15 @@ description: Use when creating or editing an lhelper build specification file (.
 A `.lhelper` file is a Lua script that declares the compiler toolchain,
 compiler/linker flags, CPU target, build type, system-library preference, and
 the list of packages for an lhelper *environment*. lhelper reads this file
-when you run `lhelper create <name>` or `lhelper activate <name>`.
+when you run `lhelper build <name>` or `lhelper activate <name>`.
 
 ## Where spec files live
 
 Spec files can be placed anywhere. The convention is `<name>.lhelper`. When
-you run `lhelper create myproject`, lhelper looks for `myproject.lhelper` in
-the current directory; if it doesn't exist, it generates a commented template
-(with `-e` it also opens an editor). The environment's working data
+you run `lhelper build myproject`, lhelper looks for `myproject.lhelper` in
+the current directory and stops with an error if it doesn't exist:
+`lhelper init myproject` generates a commented template (with `-e` it also
+opens an editor). The environment's working data
 (built packages, logs, digest) lives in a `.lhelper/` directory next to the
 spec file.
 
@@ -186,7 +187,7 @@ means the spec is valid but a pinned version has no matching recipe file.
 
 ## Template generation
 
-Run `lhelper create -e <name>` to generate a fully commented template and open
+Run `lhelper init -e <name>` to generate a fully commented template and open
 it in your editor. The template lists every supported variable with
 explanations and commented-out examples. Use this as a starting point.
 
