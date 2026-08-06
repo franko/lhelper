@@ -235,7 +235,7 @@ rm -rf /tmp/fakehome && mkdir -p /tmp/fakehome
 HOME=/tmp/fakehome \
 LHELPER_LUA_DIR="$PWD/lua" \
 LHELPER_ENV_ROOT=/tmp/lh-test \
-./build/lhelper create /tmp/lh-test/test.lhelper
+./build/lhelper build /tmp/lh-test/test.lhelper
 ```
 
 A successful run prints `Package "<package>" successfully installed`. Check

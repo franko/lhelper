@@ -76,19 +76,31 @@ Dev mode as written above writes `var/lhelper` into the repo and reads the real
 is ever in scope. The sandbox persists between invocations; `--fresh` resets it.
 
 ```sh
-tools/lhtest create test --packages freetype2   # sandboxed run
-tools/lhtest -f -b create test.lhelper          # rebuild + fresh sandbox
+tools/lhtest init test --packages freetype2     # write the spec file
+tools/lhtest build test                         # build the environment
+tools/lhtest -f -b build test.lhelper           # rebuild + fresh sandbox
 tools/lhtest sh 'cat test.lhelper'              # inspect results in the sandbox
 tools/lhtest -t <other-checkout> list recipes   # run against another tree
-tools/lhtest -i create demo                     # test the installed layout
+tools/lhtest -i build demo                      # test the installed layout
 tools/lhtest env | path | reset                 # env lines / location / wipe
 ```
 
 ## Commands (see `lua/main.lua`)
 
-`create` / `activate` (with `-e`/`--edit`, `--packages`), `install`
-(`--local`, `--rebuild`), `remove`, `list (files|packages|recipes)`, `update recipes`,
-`register key <ssh-key> <port>`, `env-source`, `cleanup`, `dir`.
+`init` (with `-e`/`--edit`, `--packages`) writes the spec file from the
+template, `build` / `activate` (with `-e`/`--edit`, `--show-dependencies`)
+create or update the environment, `activate` also starts a subshell.
+`create` is a deprecated alias of `build`.
+
+`env-source` prints the path of the environment's activate script (only the
+path on stdout, every message on stderr, since it is used inside a command
+substitution) and `shell-init` prints the shell function of
+`lhelper-shell-init.sh`, which adds the `source` command activating an
+environment in the current shell.
+
+Also: `install` (`--local`, `--rebuild`), `remove`,
+`list (files|packages|recipes)`, `update recipes`,
+`register key <ssh-key> <port>`, `cleanup`, `dir`.
 
 ## Spec files and recipes
 
@@ -96,7 +108,7 @@ tools/lhtest env | path | reset                 # env lines / location / wipe
   `cc`, `cxx`, `cflags`, `cxxflags`, `ldflags`, `cpu_type`, `cpu_target`,
   `build_type` (`"Release"`/`"Debug"`), `prefer_system_libraries`, and a
   `packages` list. It runs in a
-  restricted sandbox (`getenv`, `os`, `string` only). `lhelper create -e <name>`
+  restricted sandbox (`getenv`, `os`, `string` only). `lhelper init -e <name>`
   generates a commented template. The `packages` list needs only the libraries
   used directly: missing dependencies are resolved and installed automatically
   (`resolve_install_plans` in `install.lua`). A dependency is taken from the

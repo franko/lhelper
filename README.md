@@ -27,6 +27,9 @@ compiler flags.
   - `util.lua` — filesystem/process/string helpers
 - `recipes/` — the Lua recipes (currently freetype2 and sdl2) and the
   `index` file with the latest version of each package.
+- `lhelper-bash-init` — the init file of the `activate` subshell.
+- `lhelper-shell-init.sh` — the shell function printed by `shell-init`,
+  adding the `source` command to lhelper.
 
 The former C helper tools (`lh-path-replace`, `lh-sort`, `lh-cmp`,
 `lh-realpath`) are absorbed by the Lua code. GNU sed, awk and md5sum are no
@@ -54,6 +57,51 @@ LHELPER_LUA_DIR="$PWD/lua" ./build/lhelper <command> ...
 In this mode the repository directory itself is used as prefix (the working
 data goes in `./var/lhelper`).
 
+## Using an environment
+
+An environment is described by a spec file and lives in the `.lhelper`
+directory next to it. Three commands cover its life cycle:
+
+```sh
+lhelper init <name>      # write <name>.lhelper from a commented template
+lhelper build <name>     # create or update the environment, install packages
+lhelper activate <name>  # build if needed, then start a subshell using it
+```
+
+`build` is idempotent: it does nothing when the environment already matches
+the spec file, so it is cheap to run before every build. It never writes the
+spec file, `init` does that.
+
+### In the current shell
+
+`activate` starts a subshell, which is not what a script or a CI job wants.
+Adding to your `~/.bashrc` or `~/.zshrc`:
+
+```sh
+eval "$(lhelper shell-init)"
+```
+
+defines a shell function providing the `source` command, which activates the
+environment in the shell you are already in:
+
+```sh
+lhelper source <name>       # activate in the current shell
+lhelper source -b <name>    # build it first, then activate
+```
+
+Every other command is passed unchanged to the lhelper executable, so the
+function can simply replace lhelper in your shell.
+
+Without the shell integration the same is done with the `env-source`
+command, which prints the path of the environment's activate script:
+
+```sh
+source $(lhelper env-source <name>)
+```
+
+`env-source` writes only the path on stdout, and its messages on stderr, so
+a failure inside the command substitution stays visible.
+
 ## The spec file (.lhelper)
 
 The build spec file is now a simple Lua script:
@@ -72,8 +120,8 @@ packages = {
 }
 ```
 
-`lhelper create -e <name>` generates a commented template with the CPU
-targets available for the current machine.
+`lhelper init -e <name>` generates a commented template with the CPU targets
+available for the current machine and opens it in your editor.
 
 ### Dependencies
 
@@ -110,7 +158,7 @@ The same happens with `lhelper install <package>` in an activated
 environment: the dependencies missing from the environment are installed
 first. A package already installed with options that do not satisfy a
 requirement is instead reported as an error: rebuilding it with different
-options is done by changing the spec file and activating the environment
+options is done by changing the spec file and building the environment
 again.
 
 ### System libraries

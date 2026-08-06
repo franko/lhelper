@@ -45,12 +45,13 @@ Options:
   -h, --help           this message
 
 Examples:
-  tools/lhtest create test --packages freetype2       # sandboxed create
-  tools/lhtest -f -b create test.lhelper              # rebuild, fresh sandbox
+  tools/lhtest init test --packages freetype2         # write the spec file
+  tools/lhtest build test                             # build the environment
+  tools/lhtest -f -b build test.lhelper               # rebuild, fresh sandbox
   tools/lhtest list recipes
   tools/lhtest sh 'cat test.lhelper; ls .lhelper'     # inspect the result
-  tools/lhtest -t /path/to/old/checkout create test   # run against another tree
-  tools/lhtest -i create demo                         # test the installed layout
+  tools/lhtest -t /path/to/old/checkout build test    # run against another tree
+  tools/lhtest -i build demo                          # test the installed layout
   eval "$(tools/lhtest env)"                          # set up an interactive shell
 EOF
 }
@@ -107,6 +108,11 @@ fi
 mkdir -p "$sandbox/home" "$sandbox/tree" "$sandbox/proj/$project"
 for d in lua recipes patch; do
     [ -d "$tree/$d" ] && ln -sfn "$tree/$d" "$sandbox/tree/$d"
+done
+# The runtime files lhelper resolves from <lhelper_dir>, the parent of lua/:
+# the activate subshell init file and the shell integration function.
+for f in lhelper-bash-init lhelper-shell-init.sh; do
+    [ -f "$tree/$f" ] && ln -sfn "$tree/$f" "$sandbox/tree/$f"
 done
 
 if [ "$installed" = 1 ]; then

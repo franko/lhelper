@@ -11,6 +11,26 @@ local command_name = util.basename(arg[0] or "lhelper")
 
 if #arg < 1 then
     print(string.format("Usage: %s <command> [<other options>]", command_name))
+    print("")
+    print("Environment commands:")
+    print("  init <spec-filename>        create a build spec file from a template")
+    print("  build <spec-filename>       create or update the environment")
+    print("  activate <spec-filename>    build the environment and start a subshell")
+    print("  source <spec-filename>      activate the environment in the current")
+    print("                              shell, needs the shell integration")
+    print("  env-source <spec-filename>  print the path of the activate script")
+    print("  shell-init                  print the shell integration function")
+    print("")
+    print("Package commands:")
+    print("  install <library-name> [version]")
+    print("  remove <library-name>")
+    print("  list (files|packages|recipes) [package]")
+    print("  update recipes")
+    print("")
+    print("Other commands:")
+    print("  register key <ssh-key-filename> <port-number>")
+    print("  cleanup")
+    print("  dir")
     os.exit(1)
 end
 
@@ -297,15 +317,26 @@ packages = {
 end
 
 -------------------------------------------------------------------------------
--- create / activate command
+-- init / build / activate commands
 
-local function activate_command(args)
-    local command = args[1]
+-- The spec file name given on the command line is used as it is when it
+-- names an existing file, otherwise the ".lhelper" suffix is added.
+local function spec_filename(name)
+    if not util.is_file(name) and not util.ends_with(name, ".lhelper") then
+        return name .. ".lhelper"
+    end
+    return name
+end
+
+-- Write a build spec file from the template. Does not overwrite an existing
+-- file: the environment is built with "build" or "activate".
+local function init_command(args)
+    local usage = string.format(
+        "Usage: %s init [-e] [--packages <name>...] <spec-filename>", command_name)
     if #args < 2 then
-        print(string.format("Usage: %s activate [options] <spec-filename>", command_name))
+        io.stderr:write(usage .. "\n")
         os.exit(1)
     end
-    installer.lib_install_mode = "verbose"
     local edit_file = false
     local build_filename
     local ini_packages = {}
@@ -314,46 +345,102 @@ local function activate_command(args)
         local a = args[i]
         if a == "-e" or a == "--edit" then
             edit_file = true
-        elseif a == "--show-dependencies" then
-            installer.show_dependencies = true
         elseif a == "--packages" then
             for k = i + 1, #args do
                 ini_packages[#ini_packages + 1] = args[k]
             end
             break
         elseif util.starts_with(a, "-") then
-            print("error: unknown option " .. a)
+            io.stderr:write("error: unknown option " .. a .. "\n")
+            io.stderr:write(usage .. "\n")
             os.exit(1)
         else
             if build_filename then
-                print("error: multiple package names")
+                io.stderr:write("error: multiple spec file names\n")
                 os.exit(1)
             end
             build_filename = a
         end
         i = i + 1
     end
-
-    if not util.is_file(build_filename) and
-        not util.ends_with(build_filename, ".lhelper") then
-        build_filename = build_filename .. ".lhelper"
+    if not build_filename then
+        io.stderr:write("error: no spec file name given\n")
+        io.stderr:write(usage .. "\n")
+        os.exit(1)
     end
-    local build_basename = util.basename(build_filename)
 
-    local cpu_type_guess, cpu_target_guess, cpu_help = cpu.guess()
-
-    if (edit_file or command == "create") and not util.is_file(build_filename) then
+    build_filename = spec_filename(build_filename)
+    if util.is_file(build_filename) then
+        print(string.format("The file %s already exists, leaving it unchanged.",
+            build_filename))
+    else
+        local cpu_type_guess, cpu_target_guess, cpu_help = cpu.guess()
         util.write_file(build_filename, spec_template(cpu_type_guess,
             cpu_target_guess, cpu_help, ini_packages))
+        print("Created " .. build_filename)
     end
     if edit_file then
         run_editor(build_filename)
     end
-    if command == "activate" and not util.is_file(build_filename) then
-        print(string.format("error: the file %s does not exist or is not a file",
-            build_filename))
+    local env_name = util.basename(build_filename):gsub("%.lhelper$", "")
+    print(string.format("Use \"%s build %s\" to create the environment.",
+        command_name, env_name))
+end
+
+-- Create or update the environment described by the spec file. With the
+-- "activate" command a subshell using the environment is started as well.
+local function build_command(args)
+    local command = args[1]
+    local usage = string.format("Usage: %s %s [options] <spec-filename>",
+        command_name, command)
+    if #args < 2 then
+        io.stderr:write(usage .. "\n")
         os.exit(1)
     end
+    installer.lib_install_mode = "verbose"
+    local edit_file = false
+    local build_filename
+    local i = 2
+    while i <= #args do
+        local a = args[i]
+        if a == "-e" or a == "--edit" then
+            edit_file = true
+        elseif a == "--show-dependencies" then
+            installer.show_dependencies = true
+        elseif util.starts_with(a, "-") then
+            io.stderr:write("error: unknown option " .. a .. "\n")
+            io.stderr:write(usage .. "\n")
+            os.exit(1)
+        else
+            if build_filename then
+                io.stderr:write("error: multiple spec file names\n")
+                os.exit(1)
+            end
+            build_filename = a
+        end
+        i = i + 1
+    end
+    if not build_filename then
+        io.stderr:write("error: no spec file name given\n")
+        io.stderr:write(usage .. "\n")
+        os.exit(1)
+    end
+
+    build_filename = spec_filename(build_filename)
+    local build_basename = util.basename(build_filename)
+
+    if not util.is_file(build_filename) then
+        io.stderr:write(string.format(
+            "error: the file %s does not exist or is not a file\n", build_filename))
+        io.stderr:write(string.format("Use \"%s init %s\" to create it.\n",
+            command_name, (build_basename:gsub("%.lhelper$", ""))))
+        os.exit(1)
+    end
+    if edit_file then
+        run_editor(build_filename)
+    end
+
+    local cpu_type_guess, cpu_target_guess = cpu.guess()
 
     local build_realpath = util.realpath(build_filename)
     local env_workdir = util.dirname(build_realpath) .. "/.lhelper"
@@ -424,23 +511,34 @@ local function install_command(args)
     installer.library_check_and_install(flags, install_args)
 end
 
+-- Print the path of the environment's activate script. The path is the only
+-- thing written on stdout: this command is meant to be used inside a command
+-- substitution, source $(lhelper env-source <name>), so any other message
+-- goes to stderr.
 local function env_source_command(args)
     if #args ~= 2 then
-        print(string.format("Usage: %s env-source <spec-filename>", command_name))
+        io.stderr:write(string.format("Usage: %s env-source <spec-filename>\n",
+            command_name))
         os.exit(1)
     end
     local env_name = args[2]:gsub("%.lhelper$", "")
     local env_root = os.getenv("LHELPER_ENV_ROOT")
     local env_dir = (env_root and (env_root .. "/") or "") .. ".lhelper"
-    if util.is_file(env_name .. ".lhelper") and
-        util.is_dir(env_dir .. "/" .. env_name .. "/bin") then
-        print(env_dir .. "/" .. env_name .. "/bin/activate")
-    else
-        print("error: invalid environment name: " .. args[2])
-        print("The spec file \"" .. env_name .. ".lhelper\" does not exit or the environment")
-        print("is not yet created. You may need to run the \"create\" command.")
+    if not util.is_file(env_name .. ".lhelper") then
+        io.stderr:write(string.format(
+            "error: the spec file \"%s.lhelper\" does not exist\n", env_name))
+        io.stderr:write(string.format("Use \"%s init %s\" to create it.\n",
+            command_name, env_name))
         os.exit(1)
     end
+    if not util.is_dir(env_dir .. "/" .. env_name .. "/bin") then
+        io.stderr:write(string.format(
+            "error: the environment \"%s\" is not yet created\n", env_name))
+        io.stderr:write(string.format("Use \"%s build %s\" to create it.\n",
+            command_name, env_name))
+        os.exit(1)
+    end
+    print(env_dir .. "/" .. env_name .. "/bin/activate")
 end
 
 local function update_command(args)
@@ -513,17 +611,28 @@ end
 -- code and compiled packages. make is checked here as well because it is a
 -- very standard command required to compile many projects. Other commands
 -- possibly needed (cmake, meson, ninja, ...) are verified by each recipe.
+-- The commands that never build anything skip the check: "shell-init" is
+-- run by every interactive shell using the shell integration and
+-- "env-source" is used inside a command substitution, where failing for a
+-- missing build tool would be surprising.
+local no_build_commands = {
+    ["shell-init"] = true, ["env-source"] = true, ["source"] = true,
+    ["dir"] = true, ["init"] = true,
+}
+
 local required_commands = {"tar", "gzip", "git", "curl", "pkg-config", "make"}
 if util.is_file("/etc/debian_version") then
     required_commands[#required_commands + 1] = "dpkg-architecture"
 end
-for _, command in ipairs(required_commands) do
-    if not util.which(command) then
-        io.stderr:write(string.format(
-            "error: command \"%s\" is required but it's not available\n", command))
-        print("Make sure the commands: " ..
-            table.concat(required_commands, " ") .. " are all available.")
-        os.exit(1)
+if not no_build_commands[arg[1]] then
+    for _, command in ipairs(required_commands) do
+        if not util.which(command) then
+            io.stderr:write(string.format(
+                "error: command \"%s\" is required but it's not available\n", command))
+            print("Make sure the commands: " ..
+                table.concat(required_commands, " ") .. " are all available.")
+            os.exit(1)
+        end
     end
 end
 
@@ -533,9 +642,46 @@ end
 local commands = {}
 
 commands["install"] = install_command
-commands["create"] = activate_command
-commands["activate"] = activate_command
+commands["init"] = init_command
+commands["build"] = build_command
+commands["activate"] = build_command
 commands["env-source"] = env_source_command
+
+-- Deprecated: "create" used to write the spec file from the template and
+-- build the environment. The two are now the "init" and "build" commands.
+commands["create"] = function(args)
+    io.stderr:write(string.format(
+        "warning: the \"create\" command is deprecated: use \"%s init\" to " ..
+        "write the spec\nfile and \"%s build\" to create the environment.\n",
+        command_name, command_name))
+    build_command(args)
+end
+
+-- "source" is implemented by the shell function printed by "shell-init": a
+-- command cannot change the environment of the shell that started it.
+commands["source"] = function()
+    io.stderr:write("error: the \"source\" command needs the lhelper shell integration.\n")
+    io.stderr:write("A command cannot change the environment of the shell that " ..
+        "started it, so\n\"source\" is provided by a shell function. Add to " ..
+        "your ~/.bashrc or ~/.zshrc:\n")
+    io.stderr:write(string.format("\n    eval \"$(%s shell-init)\"\n\n", command_name))
+    io.stderr:write("Without the shell integration, use:\n")
+    io.stderr:write(string.format(
+        "\n    source $(%s env-source <spec-filename>)\n", command_name))
+    os.exit(1)
+end
+
+commands["shell-init"] = function()
+    local init_filename = lhelper_dir .. "/lhelper-shell-init.sh"
+    local content = util.read_file(init_filename)
+    if not content then
+        io.stderr:write("error: cannot read the shell integration file " ..
+            init_filename .. "\n")
+        os.exit(1)
+    end
+    io.write(content)
+end
+
 commands["update"] = update_command
 commands["register"] = register_command
 commands["list"] = list_command
@@ -567,7 +713,9 @@ end
 
 local command_fn = commands[arg[1]]
 if not command_fn then
-    print("error: unknown command " .. arg[1])
+    io.stderr:write("error: unknown command " .. arg[1] .. "\n")
+    io.stderr:write(string.format("Run \"%s\" for the list of the commands.\n",
+        command_name))
     os.exit(1)
 end
 

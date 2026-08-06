@@ -31,7 +31,7 @@ functionalities. The work is in commit `4fbe151`.
   subshell and the generated `activate`/`lhelper-config` scripts.
 - The `.lhelper` spec files are now simple Lua scripts (lowercase
   variables: `cc`, `cxx`, `cflags`, `cpu_type`, `build_type`,
-  `packages`, ...). `lhelper create -e` still generates a commented
+  `packages`, ...). `lhelper init -e` still generates a commented
   template with the CPU help for the current machine.
 - Recipes are now Lua scripts (see `README-lua.md` for the API). Two
   recipes were ported as the first-phase samples: `freetype2` and `sdl2`

@@ -38,5 +38,6 @@ cp lua/*.lua "$DESTDIR/share/lhelper/lua"
 cp recipes/index recipes/*.lua "$DESTDIR/share/lhelper/recipes"
 cp patch/*.patch "$DESTDIR/share/lhelper/patch"
 cp lhelper-bash-init "$DESTDIR/share/lhelper"
+cp lhelper-shell-init.sh "$DESTDIR/share/lhelper"
 
 echo "lhelper installed in $DESTDIR/bin"
