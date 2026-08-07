@@ -194,6 +194,30 @@ local function library_dir_reloc(archive_dir, old_prefix, new_prefix)
     return warning_files
 end
 
+-- On Windows, shell-based config scripts in bin/ (like sdl2-config) are
+-- not directly executable by native tools because they have no .exe or
+-- .bat extension. We rename the script to <name>.sh and create a .cmd
+-- wrapper in its place that invokes sh. Tools finding the config tool
+-- by name (via shutil.which or PATHEXT resolution) will then find the
+-- .cmd wrapper, which runs the actual shell script.
+local function create_config_wrappers(package_temp_dir)
+    if not util.is_windows then return end
+    local bindir = package_temp_dir .. "/bin"
+    if not util.is_dir(bindir) then return end
+    for _, name in ipairs(util.listdir(bindir)) do
+        local full = bindir .. "/" .. name
+        if util.ends_with(name, "-config") and util.is_file(full) then
+            local content = util.read_file(full)
+            if content and content:match("^#!%s*/%S*sh") then
+                local script_name = name .. ".sh"
+                os.rename(full, bindir .. "/" .. script_name)
+                util.write_file(bindir .. "/" .. name .. ".cmd",
+                    string.format("@sh \"%%~dp0%s\" %%*\n", script_name))
+            end
+        end
+    end
+end
+
 -- Extract a library package archive, relocate the prefix path references
 -- and copy the files into the environment, writing the file list.
 local function extract_archive_reloc(tar_package_filename, old_prefix, new_prefix,
@@ -204,6 +228,7 @@ local function extract_archive_reloc(tar_package_filename, old_prefix, new_prefi
     util.spawn({"tar", "-C", package_temp_dir, "-xf",
         package_dir() .. "/" .. tar_package_filename})
     library_dir_reloc(package_temp_dir, old_prefix, new_prefix)
+    create_config_wrappers(package_temp_dir)
     -- Write the list of the package's files (like "find ." would)
     local list_lines = { "." }
     for _, rel in ipairs(util.walk_all(package_temp_dir)) do

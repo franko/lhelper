@@ -603,6 +603,18 @@ function recipe.make_recipe_env(ctx)
         if not ok then error(err, 0) end
     end
 
+    -- On Windows wrap a command argv as 'bash -c "<quoted command>"' so
+    -- that the tool runs inside the MSYS2 environment where shell scripts
+    -- (e.g. sdl2-config) are natively executable.
+    local function bash_wrap(cmd)
+        if not util.is_windows then return cmd end
+        local quoted = {}
+        for _, a in ipairs(cmd) do
+            quoted[#quoted + 1] = "'" .. a:gsub("'", "'\\''") .. "'"
+        end
+        return {"bash", "-c", table.concat(quoted, " ")}
+    end
+
     function R.build_and_install(kind, ...)
         if dependencies_mode then return end
         local args = {...}
@@ -615,11 +627,12 @@ function recipe.make_recipe_env(ctx)
             util.append_all(cmd, options)
             cmd[#cmd + 1] = ".."
             log_print("Using cmake command: ", table.concat(cmd, " "))
-            log_run(cmd, { cwd = ".build",
+            log_run(bash_wrap(cmd), { cwd = ".build",
                 error_message = "error: while running cmake config" })
-            log_run({"cmake", "--build", "."}, { cwd = ".build",
+            log_run(bash_wrap({"cmake", "--build", "."}), { cwd = ".build",
                 error_message = "error: while running cmake build" })
-            run_with_destdir({"cmake", "--build", ".", "--target", "install"},
+            run_with_destdir(bash_wrap(
+                {"cmake", "--build", ".", "--target", "install"}),
                 destdir, { cwd = ".build" })
             normalize_destdir_install(destdir, setup_prefix, true)
         elseif kind == "meson" then
@@ -630,12 +643,14 @@ function recipe.make_recipe_env(ctx)
             cmd[#cmd + 1] = ".."
             util.mkdir_p(".build")
             log_print("Using meson command: ", table.concat(cmd, " "))
-            log_run(cmd, { cwd = ".build",
+            log_run(bash_wrap(cmd), { cwd = ".build",
                 error_message = "error: while running meson config" })
-            log_run({"meson", "compile"}, { cwd = ".build",
+            local meson_compile = {"meson", "compile"}
+            log_run(bash_wrap(meson_compile), { cwd = ".build",
                 error_message = "error: while running meson build" })
-            log_print("Using meson install command:  meson install --destdir=" .. destdir)
-            log_run({"meson", "install", "--destdir=" .. destdir}, { cwd = ".build" })
+            local meson_install = {"meson", "install", "--destdir=" .. destdir}
+            log_print("Using meson install command:  " .. table.concat(meson_install, " "))
+            log_run(bash_wrap(meson_install), { cwd = ".build" })
             normalize_destdir_install(destdir, setup_prefix, true)
         elseif kind == "configure" then
             local required = {"make", "grep", "cmp", "diff"}
