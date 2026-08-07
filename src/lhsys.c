@@ -348,16 +348,23 @@ static int l_spawn(lua_State *L) {
     si.cb = sizeof(si);
     HANDLE hout = NULL, herr = NULL;
     DWORD disp = append ? OPEN_ALWAYS : CREATE_ALWAYS;
+    /* FILE_SHARE_WRITE is required: the log files are usually kept open for
+       writing by the Lua side while the child runs. Without it CreateFile
+       fails with a sharing violation and the child would inherit an invalid
+       standard handle. */
+    DWORD share = FILE_SHARE_READ | FILE_SHARE_WRITE;
     if (out_path) {
-        hout = CreateFileA(out_path, FILE_APPEND_DATA | GENERIC_WRITE, FILE_SHARE_READ, &sa, disp, FILE_ATTRIBUTE_NORMAL, NULL);
-        if (append && hout != INVALID_HANDLE_VALUE) SetFilePointer(hout, 0, NULL, FILE_END);
+        hout = CreateFileA(out_path, FILE_APPEND_DATA | GENERIC_WRITE, share, &sa, disp, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (hout == INVALID_HANDLE_VALUE) hout = NULL;
+        if (append && hout) SetFilePointer(hout, 0, NULL, FILE_END);
     }
     if (err_path) {
         if (out_path && strcmp(out_path, err_path) == 0) {
             herr = hout;
         } else {
-            herr = CreateFileA(err_path, FILE_APPEND_DATA | GENERIC_WRITE, FILE_SHARE_READ, &sa, disp, FILE_ATTRIBUTE_NORMAL, NULL);
-            if (append && herr != INVALID_HANDLE_VALUE) SetFilePointer(herr, 0, NULL, FILE_END);
+            herr = CreateFileA(err_path, FILE_APPEND_DATA | GENERIC_WRITE, share, &sa, disp, FILE_ATTRIBUTE_NORMAL, NULL);
+            if (herr == INVALID_HANDLE_VALUE) herr = NULL;
+            if (append && herr) SetFilePointer(herr, 0, NULL, FILE_END);
         }
     }
     si.dwFlags = STARTF_USESTDHANDLES;
@@ -367,8 +374,8 @@ static int l_spawn(lua_State *L) {
     fflush(stdout); fflush(stderr);
     BOOL ok = CreateProcessA(NULL, cmdline, NULL, NULL, TRUE, 0, NULL, cwd, &si, &pi);
     free(cmdline);
-    if (hout && hout != INVALID_HANDLE_VALUE) CloseHandle(hout);
-    if (herr && herr != hout && herr != INVALID_HANDLE_VALUE) CloseHandle(herr);
+    if (hout) CloseHandle(hout);
+    if (herr && herr != hout) CloseHandle(herr);
     if (!ok) {
         lua_pushnil(L);
         lua_pushfstring(L, "cannot execute command (error %d)", (int) GetLastError());
