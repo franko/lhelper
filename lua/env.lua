@@ -90,22 +90,32 @@ end
 -- to generate the bash "activate" script (serialize_activation, sourced by
 -- the user's subshell) and to set the same variables in lhelper's own
 -- process (apply_activation, so package builds run inside the environment).
--- Each entry is { name=, value=, prepend=, default= }:
+-- Each entry is { name=, value=, prepend=, default=, sep= }:
 --   prepend   the value is prepended to the variable's current content;
 --   default   when the variable is unset this value is used instead of
---             prepending (only PKG_CONFIG_PATH needs it).
+--             prepending (only PKG_CONFIG_PATH needs it);
+--   sep       the list separator, ":" unless stated otherwise.
 -- The paths are absolute (abs_prefix inlined) rather than expressed through
 -- a bash "prefix" variable, so the very same entries can be applied
 -- in-process, where no shell expansion happens.
 local function activation_entries(env_root, env_name, abs_prefix, libdir_array)
     local ldlibpath_var = (util.platform == "darwin") and
         "DYLD_LIBRARY_PATH" or "LD_LIBRARY_PATH"
+    -- Separator for the variables read by *native* Windows tools. On MSYS2 a
+    -- ":"-separated list of POSIX paths is translated to a ";"-separated list
+    -- of Windows paths by the MSYS runtime, but only when the value still
+    -- looks like a POSIX path and only when the child is spawned from an MSYS
+    -- process. lhelper is a native binary that runs cmake, meson and
+    -- pkg-config directly, so neither holds: the value must already be in
+    -- Windows form, with ";". PATH is different — bash parses it — and keeps
+    -- ":", as does LD_LIBRARY_PATH, which Windows ignores entirely.
+    local native_sep = util.is_windows and ";" or ":"
     local ldpaths, pkgconfig_paths = {}, {}
     for _, libdir in ipairs(libdir_array) do
         ldpaths[#ldpaths + 1] = abs_prefix .. "/" .. libdir
         pkgconfig_paths[#pkgconfig_paths + 1] = abs_prefix .. "/" .. libdir .. "/pkgconfig"
     end
-    local pkgconfig_value = table.concat(pkgconfig_paths, ":")
+    local pkgconfig_value = table.concat(pkgconfig_paths, native_sep)
     return {
         { name = "PATH", value = abs_prefix .. "/bin", prepend = true },
         { name = ldlibpath_var, value = table.concat(ldpaths, ":"), prepend = true },
@@ -113,8 +123,9 @@ local function activation_entries(env_root, env_name, abs_prefix, libdir_array)
         -- "lib/pkgconfig" entry, carried over verbatim from the original
         -- implementation.
         { name = "PKG_CONFIG_PATH", value = pkgconfig_value, prepend = true,
-          default = pkgconfig_value .. ":" .. libdir_array[1] .. "/pkgconfig:" ..
-              abs_prefix .. "/share/pkgconfig" },
+          sep = native_sep,
+          default = pkgconfig_value .. native_sep .. libdir_array[1] ..
+              "/pkgconfig" .. native_sep .. abs_prefix .. "/share/pkgconfig" },
         { name = "CMAKE_PREFIX_PATH", value = abs_prefix },
         { name = "LHELPER_LIBDIR", value = libdir_array[1] },
         { name = "LHELPER_PKGCONFIG_RPATH", value = libdir_array[1] .. "/pkgconfig" },
@@ -128,14 +139,15 @@ end
 local function serialize_activation(entries)
     local lines = {}
     for _, e in ipairs(entries) do
+        local sep = e.sep or ":"
         if e.default then
             lines[#lines + 1] = string.format(
                 'if [ -z ${%s+x} ]; then\n    export %s="%s"\nelse\n' ..
-                '    export %s="%s${%s:+:}$%s"\nfi',
-                e.name, e.name, e.default, e.name, e.value, e.name, e.name)
+                '    export %s="%s${%s:+%s}$%s"\nfi',
+                e.name, e.name, e.default, e.name, e.value, e.name, sep, e.name)
         elseif e.prepend then
-            lines[#lines + 1] = string.format('export %s="%s${%s:+:}$%s"',
-                e.name, e.value, e.name, e.name)
+            lines[#lines + 1] = string.format('export %s="%s${%s:+%s}$%s"',
+                e.name, e.value, e.name, sep, e.name)
         else
             lines[#lines + 1] = string.format('export %s="%s"', e.name, e.value)
         end
@@ -151,7 +163,7 @@ local function apply_activation(entries)
         elseif e.prepend then
             local old = os.getenv(e.name)
             util.setenv(e.name, e.value ..
-                (old and old ~= "" and (":" .. old) or ""))
+                (old and old ~= "" and ((e.sep or ":") .. old) or ""))
         else
             util.setenv(e.name, e.value)
         end
