@@ -107,16 +107,22 @@ function util.listdir(path)
 end
 
 -- Recursively remove a file or a directory tree. Does not follow symlinks.
+-- Returns true, or nil and a message for the first entry that could not be
+-- removed. Removing the rest is still attempted, so that a single stubborn
+-- file does not leave most of the tree behind.
 function util.rm_rf(path)
     local st = lhsys.stat(path, "l")
     if not st then return true end
     if st.type == "dir" then
+        local first_err
         for _, name in ipairs(util.listdir(path)) do
-            util.rm_rf(path .. "/" .. name)
+            local ok, err = util.rm_rf(path .. "/" .. name)
+            if not ok and not first_err then first_err = err end
         end
+        if first_err then return nil, first_err end
         return lhsys.rmdir(path)
     end
-    return os.remove(path)
+    return lhsys.remove(path)
 end
 
 -- List all the files (not directories) under root, as paths relative
