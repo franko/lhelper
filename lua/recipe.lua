@@ -615,12 +615,19 @@ function recipe.make_recipe_env(ctx)
             log_run({"meson", "install", "--destdir=" .. destdir}, { cwd = ".build" })
             normalize_destdir_install(destdir, setup_prefix, true)
         elseif kind == "configure" then
-            if not R.test_commands("make", "grep", "cmp", "diff") then util.fail(3) end
+            local required = {"make", "grep", "cmp", "diff"}
+            if util.is_windows then required[#required + 1] = "bash" end
+            if not R.test_commands(table.unpack(required)) then util.fail(3) end
             local options, build_type, setup_prefix =
                 configure_options(args, os.getenv("BUILD_TYPE"))
             add_build_type_compiler_flags(build_type)
             add_lhelper_env_directory()
-            local cmd = {"./configure"}
+            local cmd
+            if util.is_windows then
+                cmd = {"bash", "./configure"}
+            else
+                cmd = {"./configure"}
+            end
             util.append_all(cmd, options)
             log_print("Using configure command: ", table.concat(cmd, " "))
             log_run(cmd, { error_message = "error: while running configure script" })
