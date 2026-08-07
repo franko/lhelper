@@ -263,6 +263,25 @@ function recipe.make_recipe_env(ctx)
 
     local build_root = os.getenv("LHELPER_TMPDIR") .. "/build"
 
+    -- Removing a leftover build tree and moving the freshly extracted one into
+    -- place must never fail quietly: the build would then run inside a stale,
+    -- half-deleted directory and report something unrelated, like a missing
+    -- ./configure script.
+    local function remove_or_fail(path)
+        local ok, err = util.rm_rf(path)
+        if not ok then
+            util.fail(1, "error: cannot remove \"" .. path .. "\": " .. tostring(err))
+        end
+    end
+
+    local function rename_or_fail(from, to)
+        local ok, err = os.rename(from, to)
+        if not ok then
+            util.fail(1, "error: cannot move \"" .. from .. "\" to \"" .. to ..
+                "\": " .. tostring(err))
+        end
+    end
+
     local function enter_dummy_build_dir()
         util.rm_rf(build_root .. "/.tmp")
         util.mkdir_p(build_root .. "/.tmp")
@@ -298,26 +317,30 @@ function recipe.make_recipe_env(ctx)
         local topdir
         if #entries == 1 and util.is_dir(tmp_expand_dir .. "/" .. entries[1]) then
             topdir = entries[1]
-            util.rm_rf(build_root .. "/" .. topdir)
-            os.rename(tmp_expand_dir .. "/" .. topdir, build_root .. "/" .. topdir)
+            remove_or_fail(build_root .. "/" .. topdir)
+            rename_or_fail(tmp_expand_dir .. "/" .. topdir,
+                build_root .. "/" .. topdir)
         else
             -- archive without a top level directory: use the archive name
             topdir = filename:match("^([^.]*)")
             local xdest = build_root .. "/" .. topdir
-            util.rm_rf(xdest)
+            remove_or_fail(xdest)
             util.mkdir_p(xdest)
             for _, name in ipairs(entries) do
-                os.rename(tmp_expand_dir .. "/" .. name, xdest .. "/" .. name)
+                rename_or_fail(tmp_expand_dir .. "/" .. name, xdest .. "/" .. name)
             end
         end
         util.rm_rf(tmp_expand_dir)
         assert(lhsys.chdir(build_root .. "/" .. topdir))
     end
 
+    -- Wipe everything left in the build directory by a previous build. It is
+    -- shared by every environment and is deliberately not cleaned at the end
+    -- of a build, so that a failed build can still be inspected.
     local function clean_build_root()
         util.mkdir_p(build_root)
         for _, name in ipairs(util.listdir(build_root)) do
-            util.rm_rf(build_root .. "/" .. name)
+            remove_or_fail(build_root .. "/" .. name)
         end
     end
 

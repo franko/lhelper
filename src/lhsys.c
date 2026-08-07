@@ -1,6 +1,7 @@
 /* lhsys: small C module providing the OS facilities that Lua's standard
-   library lacks: mkdir, stat, directory listing, realpath, setenv, chdir
-   and a spawn function that runs a command without going through a shell. */
+   library lacks: mkdir, remove, stat, directory listing, realpath, setenv,
+   chdir and a spawn function that runs a command without going through a
+   shell. */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -53,12 +54,43 @@ static int l_mkdir(lua_State *L) {
     return 1;
 }
 
+#ifdef _WIN32
+/* Windows refuses to delete a file or directory that carries the read-only
+   attribute. Build trees routinely contain such files (freetype, for one,
+   generates builds/unix/freetype2.pc with mode 0444), and leaving them behind
+   breaks the next build. Drop the attribute so the caller can retry; returns
+   true only when something was actually changed. */
+static int win_clear_readonly(const char *path) {
+    DWORD attr = GetFileAttributesA(path);
+    if (attr == INVALID_FILE_ATTRIBUTES || !(attr & FILE_ATTRIBUTE_READONLY)) {
+        return 0;
+    }
+    return SetFileAttributesA(path, attr & ~FILE_ATTRIBUTE_READONLY) != 0;
+}
+#endif
+
 static int l_rmdir(lua_State *L) {
     const char *path = luaL_checkstring(L, 1);
 #ifdef _WIN32
     int rc = _rmdir(path);
+    if (rc != 0 && win_clear_readonly(path)) rc = _rmdir(path);
 #else
     int rc = rmdir(path);
+#endif
+    if (rc != 0) return push_errno(L, path);
+    lua_pushboolean(L, 1);
+    return 1;
+}
+
+/* Remove a file. Unlike os.remove this also deletes read-only files on
+   Windows, which is what makes recursive removal of a build tree reliable. */
+static int l_remove(lua_State *L) {
+    const char *path = luaL_checkstring(L, 1);
+#ifdef _WIN32
+    int rc = remove(path);
+    if (rc != 0 && win_clear_readonly(path)) rc = remove(path);
+#else
+    int rc = unlink(path);
 #endif
     if (rc != 0) return push_errno(L, path);
     lua_pushboolean(L, 1);
@@ -419,6 +451,7 @@ static int l_spawn(lua_State *L) {
 static const luaL_Reg lhsys_funcs[] = {
     { "mkdir",    l_mkdir },
     { "rmdir",    l_rmdir },
+    { "remove",   l_remove },
     { "chdir",    l_chdir },
     { "getcwd",   l_getcwd },
     { "setenv",   l_setenv },
