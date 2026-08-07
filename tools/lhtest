@@ -103,10 +103,32 @@ fi
 [ "$fresh" = 1 ] && rm -rf "$sandbox"
 [ "$build" = 1 ] && (cd "$repo" && sh build.sh)
 
+# Link a source directory into the sandbox tree so that edits take effect with
+# no copy step. On MSYS2/Cygwin without the "create symbolic link" privilege
+# `ln -s` silently makes a deep copy instead, which both goes stale and makes
+# the next run fail ("cannot overwrite directory"); an NTFS directory junction
+# behaves like a symlink for MSYS *and* for the native lhelper.exe, so use one.
+link_dir() {
+    if [ -L "$2" ] && [ "$(readlink "$2")" = "$1" ]; then
+        return 0
+    fi
+    rm -rf "$2"
+    if ln -sfn "$1" "$2" 2>/dev/null && [ -L "$2" ]; then
+        return 0
+    fi
+    rm -rf "$2"
+    if command -v cygpath >/dev/null 2>&1 && command -v cmd.exe >/dev/null 2>&1; then
+        MSYS2_ARG_CONV_EXCL='*' cmd.exe /c mklink /J \
+            "$(cygpath -w "$2")" "$(cygpath -w "$1")" >/dev/null 2>&1 && return 0
+    fi
+    echo "lhtest: warning: cannot link $2, copying instead" >&2
+    cp -R "$1" "$2"
+}
+
 # sandbox layout: home/ (fake HOME), tree/ (symlinked source + var/), proj/<name>/
 mkdir -p "$sandbox/home" "$sandbox/tree" "$sandbox/proj/$project"
 for d in lua recipes patch; do
-    [ -d "$tree/$d" ] && ln -sfn "$tree/$d" "$sandbox/tree/$d"
+    [ -d "$tree/$d" ] && link_dir "$tree/$d" "$sandbox/tree/$d"
 done
 
 if [ "$installed" = 1 ]; then
