@@ -18,7 +18,22 @@ Darwin*)
     EXE_SUFFIX=""
     ;;
 MINGW* | MSYS* | CYGWIN*)
-    PLATFORM_CFLAGS=""
+    # On Windows lhelper is an MSYS program: it links against the MSYS2
+    # runtime (msys-2.0.dll) to inherit its POSIX emulation -- path
+    # translation, shebang handling and the argv/env conversion applied
+    # when spawning native programs. This requires the MSYS2 gcc
+    # ("pacman -S gcc"), not a MinGW one, which would produce a native
+    # binary without any of that.
+    [ "$CC" = cc ] && CC=/usr/bin/gcc
+    case "$($CC -dumpmachine 2>/dev/null)" in
+    *-msys* | *-cygwin*) ;;
+    *)
+        echo "error: \"$CC\" does not target the MSYS2 runtime." >&2
+        echo "Install the MSYS2 compiler with \"pacman -S gcc\" and use CC=/usr/bin/gcc." >&2
+        exit 1
+        ;;
+    esac
+    PLATFORM_CFLAGS="-DLUA_USE_POSIX"
     PLATFORM_LIBS="-lm"
     EXE_SUFFIX=".exe"
     ;;

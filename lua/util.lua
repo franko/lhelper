@@ -4,8 +4,30 @@ local lhsys = require "lhsys"
 
 local util = {}
 
+-- lhsys.platform is "linux", "darwin" or "msys". On MSYS2 lhelper is an
+-- MSYS program (linked against the MSYS2 runtime), so at runtime it follows
+-- the POSIX conventions -- POSIX paths, ":" as the PATH separator,
+-- /dev/null, /tmp -- while the packages it builds target Windows. Recipes
+-- and spec files care about the target, so they see "windows".
 util.platform = lhsys.platform
-util.is_windows = (lhsys.platform == "windows")
+util.target_os = (lhsys.platform == "msys") and "windows" or lhsys.platform
+util.target_windows = (util.target_os == "windows")
+
+-- The Windows form of a POSIX path, with forward slashes ("C:/msys64/home/u"
+-- for "/home/u"), from the MSYS2 runtime's own mount table. On the other
+-- platforms the path is returned unchanged.
+--
+-- Convention: lhelper's own file operations and the values exchanged with
+-- MSYS programs (bash, make, tar) use POSIX paths. A path must go through
+-- winpath when it is handed to a native program in a form the runtime's
+-- spawn conversion cannot rewrite: written into a file a native tool will
+-- read, or buried inside a compound value such as CC="gcc -I/...".
+function util.winpath(path)
+    if not util.target_windows then return path end
+    local win_path, err = lhsys.winpath(path)
+    if not win_path then error(err) end
+    return win_path
+end
 
 -------------------------------------------------------------------------------
 -- string helpers
@@ -246,7 +268,7 @@ function util.capture(argv, opts)
         "/.lhelper-capture-" .. capture_counter
     local code = util.spawn(argv, {
         cwd = opts.cwd, stdout = tmpname,
-        stderr = opts.stderr or (util.is_windows and "NUL" or "/dev/null"),
+        stderr = opts.stderr or "/dev/null",
     })
     local output = util.read_file(tmpname) or ""
     os.remove(tmpname)
@@ -260,14 +282,12 @@ function util.which(command)
     if command:find("/") then
         return util.is_file(command) and command or nil
     end
-    local path_sep = util.is_windows and ";" or ":"
     local path = os.getenv("PATH") or ""
-    for dir in path:gmatch("([^" .. path_sep .. "]+)") do
+    -- No ".exe" handling is needed on MSYS2: the runtime's stat resolves
+    -- "name" to "name.exe" transparently.
+    for dir in path:gmatch("([^:]+)") do
         local candidate = dir .. "/" .. command
         if util.is_file(candidate) then return candidate end
-        if util.is_windows and util.is_file(candidate .. ".exe") then
-            return candidate .. ".exe"
-        end
     end
     return nil
 end

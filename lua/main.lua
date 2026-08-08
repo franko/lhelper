@@ -32,13 +32,7 @@ if os.getenv("LHELPER_LUA_DIR") then
     lhelper_prefix = lhelper_dir
 end
 
-local lhelper_tmpdir
-if util.is_windows then
-    lhelper_tmpdir = "C:/Windows/Temp"
-else
-    lhelper_tmpdir = os.getenv("TMPDIR") or "/tmp"
-    lhelper_tmpdir = lhelper_tmpdir:gsub("/$", "")
-end
+local lhelper_tmpdir = (os.getenv("TMPDIR") or "/tmp"):gsub("/$", "")
 
 util.setenv("LHELPER_SYSTEM_PREFIX", "/usr")
 util.setenv("LHELPER_PACKAGE_VERSION", os.getenv("LHELPER_PACKAGE_VERSION") or "2")
@@ -75,12 +69,25 @@ for _, dir in ipairs({ working_dir .. "/packages/" .. os.getenv("LHELPER_PACKAGE
     end
 end
 
--- On MSYS unix-like absolute paths like /home/user are fed to the native
--- applications transformed into the real windows path like
--- C:/msys64/home/user. The LH_MSYSROOT variable lets lhelper recognize the
--- msys root windows path, C:/msys64/, and treat it as if it were "/".
-if util.which("cygpath") then
-    util.setenv("LH_MSYSROOT", util.trim(util.capture({"cygpath", "-m", "/"})))
+if util.target_windows then
+    -- lhelper builds native Windows packages, so it must run from a shell
+    -- whose PATH provides a native toolchain (MINGW64, UCRT64, ...). In a
+    -- plain MSYS shell "gcc" silently resolves to the MSYS /usr/bin/gcc and
+    -- every package would be built against msys-2.0.dll.
+    local msystem = os.getenv("MSYSTEM")
+    if not msystem or msystem == "MSYS" then
+        io.stderr:write(string.format(
+            "error: lhelper must be run from a MinGW-flavored MSYS2 shell\n" ..
+            "(MINGW64, UCRT64, CLANG64, ...) so that the packages are built\n" ..
+            "with a native toolchain (MSYSTEM is %s).\n",
+            msystem and '"MSYS"' or "not set"))
+        os.exit(1)
+    end
+    -- On MSYS unix-like absolute paths like /home/user are fed to the native
+    -- applications transformed into the real windows path like
+    -- C:/msys64/home/user. The LH_MSYSROOT variable lets lhelper recognize
+    -- the msys root windows path, C:/msys64, and treat it as if it were "/".
+    util.setenv("LH_MSYSROOT", util.winpath("/"))
 end
 
 if not util.is_dir(lhelper_dir) then
@@ -199,7 +206,7 @@ local function load_build_spec(build_filename)
         print("error: cannot read the file " .. build_filename)
         os.exit(1)
     end
-    local spec_env = { getenv = os.getenv, os = os, string = string, platform = util.platform }
+    local spec_env = { getenv = os.getenv, os = os, string = string, platform = util.target_os }
     local chunk, load_err = load(content, "@" .. build_filename, "t", spec_env)
     if not chunk then
         print("error loading " .. build_filename .. ": " .. load_err)

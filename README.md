@@ -42,7 +42,9 @@ sh install.sh <prefix>
 
 This compiles `build/lhelper` (via `build.sh`) and copies the runtime files
 in `<prefix>/bin` and `<prefix>/share/lhelper`. Works on Linux, macOS and
-Windows/MSYS2.
+Windows/MSYS2. On MSYS2 lhelper is built as an MSYS program with the MSYS2
+gcc (`pacman -S gcc`), so that it inherits the runtime's POSIX emulation,
+and it runs from an MSYS2 shell.
 
 To run lhelper from the source tree without installing:
 

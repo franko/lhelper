@@ -11,27 +11,16 @@
 #include "lualib.h"
 #include "lauxlib.h"
 
-#ifdef _WIN32
-#include <windows.h>
-#elif defined(__APPLE__)
+#ifdef __APPLE__
 #include <mach-o/dyld.h>
-#include <limits.h>
-#include <unistd.h>
-#else
-#include <limits.h>
-#include <unistd.h>
 #endif
+#include <limits.h>
+#include <unistd.h>
 
 int luaopen_lhsys(lua_State *L);
 
 static void get_exe_path(char *buf, size_t size, const char *argv0) {
-#ifdef _WIN32
-    DWORD n = GetModuleFileNameA(NULL, buf, (DWORD) size);
-    if (n == 0 || n >= size) {
-        snprintf(buf, size, "%s", argv0);
-    }
-    for (char *p = buf; *p; p++) { if (*p == '\\') *p = '/'; }
-#elif defined(__APPLE__)
+#if defined(__APPLE__)
     char raw[PATH_MAX];
     uint32_t rawsize = sizeof(raw);
     if (_NSGetExecutablePath(raw, &rawsize) == 0) {

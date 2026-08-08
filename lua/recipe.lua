@@ -18,7 +18,7 @@ local pkg = require "pkg"
 
 local recipe = {}
 
-local skip_pic_option = util.is_windows
+local skip_pic_option = util.target_windows
 
 -------------------------------------------------------------------------------
 -- helpers
@@ -53,11 +53,8 @@ end
 
 -- Translate /usr to C:/msys64/usr, for example, but only on windows.
 local function to_real_prefix(prefix)
-    if util.is_windows and util.starts_with(prefix, "/") then
-        local msysroot = os.getenv("LH_MSYSROOT")
-        if msysroot and msysroot ~= "" then
-            return msysroot .. prefix:sub(2)
-        end
+    if util.starts_with(prefix, "/") then
+        return util.winpath(prefix)
     end
     return prefix
 end
@@ -370,7 +367,7 @@ function recipe.make_recipe_env(ctx)
 
     R.version = ctx.version
     R.options = ctx.options
-    R.platform = util.platform
+    R.platform = util.target_os
     R.cpu_type = os.getenv("CPU_TYPE")
     R.cpu_target = os.getenv("CPU_TARGET")
     R.build_type = os.getenv("BUILD_TYPE")
@@ -566,10 +563,10 @@ function recipe.make_recipe_env(ctx)
     -- add the environment's include and library directories to CC, CXX and
     -- LDFLAGS.
     local function add_lhelper_env_directory()
-        local env_prefix = os.getenv("LHELPER_ENV_PREFIX")
-        if util.is_windows then
-            env_prefix = env_prefix:gsub("^/c/", "C:/")
-        end
+        -- The prefix ends up inside compound values (CC="gcc -I..."), which
+        -- the runtime's spawn conversion cannot rewrite, so it must be in
+        -- Windows form already.
+        local env_prefix = util.winpath(os.getenv("LHELPER_ENV_PREFIX"))
         util.setenv("CC", os.getenv("CC") .. " -I" .. env_prefix .. "/include")
         util.setenv("CXX", os.getenv("CXX") .. " -I" .. env_prefix .. "/include")
         local ldflags = os.getenv("LDFLAGS") or ""

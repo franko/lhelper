@@ -95,8 +95,7 @@ end
 local function check_remote_package(package_version, package_name)
     local url = string.format("%s/packages/%s/%s", LHELPER_WWW_DOMAIN,
         package_version, package_name)
-    return util.run_ok({"curl", "--output",
-        util.is_windows and "NUL" or "/dev/null",
+    return util.run_ok({"curl", "--output", "/dev/null",
         "--silent", "--head", "--fail", url})
 end
 
@@ -104,18 +103,16 @@ local function download_package(package_version, package_name, destdir)
     local url = string.format("%s/packages/%s/%s", LHELPER_WWW_DOMAIN,
         package_version, urlencode(package_name))
     local output_file = string.format("%s/%s/%s", destdir, package_version, package_name)
-    local null = util.is_windows and "NUL" or "/dev/null"
     return util.run_ok({"curl", "-L", url, "-o", output_file},
-        { stdout = null, stderr = null })
+        { stdout = "/dev/null", stderr = "/dev/null" })
 end
 
 local function upload_package(package_version, package_filename)
     local package_name = util.basename(package_filename)
     local package_url = package_version .. "/" .. urlencode(package_name)
     -- Check if the file already exists on the server
-    local response = util.trim(util.capture({"curl", "-s", "-o",
-        util.is_windows and "NUL" or "/dev/null", "-w", "%{http_code}",
-        LHELPER_WWW_DOMAIN .. "/packages/" .. package_url}))
+    local response = util.trim(util.capture({"curl", "-s", "-o", "/dev/null",
+        "-w", "%{http_code}", LHELPER_WWW_DOMAIN .. "/packages/" .. package_url}))
     if response ~= "200" then
         local dest = string.format("lhelper@%s:/lhelper/files/%s/%s",
             LHELPER_DOMAIN, package_version, package_name)
@@ -141,18 +138,16 @@ local function fs_security_delay()
     -- Sometimes on windows we get an error when running tar:
     -- tar: <some-file>: file changed as we read it
     -- so we add an artificial delay to try to avoid the problem.
-    if util.is_windows then
+    if util.target_windows then
         util.spawn({"sleep", "1"})
     end
 end
 
 local function set_prefix_variables(prefix_dir)
     util.setenv("INSTALL_PREFIX", prefix_dir)
-    local win_prefix = prefix_dir
-    if util.is_windows then
-        win_prefix = prefix_dir:gsub("^/c/", "c:/")
-    end
-    util.setenv("WIN_INSTALL_PREFIX", win_prefix)
+    -- The Windows form is the one written into the installed .pc and config
+    -- files, where a native compiler must be able to resolve it.
+    util.setenv("WIN_INSTALL_PREFIX", util.winpath(prefix_dir))
 end
 
 local function prepare_temp_dir(base_dir)
@@ -829,10 +824,15 @@ local function execute_install_plan(plan)
         fix_pkgconfig_install()
         msg("done")
 
+        -- On Windows the built files may contain the prefix in any of its
+        -- forms: C:/msys64/usr from a native cmake or meson, /usr from a
+        -- configure script. Passing the Windows form lets pathreplace
+        -- derive all the variants, the POSIX one included (LH_MSYSROOT).
+        local package_prefix = util.winpath(spec.package_prefix)
         local warning_files = library_dir_reloc(temp_root,
-            spec.package_prefix, "__LHELPER_PREFIX__")
+            package_prefix, "__LHELPER_PREFIX__")
         if #warning_files > 0 then
-            io.stderr:write("warning: prefix directory \"" .. spec.package_prefix ..
+            io.stderr:write("warning: prefix directory \"" .. package_prefix ..
                 "\" found in binary files:\n\n")
             for _, warn_filename in ipairs(warning_files) do
                 io.stderr:write(warn_filename .. "\n")

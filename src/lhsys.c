@@ -1,7 +1,17 @@
 /* lhsys: small C module providing the OS facilities that Lua's standard
    library lacks: mkdir, remove, stat, directory listing, realpath, setenv,
    chdir and a spawn function that runs a command without going through a
-   shell. */
+   shell.
+
+   The module is written against the POSIX API only. On Windows lhelper is
+   an MSYS program linked against the MSYS2 runtime (msys-2.0.dll), which
+   provides these calls and with them its battle-tested POSIX emulation:
+   path translation, shebang handling in exec, and the argv/env conversion
+   applied when spawning native Windows programs. */
+
+#ifdef _WIN32
+#error "On Windows lhelper must be built with the MSYS2 gcc (pacman -S gcc), see build.sh"
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,17 +19,6 @@
 #include <errno.h>
 #include <signal.h>
 
-#include "lua.h"
-#include "lauxlib.h"
-
-#ifdef _WIN32
-#include <windows.h>
-#include <direct.h>
-#include <io.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <process.h>
-#else
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -27,8 +26,15 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <limits.h>
-extern char **environ;
+
+#if defined(__MSYS__) || defined(__CYGWIN__)
+#include <sys/cygwin.h>
 #endif
+
+#include "lua.h"
+#include "lauxlib.h"
+
+extern char **environ;
 
 static int push_errno(lua_State *L, const char *path) {
     lua_pushnil(L);
@@ -42,11 +48,7 @@ static int push_errno(lua_State *L, const char *path) {
 
 static int l_mkdir(lua_State *L) {
     const char *path = luaL_checkstring(L, 1);
-#ifdef _WIN32
-    int rc = _mkdir(path);
-#else
     int rc = mkdir(path, 0777);
-#endif
     if (rc != 0 && errno != EEXIST) {
         return push_errno(L, path);
     }
@@ -54,70 +56,33 @@ static int l_mkdir(lua_State *L) {
     return 1;
 }
 
-#ifdef _WIN32
-/* Windows refuses to delete a file or directory that carries the read-only
-   attribute. Build trees routinely contain such files (freetype, for one,
-   generates builds/unix/freetype2.pc with mode 0444), and leaving them behind
-   breaks the next build. Drop the attribute so the caller can retry; returns
-   true only when something was actually changed. */
-static int win_clear_readonly(const char *path) {
-    DWORD attr = GetFileAttributesA(path);
-    if (attr == INVALID_FILE_ATTRIBUTES || !(attr & FILE_ATTRIBUTE_READONLY)) {
-        return 0;
-    }
-    return SetFileAttributesA(path, attr & ~FILE_ATTRIBUTE_READONLY) != 0;
-}
-#endif
-
 static int l_rmdir(lua_State *L) {
     const char *path = luaL_checkstring(L, 1);
-#ifdef _WIN32
-    int rc = _rmdir(path);
-    if (rc != 0 && win_clear_readonly(path)) rc = _rmdir(path);
-#else
-    int rc = rmdir(path);
-#endif
-    if (rc != 0) return push_errno(L, path);
+    if (rmdir(path) != 0) return push_errno(L, path);
     lua_pushboolean(L, 1);
     return 1;
 }
 
-/* Remove a file. Unlike os.remove this also deletes read-only files on
-   Windows, which is what makes recursive removal of a build tree reliable. */
+/* Remove a file. Unlike os.remove this reports the failing path in the
+   error message, which is what makes recursive removal of a build tree
+   debuggable. */
 static int l_remove(lua_State *L) {
     const char *path = luaL_checkstring(L, 1);
-#ifdef _WIN32
-    int rc = remove(path);
-    if (rc != 0 && win_clear_readonly(path)) rc = remove(path);
-#else
-    int rc = unlink(path);
-#endif
-    if (rc != 0) return push_errno(L, path);
+    if (unlink(path) != 0) return push_errno(L, path);
     lua_pushboolean(L, 1);
     return 1;
 }
 
 static int l_chdir(lua_State *L) {
     const char *path = luaL_checkstring(L, 1);
-#ifdef _WIN32
-    int rc = _chdir(path);
-#else
-    int rc = chdir(path);
-#endif
-    if (rc != 0) return push_errno(L, path);
+    if (chdir(path) != 0) return push_errno(L, path);
     lua_pushboolean(L, 1);
     return 1;
 }
 
 static int l_getcwd(lua_State *L) {
     char buf[4096];
-#ifdef _WIN32
-    if (!_getcwd(buf, sizeof(buf))) return push_errno(L, NULL);
-    /* normalize to forward slashes */
-    for (char *p = buf; *p; p++) { if (*p == '\\') *p = '/'; }
-#else
     if (!getcwd(buf, sizeof(buf))) return push_errno(L, NULL);
-#endif
     lua_pushstring(L, buf);
     return 1;
 }
@@ -125,22 +90,11 @@ static int l_getcwd(lua_State *L) {
 static int l_setenv(lua_State *L) {
     const char *name = luaL_checkstring(L, 1);
     const char *value = luaL_optstring(L, 2, NULL);
-#ifdef _WIN32
-    /* update both the win32 environment (used by CreateProcess) and the
-       CRT environment (used by getenv). */
-    SetEnvironmentVariableA(name, value);
-    size_t len = strlen(name) + (value ? strlen(value) : 0) + 2;
-    char *entry = malloc(len);
-    snprintf(entry, len, "%s=%s", name, value ? value : "");
-    _putenv(entry);
-    free(entry);
-#else
     if (value) {
         setenv(name, value, 1);
     } else {
         unsetenv(name);
     }
-#endif
     lua_pushboolean(L, 1);
     return 1;
 }
@@ -148,17 +102,6 @@ static int l_setenv(lua_State *L) {
 /* Return the whole environment as a table {name = value}. */
 static int l_environ(lua_State *L) {
     lua_newtable(L);
-#ifdef _WIN32
-    char *envs = GetEnvironmentStringsA();
-    for (char *p = envs; *p; p += strlen(p) + 1) {
-        char *eq = strchr(p + 1, '='); /* skip drive-cwd entries like "=C:=..." */
-        if (!eq) continue;
-        lua_pushlstring(L, p, eq - p);
-        lua_pushstring(L, eq + 1);
-        lua_settable(L, -3);
-    }
-    FreeEnvironmentStringsA(envs);
-#else
     for (char **e = environ; *e; e++) {
         char *eq = strchr(*e, '=');
         if (!eq) continue;
@@ -166,31 +109,12 @@ static int l_environ(lua_State *L) {
         lua_pushstring(L, eq + 1);
         lua_settable(L, -3);
     }
-#endif
     return 1;
 }
 
 static int l_listdir(lua_State *L) {
     const char *path = luaL_checkstring(L, 1);
     int i = 1;
-#ifdef _WIN32
-    char pattern[4096];
-    snprintf(pattern, sizeof(pattern), "%s\\*", path);
-    WIN32_FIND_DATAA fd;
-    HANDLE h = FindFirstFileA(pattern, &fd);
-    if (h == INVALID_HANDLE_VALUE) {
-        lua_pushnil(L);
-        lua_pushfstring(L, "%s: cannot list directory", path);
-        return 2;
-    }
-    lua_newtable(L);
-    do {
-        if (strcmp(fd.cFileName, ".") == 0 || strcmp(fd.cFileName, "..") == 0) continue;
-        lua_pushstring(L, fd.cFileName);
-        lua_rawseti(L, -2, i++);
-    } while (FindNextFileA(h, &fd));
-    FindClose(h);
-#else
     DIR *dir = opendir(path);
     if (!dir) return push_errno(L, path);
     lua_newtable(L);
@@ -201,7 +125,6 @@ static int l_listdir(lua_State *L) {
         lua_rawseti(L, -2, i++);
     }
     closedir(dir);
-#endif
     return 1;
 }
 
@@ -209,20 +132,12 @@ static int l_listdir(lua_State *L) {
 static int l_stat(lua_State *L) {
     const char *path = luaL_checkstring(L, 1);
     const char *mode = luaL_optstring(L, 2, "");
-#ifdef _WIN32
-    struct _stat st;
-    (void) mode;
-    if (_stat(path, &st) != 0) return push_errno(L, path);
-    const char *type = (st.st_mode & _S_IFDIR) ? "dir" :
-                       (st.st_mode & _S_IFREG) ? "file" : "other";
-#else
     struct stat st;
     int rc = (mode[0] == 'l') ? lstat(path, &st) : stat(path, &st);
     if (rc != 0) return push_errno(L, path);
     const char *type = S_ISDIR(st.st_mode) ? "dir" :
                        S_ISREG(st.st_mode) ? "file" :
                        S_ISLNK(st.st_mode) ? "link" : "other";
-#endif
     lua_newtable(L);
     lua_pushstring(L, type);
     lua_setfield(L, -2, "type");
@@ -235,41 +150,27 @@ static int l_stat(lua_State *L) {
 
 static int l_realpath(lua_State *L) {
     const char *path = luaL_checkstring(L, 1);
-#ifdef _WIN32
-    char buf[4096];
-    if (!_fullpath(buf, path, sizeof(buf))) return push_errno(L, path);
-    for (char *p = buf; *p; p++) { if (*p == '\\') *p = '/'; }
-#else
     char buf[PATH_MAX];
     if (!realpath(path, buf)) return push_errno(L, path);
-#endif
     lua_pushstring(L, buf);
     return 1;
 }
 
-#ifdef _WIN32
-/* Quote a single argument following the MSVCRT command line rules. */
-static void win_append_arg(luaL_Buffer *b, const char *arg) {
-    if (arg[0] != '\0' && !strpbrk(arg, " \t\"")) {
-        luaL_addstring(b, arg);
-        return;
+#if defined(__MSYS__) || defined(__CYGWIN__)
+/* winpath(path) -> the Windows form of a POSIX path, with forward slashes
+   (the "mixed" form of cygpath -m). The conversion is the runtime's own
+   mount-table lookup, so /c/..., /home/..., /usr/... and any /etc/fstab
+   mount are all handled. Only defined on MSYS. */
+static int l_winpath(lua_State *L) {
+    const char *path = luaL_checkstring(L, 1);
+    char *buf = cygwin_create_path(CCP_POSIX_TO_WIN_A, path);
+    if (!buf) return push_errno(L, path);
+    for (char *p = buf; *p; p++) {
+        if (*p == '\\') *p = '/';
     }
-    luaL_addchar(b, '"');
-    for (const char *p = arg; *p; p++) {
-        int backslashes = 0;
-        while (*p == '\\') { backslashes++; p++; }
-        if (*p == '\0') {
-            for (int i = 0; i < backslashes * 2; i++) luaL_addchar(b, '\\');
-            break;
-        } else if (*p == '"') {
-            for (int i = 0; i < backslashes * 2 + 1; i++) luaL_addchar(b, '\\');
-            luaL_addchar(b, '"');
-        } else {
-            for (int i = 0; i < backslashes; i++) luaL_addchar(b, '\\');
-            luaL_addchar(b, *p);
-        }
-    }
-    luaL_addchar(b, '"');
+    lua_pushstring(L, buf);
+    free(buf);
+    return 1;
 }
 #endif
 
@@ -294,9 +195,6 @@ static void lh_signal_handler(int sig) {
 /* arm_interrupt(): start catching SIGINT and clear any pending flag. */
 static int l_arm_interrupt(lua_State *L) {
     interrupted_signal = 0;
-#ifdef _WIN32
-    signal(SIGINT, lh_signal_handler);
-#else
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
     sa.sa_handler = lh_signal_handler;
@@ -305,23 +203,18 @@ static int l_arm_interrupt(lua_State *L) {
        observe the interruption. */
     sa.sa_flags = 0;
     sigaction(SIGINT, &sa, NULL);
-#endif
     lua_pushboolean(L, 1);
     return 1;
 }
 
 /* disarm_interrupt(): restore the default SIGINT disposition (terminate). */
 static int l_disarm_interrupt(lua_State *L) {
-#ifdef _WIN32
-    signal(SIGINT, SIG_DFL);
-#else
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
     sa.sa_handler = SIG_DFL;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
     sigaction(SIGINT, &sa, NULL);
-#endif
     lua_pushboolean(L, 1);
     return 1;
 }
@@ -362,58 +255,6 @@ static int l_spawn(lua_State *L) {
     }
     argv[argc] = NULL;
 
-#ifdef _WIN32
-    luaL_Buffer b;
-    luaL_buffinit(L, &b);
-    for (int i = 0; i < argc; i++) {
-        if (i > 0) luaL_addchar(&b, ' ');
-        win_append_arg(&b, argv[i]);
-    }
-    luaL_pushresult(&b);
-    char *cmdline = _strdup(lua_tostring(L, -1));
-    free(argv);
-
-    SECURITY_ATTRIBUTES sa = { sizeof(sa), NULL, TRUE };
-    STARTUPINFOA si;
-    PROCESS_INFORMATION pi;
-    memset(&si, 0, sizeof(si));
-    si.cb = sizeof(si);
-    HANDLE hout = NULL, herr = NULL;
-    DWORD disp = append ? OPEN_ALWAYS : CREATE_ALWAYS;
-    if (out_path) {
-        hout = CreateFileA(out_path, FILE_APPEND_DATA | GENERIC_WRITE, FILE_SHARE_READ, &sa, disp, FILE_ATTRIBUTE_NORMAL, NULL);
-        if (append && hout != INVALID_HANDLE_VALUE) SetFilePointer(hout, 0, NULL, FILE_END);
-    }
-    if (err_path) {
-        if (out_path && strcmp(out_path, err_path) == 0) {
-            herr = hout;
-        } else {
-            herr = CreateFileA(err_path, FILE_APPEND_DATA | GENERIC_WRITE, FILE_SHARE_READ, &sa, disp, FILE_ATTRIBUTE_NORMAL, NULL);
-            if (append && herr != INVALID_HANDLE_VALUE) SetFilePointer(herr, 0, NULL, FILE_END);
-        }
-    }
-    si.dwFlags = STARTF_USESTDHANDLES;
-    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
-    si.hStdOutput = hout ? hout : GetStdHandle(STD_OUTPUT_HANDLE);
-    si.hStdError = herr ? herr : GetStdHandle(STD_ERROR_HANDLE);
-    fflush(stdout); fflush(stderr);
-    BOOL ok = CreateProcessA(NULL, cmdline, NULL, NULL, TRUE, 0, NULL, cwd, &si, &pi);
-    free(cmdline);
-    if (hout && hout != INVALID_HANDLE_VALUE) CloseHandle(hout);
-    if (herr && herr != hout && herr != INVALID_HANDLE_VALUE) CloseHandle(herr);
-    if (!ok) {
-        lua_pushnil(L);
-        lua_pushfstring(L, "cannot execute command (error %d)", (int) GetLastError());
-        return 2;
-    }
-    WaitForSingleObject(pi.hProcess, INFINITE);
-    DWORD code = 0;
-    GetExitCodeProcess(pi.hProcess, &code);
-    CloseHandle(pi.hProcess);
-    CloseHandle(pi.hThread);
-    lua_pushinteger(L, (lua_Integer) code);
-    return 1;
-#else
     fflush(stdout); fflush(stderr);
     pid_t pid = fork();
     if (pid < 0) { free(argv); return push_errno(L, NULL); }
@@ -445,7 +286,6 @@ static int l_spawn(lua_State *L) {
                WIFSIGNALED(status) ? 128 + WTERMSIG(status) : 1;
     lua_pushinteger(L, code);
     return 1;
-#endif
 }
 
 static const luaL_Reg lhsys_funcs[] = {
@@ -459,6 +299,9 @@ static const luaL_Reg lhsys_funcs[] = {
     { "listdir",  l_listdir },
     { "stat",     l_stat },
     { "realpath", l_realpath },
+#if defined(__MSYS__) || defined(__CYGWIN__)
+    { "winpath",  l_winpath },
+#endif
     { "spawn",    l_spawn },
     { "arm_interrupt",    l_arm_interrupt },
     { "disarm_interrupt", l_disarm_interrupt },
@@ -468,10 +311,10 @@ static const luaL_Reg lhsys_funcs[] = {
 
 int luaopen_lhsys(lua_State *L) {
     luaL_newlib(L, lhsys_funcs);
-#if defined(_WIN32)
-    lua_pushstring(L, "windows");
-#elif defined(__APPLE__)
+#if defined(__APPLE__)
     lua_pushstring(L, "darwin");
+#elif defined(__MSYS__) || defined(__CYGWIN__)
+    lua_pushstring(L, "msys");
 #else
     lua_pushstring(L, "linux");
 #endif

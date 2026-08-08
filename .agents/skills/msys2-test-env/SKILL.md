@@ -48,12 +48,23 @@ Expected: `/mingw64/bin/gcc`, `/mingw64/bin/g++`, `/usr/bin/make`,
 `/mingw64/bin/cmake`, `/mingw64/bin/ninja`, `/mingw64/bin/pkg-config`,
 GCC 15.x. `meson` is **not** installed, so meson recipes cannot be tested.
 
+Building lhelper itself additionally needs the **MSYS2 gcc** in
+`/usr/bin/gcc` (package `gcc` of the msys subsystem: `pacman -S gcc`). It is
+separate from `/mingw64/bin/gcc`, which builds the *packages*.
+
 ## Build
 
 ```sh
 MSYSTEM=MINGW64 /c/msys64/usr/bin/bash.exe -lc 'cd /home/AbbateF/dev/lhelper && sh build.sh'
 ```
-Produces `build/lhelper.exe` (a native mingw64 binary, not an MSYS one).
+Produces `build/lhelper.exe`, an **MSYS binary** linked against the MSYS2
+runtime (`msys-2.0.dll`) — `build.sh` selects `/usr/bin/gcc` by itself and
+refuses a MinGW compiler. Being an MSYS program is what gives lhelper the
+runtime's POSIX emulation: shebang handling when spawning scripts
+(`./configure`), POSIX→Windows argv/env conversion when spawning native
+programs (cmake, ninja, pkgconf), and `:`-separated path lists everywhere.
+It also means `lhelper.exe` only runs where `msys-2.0.dll` is on the PATH,
+i.e. from an MSYS2 shell.
 
 ## Test a recipe end to end
 
@@ -80,38 +91,34 @@ Verified working on this machine: `freetype2` (configure/make path) and
 
 ## Traps specific to MSYS2 — read before debugging a failure
 
-### Trap 1: the build root is `C:\Windows\Temp\build` and is shared
+### Trap 1: the build root is `/tmp/build` and is shared
 
-`lua/main.lua` hardcodes `LHELPER_TMPDIR = "C:/Windows/Temp"` on Windows, so
-every sandbox and every project shares `C:\Windows\Temp\build`. It is wiped at
-the *start* of each build (`clean_build_root` in `lua/recipe.lua`) and left in
-place afterwards, so after a failure you can go and inspect the source tree
-there — but only until the next build starts.
+`LHELPER_TMPDIR` is `$TMPDIR` (or `/tmp`), which in MSYS2 is
+`C:\msys64\tmp`, so every sandbox and every project shares `/tmp/build`. It
+is wiped at the *start* of each build (`clean_build_root` in
+`lua/recipe.lua`) and left in place afterwards, so after a failure you can
+go and inspect the source tree there — but only until the next build starts.
 
-Deleting files there must keep working; if it ever stops, you now get an
-explicit `error: cannot remove "..."` instead of a build that silently runs in
-a half-deleted tree. Historically the failure surfaced as a baffling
+Deleting files there must keep working; if it ever stops, you get an
+explicit `error: cannot remove "..."` instead of a build that silently runs
+in a half-deleted tree. Historically the failure surfaced as a baffling
 `bash: ./configure: No such file or directory` — see Trap 2.
 
 ### Trap 2: Windows refuses to delete read-only files
 
-`DeleteFile` fails on any file carrying the read-only attribute, and build
-systems produce those routinely (freetype generates
-`builds/unix/freetype2.pc` with mode `0444`). Plain `os.remove` therefore
-cannot clean a build tree.
-
-`util.rm_rf` uses `lhsys.remove`, which clears `FILE_ATTRIBUTE_READONLY` and
-retries; `lhsys.rmdir` does the same for directories. **Never go back to
-`os.remove` in code that deletes build output.** Note that MSYS2's `rm -rf`
-does clear the attribute, so a manual `rm -rf` succeeding proves nothing about
-the Lua side.
+Win32 `DeleteFile` fails on any file carrying the read-only attribute, and
+build systems produce those routinely (freetype generates
+`builds/unix/freetype2.pc` with mode `0444`). The MSYS2 runtime's `unlink()`
+— what `lhsys.remove`, and with it `util.rm_rf`, ends up calling — handles
+the attribute itself, exactly like MSYS2's `rm -rf` does. If a file still
+cannot be removed, `util.rm_rf` reports it (`error: cannot remove "..."`)
+instead of letting the next build run in a half-deleted tree.
 
 ### Trap 3: `ln -s` makes deep copies
 
 Without the Windows "create symbolic link" privilege (Developer Mode / admin),
-MSYS2 `ln -s` silently **copies** the directory. `MSYS=winsymlinks:nativestrict`
-fails outright here, and `MSYS=winsymlinks:lnk` produces `.lnk` shortcuts that
-`lhelper.exe` (a *native* Windows program) cannot follow.
+MSYS2 `ln -s` silently **copies** the directory, which goes stale on the
+first edit, and `MSYS=winsymlinks:nativestrict` fails outright.
 
 `tools/lhtest` therefore falls back to an **NTFS directory junction**
 (`cmd.exe /c mklink /J`), which both MSYS and native programs follow and which
@@ -145,31 +152,21 @@ MSYSTEM=MINGW64 /c/msys64/usr/bin/bash.exe -lc '
 Keep a stash outside the sandbox (e.g. `/tmp/lh-archive-stash/`): `lhtest -f`
 wipes `var/lhelper/archives` along with everything else.
 
-### Trap 5: path *lists* need `;` on Windows, but `PATH` does not
+### Trap 5: path lists are `:`-separated — trust the runtime's conversion
 
-MSYS2 auto-translates a `:`-separated list of **POSIX** paths into a
-`;`-separated list of **Windows** paths when it hands the environment to a
-native program — but only if the value still looks POSIX, and only if the
-parent is an MSYS process. Neither holds for lhelper: it is a native binary
-that emits `C:/…` paths and spawns `cmake`, `meson` and `pkg-config` directly
-via `CreateProcess`. So on Windows those lists must already be `;`-joined.
+Every path list lhelper composes (`PATH`, `PKG_CONFIG_PATH`,
+`LD_LIBRARY_PATH`, ...) uses `:` and POSIX paths, on every platform. lhelper
+is an MSYS process, so when it spawns a **native** program (cmake, ninja,
+pkgconf) the MSYS2 runtime converts path-like values to `;`-separated
+Windows paths at that moment; MSYS children (bash, make) read the POSIX form
+directly. Do **not** hand-convert separators or paths in the Lua code — a
+value the heuristic mishandles is excluded case by case with
+`MSYS2_ARG_CONV_EXCL` / `MSYS2_ENV_CONV_EXCL` instead.
 
-`lua/env.lua` therefore sets a per-variable separator (`sep`), not a global
-one:
-
-| variable | separator | why |
-|---|---|---|
-| `PATH` | `:` | parsed by bash |
-| `LD_LIBRARY_PATH` | `:` | ignored by Windows anyway |
-| `PKG_CONFIG_PATH` | `;` on Windows | read by native pkgconf |
-| `CMAKE_PREFIX_PATH` | `;` on Windows | read by native cmake (single value today) |
-
-Do **not** "simplify" this back to one separator, in either direction.
-
-The old failure mode was silent and easy to misread: with `:` the env entry
-got glued to the next one, pkgconf found nothing, fell back to its built-in
-`/mingw64` search path and returned a perfectly plausible answer from the
-**system** library. Sanity check after changing anything here:
+The failure mode when this goes wrong is silent and easy to misread: if
+pkgconf receives a list it cannot parse it finds nothing, falls back to its
+built-in `/mingw64` search path and returns a perfectly plausible answer
+from the **system** library. Sanity check after changing anything here:
 
 ```sh
 tools/lhtest -q sh ". .lhelper/<env>/bin/activate && pkg-config --cflags freetype2"
@@ -187,15 +184,9 @@ print("PROBE=" .. tostring(pkg_config("--cflags", "freetype2")))
 
 ## Notes for anyone touching `src/lhsys.c` on Windows
 
-Two Win32 details in there were expensive to find; do not undo them.
-
-**`l_spawn` redirection.** The child's stdout/stderr go to log files that the
-Lua side keeps open with `io.open(..., "a")`. The `CreateFileA` share mode
-must include `FILE_SHARE_WRITE`, and a failed `CreateFileA` must be
-normalised to `NULL` — `INVALID_HANDLE_VALUE` is `(HANDLE)-1`, i.e. *truthy*,
-so passing it in `STARTUPINFO.hStdOutput` gives the child a broken stdout.
-The symptom is brutal to diagnose: every child exits non-zero (bash → 2) and
-**all log files stay empty**.
-
-**`win_clear_readonly`.** `l_remove` and `l_rmdir` drop
-`FILE_ATTRIBUTE_READONLY` and retry once. See Trap 2.
+There is no Win32 code in `src/lhsys.c` (or anywhere in `src/`): the file is
+POSIX-only and a `#error` rejects any compiler that defines `_WIN32`. Keep
+it that way — every past Windows-specific branch in there (CreateProcess
+command-line quoting, stdout handle sharing modes, read-only attribute
+clearing) was a partial reimplementation of something the MSYS2 runtime
+already does, and each one carried its own hard-to-diagnose bugs.
