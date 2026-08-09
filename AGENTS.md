@@ -87,7 +87,8 @@ tools/lhtest env | path | reset                 # env lines / location / wipe
 ## Commands (see `lua/main.lua`)
 
 `create` / `activate` (with `-e`/`--edit`, `--packages`), `install`
-(`--local`, `--rebuild`), `remove`, `list (files|packages|recipes)`, `update recipes`,
+(`--local`, `--rebuild`), `test recipe` (with `-s`/`--shell`,
+`-r`/`--recipes-dir`), `remove`, `list (files|packages|recipes)`, `update recipes`,
 `register key <ssh-key> <port>`, `env-source`, `cleanup`, `dir`.
 
 ## Spec files and recipes

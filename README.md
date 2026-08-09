@@ -163,3 +163,18 @@ A minimal recipe looks like:
 enter_git_repository("https://github.com/mosra/magnum.git", "master")
 build_and_install("cmake", "-DWITH_SDL2APPLICATION=ON")
 ```
+
+### Testing a recipe
+
+`lhelper test recipe <recipe-name>` creates an environment named
+`test-<recipe-name>` in the `.lhelper` directory of the current directory,
+installs the recipe and its dependencies in it, reports success or error and
+leaves the environment available. The recipe is always run, no saved package
+is reused, and the result is never uploaded to the remote repository.
+
+- `-s` / `--shell` — after a successful build, start a shell with the
+  environment activated.
+- `-r <dir>` / `--recipes-dir <dir>` — look the recipes up in `<dir>` before
+  the standard one, for the tested recipe and its dependencies. The version
+  of a recipe is taken from the directory's `index` file, or detected from
+  the recipe file names (`<name>_<version>.lua`) when it is not indexed.

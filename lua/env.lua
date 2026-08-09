@@ -58,6 +58,17 @@ export LHELPER_PREFER_SYSTEM_LIBRARIES="%s"
 ]], spec.prefer_system_libraries)
 end
 
+-- The lhelper-config block declaring the recipes directory used to create
+-- the environment. Written only when a custom one was given.
+local function recipes_dir_format(spec)
+    if not spec.recipe_dir then return "" end
+    return string.format([[
+
+# Directory where the recipes are looked up, in place of the standard one.
+export LHELPER_RECIPES_DIR="%s"
+]], spec.recipe_dir)
+end
+
 local function config_format(spec)
     return string.format([[
 # Edit here the compiler variables and flags for this
@@ -79,10 +90,10 @@ export CPU_TARGET="%s"
 
 # Can be Release or Debug
 export BUILD_TYPE="%s"
-%s]], spec.cc, spec.cxx, spec.cc, spec.cpu_flags, spec.cxx, spec.cpu_flags,
+%s%s]], spec.cc, spec.cxx, spec.cc, spec.cpu_flags, spec.cxx, spec.cpu_flags,
         spec.cflags or "", spec.cxxflags or "", spec.ldflags or "",
         spec.cpu_type, spec.cpu_target, spec.build_type,
-        prefer_system_format(spec))
+        prefer_system_format(spec), recipes_dir_format(spec))
 end
 
 -- The environment variables that define an activated environment, as an
@@ -186,7 +197,7 @@ end
 -- The configuration values of a build spec, as the table that
 -- parse_config would return for the corresponding lhelper-config file.
 function env.spec_config(spec)
-    return {
+    local config = {
         CC_BARE = spec.cc,
         CXX_BARE = spec.cxx,
         CC = spec.cc .. " " .. spec.cpu_flags,
@@ -199,6 +210,8 @@ function env.spec_config(spec)
         BUILD_TYPE = spec.build_type,
         LHELPER_PREFER_SYSTEM_LIBRARIES = spec.prefer_system_libraries,
     }
+    if spec.recipe_dir then config.LHELPER_RECIPES_DIR = spec.recipe_dir end
+    return config
 end
 
 -- Create an environment: directories, lhelper-config and activate script.

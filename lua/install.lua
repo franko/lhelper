@@ -55,11 +55,60 @@ function installer.recipes_dir()
     return getenv("LHELPER_DIR") .. "/recipes"
 end
 
-function installer.latest_package_version(package)
-    local index_filename = installer.recipes_dir() .. "/index"
-    for _, line in ipairs(util.read_lines(index_filename)) do
-        local name, version = line:match("^(%S+)%s+(%S+)")
-        if name == package then return version end
+-- The recipe directories to look up packages, in order of preference: the
+-- custom recipes directory of the install flags when given, then "." for
+-- the local recipes of the --local option, then the standard one.
+local function recipe_dirs(flags)
+    local dirs = {}
+    if flags.recipe_dir then dirs[#dirs + 1] = flags.recipe_dir end
+    if flags.local_recipe then dirs[#dirs + 1] = "." end
+    dirs[#dirs + 1] = installer.recipes_dir()
+    return dirs
+end
+
+-- Compare two versions a > b, with the components separated by dots
+-- compared numerically (1.10.0 is greater than 1.9.0).
+local function version_greater(a, b)
+    local ai, bi = util.split(a, "."), util.split(b, ".")
+    for i = 1, math.max(#ai, #bi) do
+        local av, bv = tonumber(ai[i]), tonumber(bi[i])
+        if (av or 0) ~= (bv or 0) then
+            return (av or 0) > (bv or 0)
+        end
+    end
+    return false
+end
+
+-- The latest version of a package in a recipes directory: from the
+-- directory's index file when the package is listed, else from the recipe
+-- file names (<package>_<version>.lua, the +<n> revision suffix is
+-- ignored). Returns nil when the package is not in the directory.
+local function dir_latest_package_version(recipe_dir, package)
+    local index_filename = recipe_dir .. "/index"
+    if util.is_file(index_filename) then
+        for _, line in ipairs(util.read_lines(index_filename)) do
+            local name, version = line:match("^(%S+)%s+(%S+)")
+            if name == package then return version end
+        end
+    end
+    local best
+    for _, name in ipairs(util.listdir(recipe_dir)) do
+        local version = name:match("^" .. util.pattern_escape(package) ..
+            "_(%S+)%.lua$")
+        if version then
+            version = version:gsub("%+%d+$", "")
+            if not best or version_greater(version, best) then best = version end
+        end
+    end
+    return best
+end
+
+-- The latest version of a package, looking the given recipe directories up
+-- in order (defaults to the standard one).
+function installer.latest_package_version(package, dirs)
+    for _, recipe_dir in ipairs(dirs or { installer.recipes_dir() }) do
+        local version = dir_latest_package_version(recipe_dir, package)
+        if version then return version end
     end
     return nil
 end
@@ -298,7 +347,7 @@ end
 -- satisfied, "missing" when no package provides it or, when a package with
 -- that name does not satisfy the spec, "mismatch" with the
 -- pkg.test_package_spec code and the registry entry found.
-local function dependency_status(dependency, registry_lines, prefer_system)
+local function dependency_status(dependency, registry_lines, prefer_system, flags)
     local dep_name = dependency:match("^%S+")
     local found = pkg.query_lines(registry_lines, dep_name)
     if found then
@@ -308,7 +357,7 @@ local function dependency_status(dependency, registry_lines, prefer_system)
         return "ok"
     end
     if prefer_system(dep_name) or
-        not installer.latest_package_version(dep_name) then
+        not installer.latest_package_version(dep_name, recipe_dirs(flags)) then
         local sys_version = pkg.system_library_version(dep_name)
         if sys_version then
             local entry = dep_name .. " " .. sys_version
@@ -371,8 +420,11 @@ local function digest_content(config, usage_lines)
         'CC_VERSION="' .. env.get_compiler_version(config.CC_BARE or "cc") .. '"',
         'CXX_VERSION="' .. env.get_compiler_version(config.CXX_BARE or "c++") .. '"',
         'OS_VERSION="' .. env.find_os_release() .. '"',
-        '# dependencies',
     }
+    if config.LHELPER_RECIPES_DIR then
+        lines[#lines + 1] = 'RECIPES_DIR="' .. config.LHELPER_RECIPES_DIR .. '"'
+    end
+    lines[#lines + 1] = '# dependencies'
     util.append_all(lines, usage_lines)
     return table.concat(lines, "\n") .. "\n"
 end
@@ -429,17 +481,24 @@ local function resolve_recipe(flags, spec, required_by)
         print("error: version is required for local recipes")
         os.exit(1)
     end
+    local dirs = recipe_dirs(flags)
     if not spec.version then
-        spec.version = installer.latest_package_version(spec.package)
+        spec.version = installer.latest_package_version(spec.package, dirs)
         if not spec.version then
             print(string.format("error: cannot find package \"%s\"%s",
                 spec.package, context))
             os.exit(1)
         end
     end
-    local recipe_dir = flags.local_recipe and "." or installer.recipes_dir()
-    local recipe_filename = installer.find_recipe_filename(recipe_dir,
-        spec.package, spec.version)
+    local recipe_dir, recipe_filename
+    for _, dir in ipairs(dirs) do
+        recipe_filename = installer.find_recipe_filename(dir,
+            spec.package, spec.version)
+        if recipe_filename then
+            recipe_dir = dir
+            break
+        end
+    end
     if not recipe_filename then
         print(string.format("error: no recipe found for \"%s\" version %s%s.",
             spec.package, spec.version, context))
@@ -599,7 +658,7 @@ end
 -- options than it was given the options are recorded in extra_options and
 -- the pass is abandoned raising a {restart = true} error.
 local function resolve_plans_pass(requested, registry_lines, config,
-        log_dirname, extra_options)
+        log_dirname, extra_options, dep_flags)
     local explicit = {}
     for _, request in ipairs(requested) do
         explicit[request.args[1]] = request
@@ -614,7 +673,7 @@ local function resolve_plans_pass(requested, registry_lines, config,
     local function satisfy(dependency, required_by)
         local dep_name = dependency:match("^%S+")
         local status, rc, entry = dependency_status(dependency, lines,
-            prefer_system)
+            prefer_system, dep_flags)
         if status == "ok" then return end
         if status == "mismatch" then
             local found = planned[dep_name]
@@ -633,6 +692,7 @@ local function resolve_plans_pass(requested, registry_lines, config,
         local request = explicit[dep_name]
         local plan = resolve(request or {
             args = dependency_install_args(dependency, extra_options[dep_name]),
+            flags = dep_flags,
         }, request == nil, required_by)
         -- The options of an automatically added package are the required
         -- ones by construction but its version, the latest one available,
@@ -695,10 +755,17 @@ end
 -- repeated as long as the options of an automatically added package need to
 -- be extended.
 local function resolve_install_plans(requested, registry_lines, config, log_dirname)
+    -- The automatically added packages share the recipe lookup and upload
+    -- policy of the requested ones, but keep their own flags otherwise
+    -- (e.g. they are not forced to rebuild).
+    local dep_flags = {}
+    local flags = requested[1] and requested[1].flags
+    if flags and flags.recipe_dir then dep_flags.recipe_dir = flags.recipe_dir end
+    if flags and flags.no_upload then dep_flags.no_upload = true end
     local extra_options = {}
     for _ = 1, RESOLVE_PASSES_LIMIT do
         local ok, result = pcall(resolve_plans_pass, requested, registry_lines,
-            config, log_dirname, extra_options)
+            config, log_dirname, extra_options, dep_flags)
         if ok then return result end
         if not (type(result) == "table" and result.restart) then
             error(result, 0)
@@ -848,7 +915,7 @@ local function execute_install_plan(plan)
             os.exit(1)
         end
         if getenv("LH_SSH_KEY_PATH") ~= "" and getenv("LH_SSH_KEY_PORT") ~= "" and
-            not flags.local_recipe then
+            not flags.local_recipe and not flags.no_upload then
             upload_package(getenv("LHELPER_PACKAGE_VERSION"), staging_tar)
         end
         os.rename(staging_tar, package_dir() .. "/" .. tar_package_filename)
@@ -913,7 +980,8 @@ local function compute_install_plans(build_spec)
     local log_dirname = getenv("LHELPER_TMPDIR")
     local requested = {}
     for _, package_spec in ipairs(build_spec.packages) do
-        requested[#requested + 1] = { args = util.split(package_spec), flags = {} }
+        requested[#requested + 1] = { args = util.split(package_spec),
+            flags = build_spec.flags or {} }
     end
     local plans = resolve_install_plans(requested, {}, config, log_dirname)
 
@@ -954,7 +1022,7 @@ function installer.update_installed_packages(plans)
     fs_security_delay()
     util.write_file(packages_filename, "")
     for _, plan in ipairs(plans) do
-        if kept[plan.package_line] then
+        if kept[plan.package_line] and not plan.flags.rebuild then
             -- already installed and unchanged: keep the files and
             -- re-register the package and its virtual packages
             pkg.register_package(env_prefix, plan.package_line,

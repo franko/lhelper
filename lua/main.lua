@@ -410,6 +410,109 @@ local function activate_command(args)
     end
 end
 
+-- The "test recipe" command: create an environment named test-<recipe>
+-- in the .lhelper directory of the current working directory, install the
+-- recipe and its dependencies in it and leave the environment available.
+-- The recipe is always run (no saved package is reused) and the result is
+-- never uploaded to the remote repository.
+local function test_command(args)
+    if args[2] ~= "recipe" or #args < 3 then
+        print(string.format("Usage: %s test recipe <recipe-name> " ..
+            "[-s|--shell] [-r|--recipes-dir <dir>]", command_name))
+        os.exit(1)
+    end
+    local shell = false
+    local recipes_dir_arg
+    local recipe_name
+    local i = 3
+    while i <= #args do
+        local a = args[i]
+        if a == "-s" or a == "--shell" then
+            shell = true
+        elseif a == "-r" or a == "--recipes-dir" then
+            i = i + 1
+            recipes_dir_arg = args[i]
+            if not recipes_dir_arg or not util.is_dir(recipes_dir_arg) then
+                print("error: the recipes directory \"" ..
+                    tostring(recipes_dir_arg) .. "\" does not exist")
+                os.exit(1)
+            end
+        elseif util.starts_with(a, "-") then
+            print("error: unknown option " .. a)
+            os.exit(1)
+        elseif recipe_name then
+            print("error: multiple recipe names")
+            os.exit(1)
+        else
+            recipe_name = a
+        end
+        i = i + 1
+    end
+
+    local cpu_type_guess, cpu_target_guess = cpu.guess()
+    local build_spec = {
+        cc = os.getenv("CC") or "gcc",
+        cxx = os.getenv("CXX") or "g++",
+        cflags = os.getenv("CFLAGS") or "",
+        cxxflags = os.getenv("CXXFLAGS") or "",
+        ldflags = os.getenv("LDFLAGS") or "",
+        cpu_type = nil,
+        cpu_target = nil,
+        build_type = os.getenv("BUILD_TYPE") or "Release",
+        prefer_system_libraries = nil,
+        packages = { recipe_name },
+        recipe_dir = recipes_dir_arg,
+        flags = { rebuild = true, no_upload = true,
+            recipe_dir = recipes_dir_arg },
+    }
+    local cpu_type, cpu_target, cpu_err = cpu.resolve(build_spec.cpu_type,
+        build_spec.cpu_target, cpu_type_guess, cpu_target_guess)
+    if not cpu_type then
+        print("error: " .. cpu_err)
+        os.exit(1)
+    end
+    build_spec.cpu_type, build_spec.cpu_target = cpu_type, cpu_target
+
+    local env_name = "test-" .. recipe_name
+    local env_workdir = lhsys.getcwd() .. "/.lhelper"
+    if not util.is_dir(env_workdir) then
+        if not util.mkdir_p(env_workdir) then
+            print("error: cannot create local environment directory: " .. env_workdir)
+            os.exit(1)
+        end
+    end
+
+    installer.lib_install_mode = "verbose"
+    local env_loaded, install_plans = installer.load_matching_env(
+        env_name, env_workdir, build_spec)
+    if not env_loaded then
+        -- Create a new environment.
+        local env_prefix = env_workdir .. "/" .. env_name
+        util.rm_rf(env_prefix)
+        local env_spec = {
+            env_name = env_name,
+            prefix = env_prefix,
+            env_source = env_prefix .. "/bin/activate",
+            cc = build_spec.cc, cxx = build_spec.cxx,
+            cflags = build_spec.cflags, cxxflags = build_spec.cxxflags,
+            ldflags = build_spec.ldflags,
+            cpu_type = build_spec.cpu_type, cpu_target = build_spec.cpu_target,
+            build_type = build_spec.build_type,
+            prefer_system_libraries = build_spec.prefer_system_libraries,
+            recipe_dir = build_spec.recipe_dir,
+        }
+        env.create_env(env_spec)
+        -- install the packages, with the environment activated
+        env.activate_in_process(env_prefix, lhsys.getcwd(), env_name)
+        installer.update_installed_packages(install_plans)
+    end
+    print("Environment \"" .. env_name .. "\" ready in " ..
+        env_workdir .. "/" .. env_name)
+    if shell then
+        start_subshell()
+    end
+end
+
 -------------------------------------------------------------------------------
 -- other commands
 
@@ -546,6 +649,7 @@ commands["env-source"] = env_source_command
 commands["update"] = update_command
 commands["register"] = register_command
 commands["list"] = list_command
+commands["test"] = test_command
 
 commands["cleanup"] = function()
     local env_root = os.getenv("LHELPER_ENV_ROOT")
