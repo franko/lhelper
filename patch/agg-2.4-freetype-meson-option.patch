@@ -1,0 +1,18 @@
+diff --git a/font_freetype/meson.build b/font_freetype/meson.build
+index 6fd4b86..96ad65e 100644
+--- a/font_freetype/meson.build
++++ b/font_freetype/meson.build
+@@ -1,4 +1,4 @@
+-freetype_dep = dependency('freetype2', required: false)
++freetype_dep = dependency('freetype2', required: get_option('freetype'))
+ 
+ if freetype_dep.found()
+     libaggfreetype = static_library('aggfreetype',
+diff --git a/meson_options.txt b/meson_options.txt
+index a800852..9ebeeef 100644
+--- a/meson_options.txt
++++ b/meson_options.txt
+@@ -1,2 +1,3 @@
+ option('demos', type : 'boolean', value : true, description: 'Enable demo applications')
++option('freetype', type : 'feature', value : 'auto', description: 'Build the freetype font engine library')
+ 
