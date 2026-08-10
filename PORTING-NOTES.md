@@ -190,7 +190,7 @@ bash implementation keeps the feature untouched.
   (the command is ported and expects a git checkout).
 - **Test on Linux and MSYS2** (see gap 1) and fix what surfaces. On MSYS2
   the points to watch are: path translation (`LH_MSYSROOT`, `/c/` vs
-  `C:/`), running from a MINGW64 shell (see the dedicated section below),
+   `C:/`), the POSIX→Windows path conversion (see the dedicated section below),
   and the temporary directory (`C:/Windows/Temp`). Note that there is no
   longer a Windows-specific `spawn`: `lhsys.c` is POSIX-only and the MSYS2
   runtime provides the emulation.
@@ -217,15 +217,13 @@ rest of the MSYS2-runtime work.
 
 ### The intended setup
 
-lhelper is now an MSYS program (linked against `msys-2.0.dll`,
-built with the MSYS2 gcc), but it is meant to be **run from a MINGW64
-shell**, so that the packages it builds are native mingw64 ones. This is
-not a workaround: the MINGW64 shell *is* `/usr/bin/bash.exe`, itself an
-MSYS program, started with `MSYSTEM=MINGW64` so that the profile prepends
-`/mingw64/bin` to `PATH`. lhelper therefore sits in the same category as
-`make`, `git` or `sed` — an MSYS tool driving a native mingw64 toolchain.
-The MSYS2 gcc is a build-time requirement for lhelper itself only, and
-never builds any package.
+lhelper is an MSYS program (linked against `msys-2.0.dll`,
+built with the MSYS2 gcc). lhelper itself accepts any compiler and
+environment; which toolchain the spawned packages are built with depends
+entirely on the user's `CC`, `CXX` and `PATH`. lhelper sits in the same
+category as `make`, `git` or `sed` — an MSYS tool that can drive any
+toolchain. The MSYS2 gcc is a build-time requirement for lhelper itself
+only, and never builds any package.
 
 Two things were checked against this model and are already correct:
 
@@ -319,12 +317,10 @@ value such as `CC="gcc -I/..."`). Converted sites:
   the only remaining consumer (`pathreplace.pattern_variants`) handles
   both forms.
 
-Also implemented in the same pass: lhelper on Windows now refuses to run
-when `MSYSTEM` is unset or `MSYS`, since from a
-plain MSYS shell `cc = getenv("CC") or "gcc"` would silently resolve to
-the MSYS `/usr/bin/gcc` and every package would be built against
-`msys-2.0.dll`. Deriving the default compiler from the `MSYSTEM` prefix
-(`UCRT64` → `/ucrt64/bin/gcc`, ...) was left out for now.
+Originally implemented in the same pass: lhelper on Windows refused to run
+when `MSYSTEM` was unset or `MSYS`. This restriction was later removed —
+lhelper now accepts any compiler and any environment; the user is
+responsible for configuring `CC`, `CXX` and `PATH` appropriately.
 
 Verified on macOS: build, `list recipes`, environment creation with a
 remote package, and a from-source `install --rebuild` (which runs the

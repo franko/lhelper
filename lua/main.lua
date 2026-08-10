@@ -70,19 +70,6 @@ for _, dir in ipairs({ working_dir .. "/packages/" .. os.getenv("LHELPER_PACKAGE
 end
 
 if util.target_windows then
-    -- lhelper builds native Windows packages, so it must run from a shell
-    -- whose PATH provides a native toolchain (MINGW64, UCRT64, ...). In a
-    -- plain MSYS shell "gcc" silently resolves to the MSYS /usr/bin/gcc and
-    -- every package would be built against msys-2.0.dll.
-    local msystem = os.getenv("MSYSTEM")
-    if not msystem or msystem == "MSYS" then
-        io.stderr:write(string.format(
-            "error: lhelper must be run from a MinGW-flavored MSYS2 shell\n" ..
-            "(MINGW64, UCRT64, CLANG64, ...) so that the packages are built\n" ..
-            "with a native toolchain (MSYSTEM is %s).\n",
-            msystem and '"MSYS"' or "not set"))
-        os.exit(1)
-    end
     -- On MSYS unix-like absolute paths like /home/user are fed to the native
     -- applications transformed into the real windows path like
     -- C:/msys64/home/user. The LH_MSYSROOT variable lets lhelper recognize
