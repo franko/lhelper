@@ -22,7 +22,7 @@ for _, a in ipairs(options) do
         opts[#opts + 1] = "-Dopengl=true"
     elseif a == "-png" then
         opts[#opts + 1] = "-Dpng=true"
-        dependency("libpng")
+        dependency("libpng16")
     elseif a == "-zlib" then
         opts[#opts + 1] = "-Dzlib=true"
         dependency("zlib")
