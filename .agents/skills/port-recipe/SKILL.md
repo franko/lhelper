@@ -22,6 +22,9 @@ new one.
     pre-processing and a version lookup table.
   - `recipes/sdl2_2.28.5+2.lua` — the richest example: per-platform/per-option
     logic, `dependency`/`provides`, patches, pkg-config file install.
+  - `recipes/zlib_1.3.1.lua`, `recipes/openblas_0.3.34.lua` — packages with no
+    supported build system, driven with `run()` (see "Recipes without a
+    supported build system" below).
 - **The API**: `lua/recipe.lua` — `make_recipe_env` defines every function and
   variable the recipe has in scope (`enter_archive`, `build_and_install`,
   `check_commands`, `dependency`, `provides`, `file_replace`, ...).
@@ -176,11 +179,17 @@ provides "freetype2 = $version"
 ```lua
 dependency("sdl2 -opengl >=2.0.14")
 dependency("--optional", "libpng")
-provides("freetype2 = " .. version)
+provides("freetype2 " .. version)
 ```
 
 `dependency`/`provides` only record info during the dependencies phase; they
 are safe to call unconditionally.
+
+**Drop the `=` when porting a `provides`.** A dependency *spec* may carry a
+comparator, but a `provides` is stored as a registry *entry*, whose version is
+read as the first non-option word — with `provides "freetype2 = 2.13.3"` the
+recorded version becomes `=` and every comparison against it is meaningless.
+See the `dependency-model` skill for the matching rules.
 
 ### other API functions
 
@@ -198,6 +207,53 @@ are safe to call unconditionally.
 Variables already in scope: `version`, `options`, `platform`, `cpu_type`,
 `cpu_target`, `build_type`.
 
+## Recipes without a supported build system
+
+`build_and_install` knows `configure`, `cmake` and `meson` only. A package
+built by a plain Makefile (zlib, OpenBLAS) has to be driven with `run()`, and
+then everything `build_and_install` would have done for you becomes your job:
+
+| Handled for you | What you must do instead |
+|---|---|
+| `--prefix=$LHELPER_SYSTEM_PREFIX` | pass the prefix the build system's own way (`PREFIX=`, `prefix=`, ...) — and pass `getenv("LHELPER_SYSTEM_PREFIX")`, never `INSTALL_PREFIX` |
+| `DESTDIR` install into the staging root | pass `DESTDIR=getenv("INSTALL_PREFIX")` yourself, or install into it explicitly |
+| moving `<destdir>/usr/*` up to `<destdir>/*` | repeat the normalization block (below) |
+| `-shared` / `-pic` / `-prefix=` / `--buildtype=` interception | parse them out of `options` yourself and translate them |
+| `-O3`/`-g` from `build_type` (configure builds; cmake and meson get the build type as an option instead) | add them to `CFLAGS`/`CXXFLAGS` yourself (see the zlib recipe) |
+| `make -j<cores>` | add it if the build system does not parallelize itself (OpenBLAS does, via its own `MAKEFLAGS += -j`) |
+
+The normalization block, identical in `zlib_1.3.1.lua` and
+`openblas_0.3.34.lua`:
+
+```lua
+local prefix = getenv("LHELPER_SYSTEM_PREFIX")
+-- INSTALL_PREFIX is only set in the "run" phase; the dependencies phase
+-- only evaluates the arguments of the no-op run() calls.
+local destdir = getenv("INSTALL_PREFIX") or ""
+...
+local rel = prefix:gsub("^%a:", ""):gsub("^/", ""):gsub("/$", "")
+if destdir ~= "" and rel ~= "" then
+    local source_dir = destdir .. "/" .. rel
+    for _, name in ipairs(util.listdir(source_dir)) do
+        os.rename(source_dir .. "/" .. name, destdir .. "/" .. name)
+    end
+    util.rm_rf(destdir .. "/" .. rel:match("^([^/]*)"))
+end
+```
+
+It is duplicated in both recipes because `normalize_destdir_install` is local
+to `recipe.lua`; **if a third recipe needs it, extract it into the recipe API
+instead of copying it a third time.**
+
+Two things to get right in this kind of recipe:
+
+- Guard for the dependencies phase. `run()` is a no-op there, but its
+  *arguments are still evaluated* and `INSTALL_PREFIX` is not set yet — hence
+  the `or ""` above.
+- Build against the system prefix so the generated `.pc` contains `/usr/lib`,
+  which is the string the relocation pass rewrites. The `prefix-relocation`
+  skill explains why, and what silently breaks when you skip it.
+
 ## Recipe file header
 
 Match the existing Lua recipes: a short comment when the bash recipe had a
@@ -214,39 +270,75 @@ maintainer's real SSH key. **Always fake `HOME`** for test builds so nothing
 is uploaded, and never run `register key` or trigger remote upload unless the
 user explicitly asks.
 
-Run from the source tree (no install needed):
+`tools/lhtest` does the HOME faking by construction and keeps `var/lhelper`
+out of the repo — prefer it to hand-rolled environment variables:
 
 ```sh
-# rebuild the binary (fast, a few seconds)
-sh build.sh
+# rebuild the binary and start from a clean sandbox
+tools/lhtest -f -b list recipes            # confirms the index lookup
 
-# dev mode: working data goes in ./var/lhelper, repo dir is the prefix
-LHELPER_LUA_DIR="$PWD/lua" ./build/lhelper list recipes   # confirms index lookup
-
-# end-to-end build with a throwaway spec and a fake HOME
-mkdir -p /tmp/lh-test && cat > /tmp/lh-test/test.lhelper <<'EOF'
-cc  = getenv("CC") or "clang"
+# a throwaway spec inside the sandbox, then an end-to-end build
+# replace package-name with the recipe's package name throughout these examples
+tools/lhtest -q sh 'cat > test.lhelper <<EOF
+cc = getenv("CC") or "clang"
 cxx = getenv("CXX") or "clang++"
 build_type = "Release"
-packages = { "<package>", }
-EOF
+packages = { "package-name", }
+EOF'
+tools/lhtest -q build test.lhelper
 
-rm -rf /tmp/fakehome && mkdir -p /tmp/fakehome
-HOME=/tmp/fakehome \
-LHELPER_LUA_DIR="$PWD/lua" \
-LHELPER_ENV_ROOT=/tmp/lh-test \
-./build/lhelper build /tmp/lh-test/test.lhelper
+# iterate on the recipe: lua/ and recipes/ are symlinked, so edits are live.
+# "install" needs an activated environment, so source the activate script.
+tools/lhtest -q sh 'bash -c "source .lhelper/test/bin/activate && lhelper install --rebuild package-name"'
 ```
 
-A successful run prints `Package "<package>" successfully installed`. Check
-the produced files under `/tmp/lh-test/.lhelper/test/{include,lib}/...` and
-the configure/meson/cmake invocation logged in
-`/tmp/lh-test/.lhelper/test/logs/<package>-stdout.log` to confirm the option
-list matches the bash original. Optionally compile and run a tiny program
-against the static lib to confirm it link/works.
+Use `-p p2` for a second, independent project when testing another option set
+in parallel.
 
-Clean up test artifacts afterward (`rm -rf /tmp/lh-test /tmp/fakehome var/lhelper/archives/* var/lhelper/packages/2 var/lhelper/digests/*`),
-and never commit the `var/lhelper/` working data (it is gitignored).
+A successful run prints `Package "package-name" successfully installed`. Then
+check, under `$(tools/lhtest -q path)/proj/p1/.lhelper/test/`:
+
+- the produced files in `include/` and the library directory (`lib/`, `lib64/`
+  or a multiarch subdirectory), including any symlinks the build creates,
+- the configure/cmake/meson/make invocation logged in
+  `logs/package-name-stdout.log`, to confirm the option list matches the bash
+  original,
+- the installed `.pc` file, if any (find its directory with `pkg-config
+  --variable=pcfiledir package-name` in the activated environment); its
+  `libdir`/`includedir` must point at the environment prefix — not `/usr` or
+  the working dir,
+- `bin/lhelper-packages`, for the registry line and any `provides` lines.
+
+Remember `--rebuild`: without it a cached package with the same recipe version
+and digest is reused and your edited recipe never runs (see the `debug-build`
+skill).
+
+### Verifying the installed package actually works
+
+Inspecting files is not proof that the library links. If the package ships a
+`.pc`, write a small `probe.c` in your current directory and compile and run
+it using only what `pkg-config` reports. Run the probe in bash with the
+environment activated so the correct pkg-config directory is used:
+
+```sh
+e=$(tools/lhtest -q path)/proj/p1/.lhelper/test
+bash -c '
+  source "$1/bin/activate" || exit 1
+  pkg-config --cflags --libs package-name || exit 1
+  cc probe.c $(pkg-config --cflags --libs package-name) -o probe && ./probe
+' bash "$e"
+```
+
+Use the `.pc` module name instead of `package-name` if they differ.
+
+Keep the probe to a few lines calling one real entry point and printing a
+result you can check by hand (a known matrix product, a parsed string, a
+version string). A link failure here usually means the `.pc` is missing a
+private dependency: `pkg-config --libs --static package-name` shows what
+`Libs.private` adds, and a recipe may need to move one of those into `Libs`.
+
+Clean up afterwards with `tools/lhtest reset` and remove your local probe.
+Never commit the `var/lhelper/` working data (it is gitignored).
 
 ### macOS gotcha (this machine)
 
@@ -273,15 +365,21 @@ Verify with `list recipes` — the new package must appear (basename without
 ## Checklist for a port
 
 - [ ] Read the bash original in `~/dev/lhelper-recipes/`.
-- [ ] Read the closest model recipe (`fmt`, `freetype2`, or `sdl2`) for the
-      build system you need.
+- [ ] Read the closest model recipe (`fmt`, `freetype2`, `sdl2`, or `zlib` /
+      `openblas` when there is no supported build system).
 - [ ] Write `recipes/<package>_<version>.lua` translating the bash per
       the rules above; expand brace expansions explicitly. Do **not** carry
       over a `+N` suffix from the old bash filename.
+- [ ] Drop the `=` from any `provides` carried over from bash.
 - [ ] Add `<package> <version>` to `recipes/index`.
-- [ ] Rebuild (`sh build.sh`) and run an end-to-end build with a faked `HOME`.
-- [ ] Inspect the configure/cmake/meson command in the build log; confirm it
-      matches the bash recipe's option set plus the standard
+- [ ] Rebuild, create a throwaway spec, and run an end-to-end build in the
+      sandbox (follow "Testing a ported recipe" above).
+- [ ] Inspect the configure/cmake/meson/make command in the build log; confirm
+      it matches the bash recipe's option set plus the standard
       `--prefix` / shared-static / pic flags.
-- [ ] Clean up test artifacts; leave only the two repo changes (the recipe
-      file and the index line).
+- [ ] If the package ships a `.pc`, check it points at the environment prefix
+      and compile and run a probe against the library.
+- [ ] Exercise the recipe's own options too (each `-flag` branch), not just the
+      default build.
+- [ ] Clean up (`tools/lhtest reset`); leave only the two repo changes (the
+      recipe file and the index line).
