@@ -131,10 +131,13 @@ mkdir -p "$sandbox/home" "$sandbox/tree" "$sandbox/proj/$project"
 for d in lua recipes patch; do
     [ -d "$tree/$d" ] && link_dir "$tree/$d" "$sandbox/tree/$d"
 done
-# The runtime files lhelper resolves from <lhelper_dir>, the parent of lua/:
-# the activate subshell init file and the shell integration function.
+# Copy the small runtime files lhelper resolves from <lhelper_dir>, the parent
+# of lua/. Copying avoids symlink support differences on MSYS2.
 for f in lhelper-bash-init lhelper-shell-init.sh; do
-    [ -f "$tree/$f" ] && ln -sfn "$tree/$f" "$sandbox/tree/$f"
+    if [ -f "$tree/$f" ]; then
+        rm -f "$sandbox/tree/$f"
+        cp "$tree/$f" "$sandbox/tree/$f"
+    fi
 done
 
 if [ "$installed" = 1 ]; then
