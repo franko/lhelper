@@ -8,7 +8,7 @@ check_commands("meson", "ninja", "git")
 -- and require sdl2. This turns a mid-build meson failure into lhelper's
 -- missing-dependency report.
 dependency("imgui", "-largeidx", "-sdl2", "-opengl3")
-dependency("sdl2", "-opengl")
+dependency("sdl2", "-threads", "-opengl")
 dependency("glad", "-loader")
 
 enter_git_repository("https://github.com/franko/implot.git", "v" .. version .. "-lhelper")
