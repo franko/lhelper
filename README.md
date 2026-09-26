@@ -84,7 +84,7 @@ eval "$(lhelper shell-init)"
 ```
 
 defines a shell function providing the `source` command, which activates the
-environment in the shell you are already in:
+environment in the shell you are already in and shows its name in the prompt:
 
 ```sh
 lhelper source <name>       # activate in the current shell

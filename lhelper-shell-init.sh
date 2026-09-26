@@ -57,7 +57,20 @@ lhelper() {
 
     # env-source writes the path of the activate script on stdout and every
     # message on stderr, so the messages are visible when it fails.
-    local lh_script
+    local lh_script lh_previous_env_name=${LHELPER_ENV_NAME-}
     lh_script=$(command lhelper env-source "$1") || return $?
-    . "$lh_script"
+    . "$lh_script" || return $?
+
+    # Match the activate subshell's prompt without stacking prefixes when
+    # sourcing again or switching environments in the same shell.
+    VIRTUAL_ENV="$LHELPER_ENV_NAME"
+    if [ -n "${PS1+x}" ]; then
+        if [ -n "$lh_previous_env_name" ]; then
+            local lh_old_prefix="($lh_previous_env_name) "
+            case "$PS1" in
+                "$lh_old_prefix"*) PS1=${PS1#"$lh_old_prefix"} ;;
+            esac
+        fi
+        PS1="($LHELPER_ENV_NAME) $PS1"
+    fi
 }
