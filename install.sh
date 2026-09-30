@@ -26,7 +26,6 @@ esac
 echo "Installing lhelper with prefix $DESTDIR"
 
 mkdir -p "$DESTDIR/bin"
-mkdir -p "$DESTDIR/share/lhelper/lua"
 mkdir -p "$DESTDIR/share/lhelper/recipes"
 mkdir -p "$DESTDIR/share/lhelper/patch"
 mkdir -p "$DESTDIR/var/lhelper/archives"
@@ -34,7 +33,6 @@ mkdir -p "$DESTDIR/var/lhelper/packages/$LHELPER_PACKAGE_VERSION"
 mkdir -p "$DESTDIR/var/lhelper/digests"
 
 cp "build/lhelper$EXE_SUFFIX" "$DESTDIR/bin"
-cp lua/*.lua "$DESTDIR/share/lhelper/lua"
 cp recipes/index recipes/*.lua "$DESTDIR/share/lhelper/recipes"
 cp patch/*.patch "$DESTDIR/share/lhelper/patch"
 cp lhelper-bash-init "$DESTDIR/share/lhelper"

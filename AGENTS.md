@@ -24,7 +24,9 @@ interpreter and runs the lhelper logic, which lives entirely in Lua modules.
   add package managers or third-party Lua libs.
 - `src/` — the thin C layer:
   - `main.c` embeds Lua, locates the install prefix from the executable path, sets a
-    few globals (`LHELPER_EXE_PATH`, `LHELPER_LUA_DIR`, `arg`), and runs `main.lua`.
+    few globals (`LHELPER_EXE_PATH`, `LHELPER_LUA_DIR`, `arg`), and runs embedded
+    `main.lua`. Embedded modules are registered in `package.preload`;
+    `LHELPER_LUA_DIR` overrides them with disk sources for development.
   - `lhsys.c` exposes the `lhsys` module: `mkdir`, `rmdir`, `chdir`, `getcwd`,
     `setenv`, `environ`, `listdir`, `stat`, `realpath`, `spawn`,
     `arm_interrupt` / `disarm_interrupt` / `interrupted`, and `platform`.
@@ -32,7 +34,9 @@ interpreter and runs the lhelper logic, which lives entirely in Lua modules.
     CreateProcess on Windows) — so there is no shell quoting anywhere. The
     `*_interrupt` trio lets `recipe.lua` catch Ctrl-C during a download and
     clean up the partial file (see `download_guarded`).
-- `lua/` — the lhelper program:
+- `tools/embed-lua.c` — compiled by `build.sh` to generate `build/lhelper_lua.h`
+  from `lua/*.lua`; no external Lua interpreter is needed for the build.
+- `lua/` — the lhelper program (embedded at build time):
   - `main.lua` — CLI parsing and command dispatch (start here).
   - `install.lua` — install orchestration, digests, remote package download/upload.
   - `recipe.lua` — the recipe API (`enter_archive`, `build_and_install`, ...).
@@ -65,7 +69,8 @@ sh install.sh <prefix>
 ```
 
 There is **no test suite** and **no CI** — verify changes by running the binary in dev
-mode. The build is a single C-compiler invocation and takes a few seconds.
+mode. The build compiles a small source-embedding generator, then the executable,
+and takes a few seconds. Installed copies do not need a separate `lua/` directory.
 
 ### Sandboxed testing: `tools/lhtest`
 

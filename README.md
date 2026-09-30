@@ -12,7 +12,7 @@ compiler flags.
 ## Layout
 
 - `vendor/lua/` — vendored Lua 5.4 sources (no external dependency).
-- `src/` — the C layer: `main.c` embeds Lua and runs the main script,
+- `src/` — the C layer: `main.c` embeds Lua and the runtime modules,
   `lhsys.c` provides mkdir, stat, listdir, realpath, setenv and a spawn
   function that runs commands without going through a shell.
 - `lua/` — the lhelper program as Lua modules:
@@ -25,6 +25,7 @@ compiler flags.
   - `pathreplace.lua` — prefix relocation in installed files
   - `md5.lua` — pure Lua MD5 (replaces the md5sum dependency)
   - `util.lua` — filesystem/process/string helpers
+- `tools/embed-lua.c` — build-time generator for the embedded Lua sources.
 - `recipes/` — the Lua recipes (currently freetype2 and sdl2) and the
   `index` file with the latest version of each package.
 - `lhelper-bash-init` — the init file of the `activate` subshell.
@@ -49,6 +50,11 @@ Windows/MSYS2. On MSYS2 lhelper is built as an MSYS program with the MSYS2
 gcc (`pacman -S gcc`), so that it inherits the runtime's POSIX emulation,
 and it runs from an MSYS2 shell.
 
+All runtime modules in `lua/*.lua` are baked into the executable by
+`build.sh`; no separate Lua files or Lua installation are needed to run it.
+Recipes, patches and shell-init files are installed in
+`<prefix>/share/lhelper`.
+
 To run lhelper from the source tree without installing:
 
 ```sh
@@ -56,8 +62,10 @@ sh build.sh
 LHELPER_LUA_DIR="$PWD/lua" ./build/lhelper <command> ...
 ```
 
-In this mode the repository directory itself is used as prefix (the working
-data goes in `./var/lhelper`).
+In this mode `LHELPER_LUA_DIR` loads the Lua modules from disk instead of
+using the embedded copies, so Lua edits take effect without rebuilding.
+The repository directory itself is used as prefix (the working data goes
+in `./var/lhelper`). Without the override, Lua edits require `sh build.sh`.
 
 ## Using an environment
 

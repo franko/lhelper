@@ -46,8 +46,12 @@ esac
 
 mkdir -p build
 
+echo "Embedding Lua modules..."
+$CC $CFLAGS tools/embed-lua.c -o "build/embed-lua$EXE_SUFFIX"
+"./build/embed-lua$EXE_SUFFIX" lua/*.lua > build/lhelper_lua.h
+
 echo "Compiling lhelper..."
-$CC $CFLAGS $PLATFORM_CFLAGS -Ivendor/lua \
+$CC $CFLAGS $PLATFORM_CFLAGS -Ivendor/lua -Ibuild \
     src/main.c src/lhsys.c vendor/lua/*.c \
     $PLATFORM_LIBS -o "build/lhelper$EXE_SUFFIX"
 echo "done: build/lhelper$EXE_SUFFIX"

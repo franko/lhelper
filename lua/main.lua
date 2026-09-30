@@ -37,17 +37,16 @@ end
 -------------------------------------------------------------------------------
 -- initialization
 
--- lhelper directories: the lua modules are in <LHELPER_DIR>/lua so the
--- parent directory of the modules is used. This works both for an installed
--- lhelper (<prefix>/share/lhelper/lua) and when running from the source
--- tree with the LHELPER_LUA_DIR variable set.
+-- External runtime data is in the parent of the logical Lua directory.
+-- Installed copies use embedded modules, so that lua/ need not exist;
+-- development overrides still load the modules from the given directory.
 local lhelper_dir = util.dirname(LHELPER_LUA_DIR)
 local lhelper_prefix
 do
     local bin_dir = util.dirname(LHELPER_EXE_PATH)
     lhelper_prefix = bin_dir:gsub("/bin$", "")
 end
-if os.getenv("LHELPER_LUA_DIR") then
+if (os.getenv("LHELPER_LUA_DIR") or "") ~= "" then
     -- running from the source tree: use a local var directory
     lhelper_prefix = lhelper_dir
 end

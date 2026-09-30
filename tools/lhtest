@@ -143,7 +143,7 @@ done
 if [ "$installed" = 1 ]; then
     (cd "$repo" && sh install.sh "$sandbox/prefix")
     : "${exe:=$sandbox/prefix/bin/lhelper}"
-    lua_dir=                        # installed mode resolves <prefix>/share/lhelper/lua
+    lua_dir=                        # installed mode uses embedded Lua modules
 else
     : "${exe:=$repo/build/lhelper}"
     lua_dir=$sandbox/tree/lua
@@ -167,8 +167,7 @@ fi
 cd "$sandbox/proj/$project"
 
 # HOME is deliberately left without a .config/lhelper: no SSH key means no upload.
-# In installed mode LHELPER_LUA_DIR must be *absent*, not empty: main.lua treats
-# an empty string as set and would fall back to dev-mode paths.
+# In installed mode leave LHELPER_LUA_DIR unset to use embedded modules.
 run_in_sandbox() {
     if [ -n "$lua_dir" ]; then
         exec env HOME="$sandbox/home" LHELPER_LUA_DIR="$lua_dir" \
