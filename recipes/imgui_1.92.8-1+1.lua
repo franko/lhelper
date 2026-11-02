@@ -66,4 +66,47 @@ end
 opts[#opts + 1] = ttf_option
 
 enter_git_repository("https://github.com/franko/imgui.git", "v" .. version .. "-lhelper")
+
+local function is_tdm_gcc(command)
+    if not command or command == "" then return false end
+    local argv = {}
+    for arg in command:gmatch("%S+") do argv[#argv + 1] = arg end
+    argv[#argv + 1] = "--version"
+    local output, code = capture(argv)
+    return code == 0 and output:lower():find("tdm64%-") ~= nil
+end
+
+if platform == "windows" and (is_tdm_gcc(getenv("CC")) or is_tdm_gcc(getenv("CXX"))) then
+    -- TDM-GCC may not provide the SetProcessDPIAware import. Resolve this
+    -- optional API dynamically instead.
+    local dpi_aware_dynamic = [[if (HMODULE user32_dll = ::GetModuleHandleA("user32.dll"))
+    {
+        typedef BOOL(WINAPI* PFN_SetProcessDPIAware)(void);
+        if (PFN_SetProcessDPIAware fn = (PFN_SetProcessDPIAware)::GetProcAddress(user32_dll, "SetProcessDPIAware"))
+            fn();
+    }]]
+
+    local function replace_dpi_awareness(filename)
+        file_replace(filename, "::SetProcessDPIAware();", dpi_aware_dynamic)
+    end
+
+    if contains(win_impl, "win32") then
+        replace_dpi_awareness("backends/imgui_impl_win32.cpp")
+    end
+    if contains(win_impl, "sdl2") then
+        if contains(options, "-opengl2") then
+            replace_dpi_awareness("examples/example_sdl2_opengl2/main.cpp")
+        end
+        if contains(options, "-opengl3") then
+            replace_dpi_awareness("examples/example_sdl2_opengl3/main.cpp")
+        end
+        if contains(options, "-d3d11") then
+            replace_dpi_awareness("examples/example_sdl2_directx11/main.cpp")
+        end
+        if contains(options, "-vulkan") then
+            replace_dpi_awareness("examples/example_sdl2_vulkan/main.cpp")
+        end
+    end
+end
+
 build_and_install("meson", table.unpack(opts))
