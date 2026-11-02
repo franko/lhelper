@@ -547,6 +547,12 @@ function recipe.make_recipe_env(ctx)
         log_run(argv)
     end
 
+    -- Run a command and capture its standard output.
+    function R.capture(argv)
+        if dependencies_mode then return "", 0 end
+        return util.capture(argv)
+    end
+
     -- pkg-config helper for recipes (e.g. to append include flags to CFLAGS)
     function R.pkg_config(...)
         local cmd = {"pkg-config", ...}
